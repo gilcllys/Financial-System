@@ -1,0 +1,110 @@
+# -------------------------------------------------------------------
+# GLOBAL .gitignore for Monorepo (Django Backend & Angular Frontend)
+# -------------------------------------------------------------------
+
+# --------------------------
+# 1. Operating System Files
+# --------------------------
+.DS_Store             # macOS
+.Trashes              # macOS
+._*                   # macOS (resource forks)
+Thumbs.db             # Windows
+ehthumbs.db           # Windows
+Desktop.ini           # Windows
+*.swp                 # Vim swap files
+*~                    # Emacs backup files
+*.bak                 # Backup files
+*.old                 # Old files
+*.orig                # Original files after merge conflicts
+
+# --------------------------
+# 2. General IDE / Editor Files
+# --------------------------
+.vscode/              # Visual Studio Code settings (user specific)
+.idea/                # IntelliJ / PyCharm / WebStorm settings
+*.sublime-project     # Sublime Text project files
+*.sublime-workspace   # Sublime Text workspace files
+.history/             # VS Code Local History Plugin
+
+# --------------------------
+# 3. Environment Variables
+# --------------------------
+.env                  # Common for both backend and frontend
+.env.*.local          # Specific local environment files (e.g., .env.development.local)
+
+# --------------------------
+# 4. Logs
+# --------------------------
+*.log
+log/
+tmp/
+
+# --------------------------
+# 5. Python / Django Backend
+# --------------------------
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyd
+*.pyo
+
+# Virtual environment
+venv/
+.venv/
+env/
+.env/                 # If you place .env directory inside project, not just file
+pip-log.txt
+pip-delete-this-arg.txt
+
+# Database files
+*.sqlite3             # Development SQLite database
+
+# Media & Static files
+/media/               # User uploaded files (often handled by cloud storage in production)
+/static_root/         # Collected static files (often served by web server in production)
+
+# Django specific
+*.pot                 # gettext translation files
+local_settings.py     # Local settings not committed to repo (if you use this pattern)
+
+# Testing
+.pytest_cache/
+
+# Mypy
+.mypy_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# --------------------------
+# 6. JavaScript / Node.js / Angular Frontend
+# --------------------------
+# Node modules
+node_modules/
+
+# Build artifacts
+dist/                 # Angular build output (default)
+.angular/             # Angular specific cache and files
+npm-debug.log*        # npm debug log
+yarn-debug.log*       # Yarn debug log
+yarn-error.log*       # Yarn error log
+lerna-debug.log*      # Lerna debug log
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Test artifacts
+e2e/*.js              # Angular e2e test compiled files
+karma.log
+
+# Temporary files
+.tmp/
+
+# Other
+package-lock.json     # If you prefer to manage dependencies with yarn.lock only
+yarn.lock             # If you prefer to manage dependencies with package-lock.json only
+
+# -------------------------------------------------------------------
+# END OF .gitignore
+# -------------------------------------------------------------------
