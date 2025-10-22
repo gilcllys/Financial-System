@@ -105,6 +105,8 @@ karma.log
 package-lock.json     # If you prefer to manage dependencies with yarn.lock only
 yarn.lock             # If you prefer to manage dependencies with package-lock.json only
 
+*sqlite3
+
 # -------------------------------------------------------------------
 # END OF .gitignore
 # -------------------------------------------------------------------
