@@ -29,9 +29,10 @@ Desktop.ini           # Windows
 # --------------------------
 # 3. Environment Variables
 # --------------------------
-.env                  # Common for both backend and frontend
+.env*                  # Common for both backend and frontend
 .env.*.local          # Specific local environment files (e.g., .env.development.local)
-
+# Ignorar arquivos de configuração de ambiente
+backend/.env
 # --------------------------
 # 4. Logs
 # --------------------------
@@ -106,7 +107,3 @@ package-lock.json     # If you prefer to manage dependencies with yarn.lock only
 yarn.lock             # If you prefer to manage dependencies with package-lock.json only
 
 *sqlite3
-
-# -------------------------------------------------------------------
-# END OF .gitignore
-# -------------------------------------------------------------------
