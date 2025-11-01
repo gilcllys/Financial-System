@@ -10,7 +10,7 @@ console_command = '/code/manage.py shell'
 [build]
 
 [deploy]
-  release_command = 'python manage.py migrate --noinput && python manage.py runserver'
+  release_command = 'pip install -r requirement.txt && python manage.py migrate --noinput && python manage.py runserver'
 
 [env]
   PORT = '8000'
