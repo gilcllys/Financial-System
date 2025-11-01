@@ -15,8 +15,11 @@ COPY . /app
 # Corrige permissões para garantir acesso aos arquivos
 RUN chmod -R 755 /app
 
+# Instala as dependências do Python
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
 # Expõe a porta padrão do Django
 EXPOSE 8000
 
 # Comando padrão para rodar o servidor de desenvolvimento
-CMD ["python", "/app/manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["python", "/app/financial_system/manage.py", "runserver", "0.0.0.0:8000"]
