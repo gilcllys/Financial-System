@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "financial_system_ui": {
+    "financial-system-ui": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -17,7 +17,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
-            "outputPath": "dist/financial_system_ui",
+            "outputPath": "dist/financial-system-ui",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
@@ -69,10 +69,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "financial_system_ui:build:production"
+              "buildTarget": "financial-system-ui:build:production"
             },
             "development": {
-              "buildTarget": "financial_system_ui:build:development"
+              "buildTarget": "financial-system-ui:build:development"
             }
           },
           "defaultConfiguration": "development"
@@ -103,5 +103,8 @@
         }
       }
     }
+  },
+  "cli": {
+    "analytics": "2ef1f705-b2d8-4495-9588-1b10dae8a243"
   }
 }

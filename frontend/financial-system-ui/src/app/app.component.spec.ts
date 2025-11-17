@@ -14,16 +14,16 @@ describe('AppComponent', () => {
     expect(app).toBeTruthy();
   });
 
-  it(`should have the 'financial_system_ui' title`, () => {
+  it(`should have the 'financial-system-ui' title`, () => {
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
-    expect(app.title).toEqual('financial_system_ui');
+    expect(app.title).toEqual('financial-system-ui');
   });
 
   it('should render title', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, financial_system_ui');
+    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, financial-system-ui');
   });
 });
