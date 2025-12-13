@@ -2,10 +2,12 @@ import { createRequire } from 'module';const require = createRequire(import.meta
 import {
   BrowserDomAdapter,
   BrowserModule,
-  DOCUMENT,
   EVENT_MANAGER_PLUGINS,
   EventManagerPlugin,
-  HTTP_ROOT_INTERCEPTOR_FNS,
+  HTTP_ROOT_INTERCEPTOR_FNS
+} from "./chunk-IYKT34U5.js";
+import {
+  DOCUMENT,
   NullViewportScroller,
   PLATFORM_SERVER_ID,
   PlatformLocation,
@@ -13,7 +15,7 @@ import {
   XhrFactory,
   getDOM,
   setRootDomAdapter
-} from "./chunk-JGFSVPYF.js";
+} from "./chunk-IIEODBIA.js";
 import {
   APP_ID,
   ApplicationRef,
@@ -47,7 +49,7 @@ import {
   ɵɵdefineInjector,
   ɵɵdefineNgModule,
   ɵɵinject
-} from "./chunk-D6PCICLC.js";
+} from "./chunk-36Y6ZFWE.js";
 import {
   __async,
   __toESM
@@ -16793,7 +16795,7 @@ function renderApplication(bootstrap, options) {
     }
   });
 }
-var VERSION = new Version("19.2.15");
+var VERSION = new Version("19.2.17");
 
 export {
   DominoAdapter,
@@ -16817,9 +16819,9 @@ export {
 @angular/platform-server/fesm2022/server-hHJ05Ji8.mjs:
 @angular/platform-server/fesm2022/platform-server.mjs:
   (**
-   * @license Angular v19.2.15
+   * @license Angular v19.2.17
    * (c) 2010-2025 Google LLC. https://angular.io/
    * License: MIT
    *)
 */
-//# sourceMappingURL=chunk-XJSZ7P3M.js.map
+//# sourceMappingURL=chunk-KXSSX7BE.js.map

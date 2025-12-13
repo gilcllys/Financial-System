@@ -502,10 +502,10 @@ import {
   ɵɵtwoWayBindingSet,
   ɵɵtwoWayListener,
   ɵɵtwoWayProperty,
-  ɵɵvalidateIframeAttribute,
+  ɵɵvalidateAttribute,
   ɵɵviewQuery,
   ɵɵviewQuerySignal
-} from "./chunk-D6PCICLC.js";
+} from "./chunk-36Y6ZFWE.js";
 import "./chunk-YHCV7DAQ.js";
 export {
   ANIMATION_MODULE_TYPE,
@@ -1012,7 +1012,7 @@ export {
   ɵɵtwoWayBindingSet,
   ɵɵtwoWayListener,
   ɵɵtwoWayProperty,
-  ɵɵvalidateIframeAttribute,
+  ɵɵvalidateAttribute,
   ɵɵviewQuery,
   ɵɵviewQuerySignal
 };

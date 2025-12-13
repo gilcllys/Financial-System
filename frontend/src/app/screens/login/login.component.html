@@ -1,1 +1,64 @@
-<p>login works!</p>
+<div
+  class="min-h-screen bg-black flex flex-col items-center justify-center p-4"
+>
+  <h1 class="text-[#f1f5f9] text-3xl font-semibold mb-8">Welcome Back!</h1>
+
+  <div class="w-full max-w-max bg-[#1e293b] p-6 sm:p-8 rounded-xl shadow-2xl">
+    <form
+      class="flex flex-col gap-5"
+      [formGroup]="loginForm"
+      (ngSubmit)="onSubmit()"
+    >
+      <mat-form-field appearance="fill" class="w-full">
+        <mat-label class="text-[#94a3b8]">Email</mat-label>
+        <input
+          matInput
+          placeholder="you@example.com"
+          formControlName="email"
+          class="text-[#f1f5f9] border-b border-solid !border-transparent focus:!border-[#3b82f6] rounded-t-lg px-3 py-2"
+        />
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="w-full">
+        <mat-label class="text-[#94a3b8]">Password</mat-label>
+        <input
+          class="text-[#f1f5f9] border-b border-solid !border-transparent rounded-t-lg px-3 py-2"
+          matInput
+          type="password"
+          formControlName="userPassword"
+          autocomplete="new-password"
+        />
+      </mat-form-field>
+      @if (isLoading) {
+        <mat-spinner></mat-spinner>
+      } @else {
+        <button
+          mat-raised-button
+          type="submit"
+          class="login-button-tailwind w-full h-12 text-black bg-[#38e8ae] hover:bg-opacity-90 rounded-lg shadow-none font-bold text-lg mt-1"
+        >
+          Login
+        </button>
+      }
+      <div
+        class="flex flex-col justify-between items-center text-xs sm:text-sm sm:flex-row pt-1"
+      >
+        <div>
+          <a href="#" class="text-[#94a3b8] hover:text-white transition-colors">
+            Forgot Password?
+          </a>
+        </div>
+
+        <div class="text-[#94a3b8] ml-10">
+          Don't have an account?
+          <a
+            href="#"
+            class="text-[#38e8ae] font-semibold hover:text-opacity-80 transition-colors ml-1"
+          >
+            Sign Up
+          </a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
