@@ -17,23 +17,24 @@ jobs:
 
     environment:
       name: production
-      url: https://seu-novo-nome-app.fly.dev
+      # URL atualizada com o novo nome do seu app
+      url: https://financial-backend.fly.dev
 
     steps:
       - name: Get code
         uses: actions/checkout@v4
 
-      # NOVO PASSO: Validação do Dockerfile
+      # Validação do Dockerfile: Garante que o build funciona antes de tentar o deploy
       - name: Build Docker Image (Dry Run)
         run: |
           docker build -t production-check:latest .
         working-directory: ./backend
-        # Este passo apenas verifica se o build completa com sucesso localmente no GitHub
 
+      # Action corrigida para evitar o erro "repository not found"
       - name: Setup Flyctl
-        uses: superfly/setup-flyctl@master
+        uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy to Fly.io
-        # O deploy só acontece se o passo acima ("Build Docker Image") passar
+        # O deploy agora aponta para o seu novo nome de app 'financial-backend'
         run: flyctl deploy --remote-only --app financial-backend --org personal
         working-directory: ./backend
