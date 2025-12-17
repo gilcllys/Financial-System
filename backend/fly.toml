@@ -5,7 +5,8 @@
 
 app = 'backend-misty-darkness-4818'
 primary_region = 'iad'
-console_command = '/code/manage.py shell'
+# console_command = '/code/manage.py shell'
+console_command = "python financial_system/manage.py shell"
 
 [build]
 
