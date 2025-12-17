@@ -31,8 +31,8 @@ FROM python:3.10-slim-bullseye
 WORKDIR /app
 
 # Variáveis de ambiente para Python não gerar arquivos .pyc e exibir logs em tempo real
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Atualiza o pip e instala dependências do sistema necessárias para o Postgres e compilação
 RUN apt-get update \
@@ -52,8 +52,8 @@ COPY . /app
 # Corrige permissões para garantir acesso aos arquivos
 RUN chmod -R 755 /app
 
-# Coleta arquivos estáticos (essencial para produção)
-# Certifique-se de ter STATIC_ROOT configurado no seu settings.py
+# # Coleta arquivos estáticos (essencial para produção)
+# # Certifique-se de ter STATIC_ROOT configurado no seu settings.py
 RUN python financial_system/manage.py collectstatic --noinput
 
 # Expõe a porta padrão definida no fly.toml
