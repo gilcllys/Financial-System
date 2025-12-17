@@ -35,6 +35,4 @@ jobs:
         id: deploy
         uses: superfly/fly-pr-review-apps@1.2.1
         with:
-          app-name-prefix: financial-system-backend-pr
-          fly-toml-path: backend/fly.toml
           working-directory: backend
