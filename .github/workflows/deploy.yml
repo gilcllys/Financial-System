@@ -36,5 +36,5 @@ jobs:
 
       - name: Deploy to Fly.io
         # O deploy agora aponta para o seu novo nome de app 'financial-backend'
-        run: flyctl deploy --remote-only --app financial-backend --org personal
+        run: flyctl deploy --remote-only --app financial-backend
         working-directory: ./backend
