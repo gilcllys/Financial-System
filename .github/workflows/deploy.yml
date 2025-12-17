@@ -1,40 +1,39 @@
-name: Deploy Review App
+name: Deploy Production
 on:
-  # Run this workflow on every PR event. Existing review apps will be updated when the PR is updated.
-  pull_request:
+  push:
     branches:
       - main
     paths:
       - "backend/**"
       - ".github/workflows/deploy.yml"
+
 env:
   FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
 jobs:
-  review_app:
-    name: Deploy backend
+  deploy_production:
+    name: Deploy backend to Fly.io
     runs-on: ubuntu-latest
-    outputs:
-      url: ${{ steps.deploy.outputs.url }}
-    # Only run one deployment at a time per PR.
-    concurrency:
-      group: pr-${{ github.event.number }}
 
-    # Deploying apps with this "review" environment allows the URL for the app to be displayed in the PR UI.
-    # Feel free to change the name of this environment.
     environment:
       name: production
-      # The script in the `deploy` sets the URL output for each review app.
-      url: ${{ steps.deploy.outputs.url }}
+      url: https://seu-novo-nome-app.fly.dev
+
     steps:
       - name: Get code
         uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            backend
-      - name: Deploy PR app to Fly.io
-        id: deploy
-        uses: superfly/fly-pr-review-apps@1.2.1
-        with:
-          org: gilcllys-de-souza-costa
-          path: backend
+
+      # NOVO PASSO: Validação do Dockerfile
+      - name: Build Docker Image (Dry Run)
+        run: |
+          docker build -t production-check:latest .
+        working-directory: ./backend
+        # Este passo apenas verifica se o build completa com sucesso localmente no GitHub
+
+      - name: Setup Flyctl
+        uses: superfly/setup-flyctl@master
+
+      - name: Deploy to Fly.io
+        # O deploy só acontece se o passo acima ("Build Docker Image") passar
+        run: flyctl deploy --remote-only --app financial-backend --org personal
+        working-directory: ./backend
