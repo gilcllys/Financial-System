@@ -16,10 +16,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from .api_root import api_root
 from user_module.viewsets import LoginView, RegisterView, LogoutView
 from rest_framework_simplejwt.views import TokenRefreshView
 
+
 urlpatterns = [
+    path('', api_root),
     path('admin/', admin.site.urls),
     path('api/auth/profile/', include(('user_module.urls'))),
     path('api/auth/cost/', include(('expenses_module.urls'))),
