@@ -3,9 +3,10 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'backend-misty-darkness-4818'
+app = 'financial-backend'
 primary_region = 'iad'
-console_command = '/code/manage.py shell'
+# console_command = '/code/manage.py shell'
+console_command = "python financial_system/manage.py shell"
 
 [build]
 
