@@ -18,7 +18,7 @@ jobs:
     environment:
       name: production
       # URL atualizada com o novo nome do seu app
-      url: https://financial-backend.fly.dev
+      url: https://financial-backend-gilcllys.fly.dev
 
     steps:
       - name: Get code
@@ -35,6 +35,6 @@ jobs:
         uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy to Fly.io
-        # O deploy agora aponta para o seu novo nome de app 'financial-backend'
-        run: flyctl deploy --remote-only --app financial-backend
+        # O deploy agora aponta para o seu novo nome de app 'financial-backend-gilcllys'
+        run: flyctl deploy --remote-only --app financial-backend-gilcllys
         working-directory: ./backend
