@@ -16,3 +16,5 @@ PyYAML==6.0.3
 sqlparse==0.5.3
 typing_extensions==4.15.0
 uritemplate==4.2.0
+whitenoise>=6.0.0
+dj-database-url>=2.0.0
