@@ -1,4 +1,9 @@
-@import 'tailwindcss';
+/* Tailwind v4 */
+@use 'tailwindcss';
+
+/* Toastr */
+@use 'ngx-toastr/toastr';
+
 html,
 body {
   height: 100%;

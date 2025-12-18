@@ -1,9 +1,11 @@
 import type { OnInit } from '@angular/core';
+import { inject } from '@angular/core';
 import { Component } from '@angular/core';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { CommonModule } from '@angular/common';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { ToastrService } from 'ngx-toastr';
 
 import {
   // O MÓDULO REACTIVE FORMS É IMPORTADO AQUI
@@ -28,6 +30,7 @@ import {
 export class LoginComponent implements OnInit {
   loginForm!: FormGroup;
   isLoading = false;
+  private toastr = inject(ToastrService);
 
   ngOnInit(): void {
     this.loginForm = this.formGroupFields();
@@ -46,9 +49,11 @@ export class LoginComponent implements OnInit {
       const formData = this.loginForm.value;
       console.log('Form Data:', formData);
       this.isLoading = false;
+      this.toastr.success('Login successful!', 'Success');
       // AQUI VOCÊ PODE ADICIONAR A LÓGICA DE AUTENTICAÇÃO
     } else {
       console.log('Form is invalid');
+      this.toastr.error('Please fill in all required fields.', 'Error');
       this.isLoading = false;
     }
   }
