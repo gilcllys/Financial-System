@@ -57,8 +57,8 @@ RUN chmod -R 755 /app
 RUN python financial_system/manage.py collectstatic --noinput
 
 # Expõe a porta padrão definida no fly.toml
-EXPOSE 8000
+EXPOSE 8080
 
 # Comando para produção usando Gunicorn
 # O formato é: modulo_onde_esta_o_wsgi.wsgi:application
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "financial_system.wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--pythonpath", "financial_system", "financial_system.wsgi:application"]
