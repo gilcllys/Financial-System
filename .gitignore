@@ -145,6 +145,7 @@ yarn-error.log
 testem.log
 /typings
 
+frontend/.angular
 # System files
 .DS_Store
 Thumbs.db
