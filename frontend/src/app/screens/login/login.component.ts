@@ -49,11 +49,13 @@ export class LoginComponent implements OnInit {
       const formData = this.loginForm.value;
       console.log('Form Data:', formData);
       this.isLoading = false;
-      this.toastr.success('Login successful!', 'Success');
-      // AQUI VOCÊ PODE ADICIONAR A LÓGICA DE AUTENTICAÇÃO
+      this.toastr.success('Login com sucesso!', 'Success');
     } else {
       console.log('Form is invalid');
-      this.toastr.error('Please fill in all required fields.', 'Error');
+      this.toastr.error(
+        'Por favor, preencha todos os campos obrigatórios.',
+        'Error',
+      );
       this.isLoading = false;
     }
   }

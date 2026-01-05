@@ -1,0 +1,132 @@
+<div
+  class="min-h-screen bg-black flex flex-col items-center justify-center p-4"
+>
+  <h1 class="text-[#f1f5f9] text-3xl font-semibold mb-8">Crie sua conta</h1>
+
+  <div
+    class="w-full max-w-md bg-[#1e293b] p-6 sm:p-8 rounded-xl shadow-2xl border border-slate-700"
+  >
+    <form
+      class="flex flex-col gap-4"
+      [formGroup]="registerForm"
+      (ngSubmit)="onSubmit()"
+    >
+      <mat-form-field appearance="fill" class="w-full">
+        <mat-label class="text-[#94a3b8]">Email</mat-label>
+        <input
+          matInput
+          type="email"
+          formControlName="email"
+          placeholder="seu@email.com"
+          class="text-[#f1f5f9]"
+        />
+        @if (
+          registerForm.get('email')?.invalid &&
+          registerForm.get('email')?.touched
+        ) {
+          <mat-error>Informe um e-mail válido</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="w-full">
+        <mat-label class="text-[#94a3b8]">Senha</mat-label>
+        <input
+          matInput
+          type="password"
+          formControlName="userPassword"
+          autocomplete="new-password"
+          class="text-[#f1f5f9]"
+        />
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="w-full">
+        <mat-label class="text-[#94a3b8]">Confirme a senha</mat-label>
+        <input
+          matInput
+          type="password"
+          formControlName="confirmPassword"
+          autocomplete="new-password"
+          class="text-[#f1f5f9]"
+        />
+      </mat-form-field>
+
+      <div class="bg-[#0f172a] p-4 rounded-lg border border-slate-700 mt-2">
+        <p
+          class="text-slate-400 text-[10px] font-bold mb-3 uppercase tracking-widest"
+        >
+          Requisitos de Segurança
+        </p>
+
+        <ul class="flex flex-col gap-2">
+          <li
+            class="flex items-center gap-3 text-xs transition-all"
+            [class.text-emerald-400]="hasMinLength()"
+            [class.text-slate-500]="!hasMinLength()"
+          >
+            <span class="w-4 flex justify-center">{{
+              hasMinLength() ? '✓' : '○'
+            }}</span>
+            Pelo menos 8 caracteres
+          </li>
+
+          <li
+            class="flex items-center gap-3 text-xs transition-all"
+            [class.text-emerald-400]="hasUpper()"
+            [class.text-slate-500]="!hasUpper()"
+          >
+            <span class="w-4 flex justify-center">{{
+              hasUpper() ? '✓' : '○'
+            }}</span>
+            Uma letra maiúscula
+          </li>
+
+          <li
+            class="flex items-center gap-3 text-xs transition-all"
+            [class.text-emerald-400]="hasNumber()"
+            [class.text-slate-500]="!hasNumber()"
+          >
+            <span class="w-4 flex justify-center">{{
+              hasNumber() ? '✓' : '○'
+            }}</span>
+            Pelo menos um número
+          </li>
+
+          <li
+            class="flex items-center gap-3 text-xs transition-all"
+            [class.text-emerald-400]="passwordsMatch()"
+            [class.text-slate-500]="!passwordsMatch()"
+          >
+            <span class="w-4 flex justify-center">{{
+              passwordsMatch() ? '✓' : '○'
+            }}</span>
+            As senhas coincidem
+          </li>
+        </ul>
+      </div>
+
+      @if (isLoading()) {
+        <div class="flex justify-center p-2">
+          <mat-spinner diameter="40"></mat-spinner>
+        </div>
+      } @else {
+        <button
+          mat-raised-button
+          type="submit"
+          [disabled]="registerForm.invalid"
+          class="w-full h-12 mt-4 font-bold rounded-lg transition-all duration-300 disabled:grayscale disabled:opacity-50"
+          [style.background-color]="registerForm.valid ? '#38e8ae' : '#475569'"
+          [style.color]="registerForm.valid ? '#000' : '#94a3b8'"
+        >
+          Cadastrar
+        </button>
+      }
+
+      <div class="text-center text-sm pt-2">
+        <span class="text-[#94a3b8]">Já tem uma conta?</span>
+        <a href="/" class="text-[#38e8ae] font-semibold hover:underline ml-1"
+          >Entre</a
+        >
+      </div>
+    </form>
+  </div>
+</div>
