@@ -1,5 +1,12 @@
 .dashboard-container {
   color: #f1f5f9;
+  padding: 1rem;
+}
+
+@media (min-width: 768px) {
+  .dashboard-container {
+    padding: 2rem;
+  }
 }
 
 .page-title {
