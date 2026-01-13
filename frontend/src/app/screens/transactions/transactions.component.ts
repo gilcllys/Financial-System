@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
 import { MatInputModule } from '@angular/material/input';
@@ -8,6 +8,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { Router } from '@angular/router';
 
 export interface Transaction {
   id: number;
@@ -132,7 +133,13 @@ export class TransactionsComponent {
     { value: 'type-0', viewValue: 'Entrada' },
     { value: 'type-1', viewValue: 'Saída' },
   ];
+  private router = inject(Router);
+
   constructor() {
     this.selectedValue = '';
+  }
+
+  goToNewTransaction() {
+    this.router.navigate(['/transactions/new']);
   }
 }
