@@ -98,6 +98,11 @@ export class RegisterComponent implements OnInit {
       return;
     }
 
+    if (!this.passwordsMatch()) {
+      this.toastr.error('As senhas não coincidem.', 'Erro');
+      return;
+    }
+
     this.isLoading.set(true);
     const { fullName, email, userPassword } = this.registerForm.value;
 

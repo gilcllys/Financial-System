@@ -24,7 +24,7 @@ class LoginView(TokenObtainPairView):
 
     def get(self, request):
         data = request.data
-        serializer = custom_serializer.LoginCustomSerializer(data=request.data)
+        serializer = custom_serializer.LoginCustomSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         data_serializer = serializer.validated_data
         response = LoginBehavior(data=data_serializer).run()
@@ -34,12 +34,12 @@ class LoginView(TokenObtainPairView):
 class LogoutView(generics.GenericAPIView):
 
     permission_classes = [IsAuthenticated]
-    serializer_class = custom_serializer.RegisterCustomSerializer
+    serializer_class = custom_serializer.LogoutCustomSerializer
 
     def post(self, request):
         data = request.data
         serializer = custom_serializer.LogoutCustomSerializer(
-            data=request.data)
+            data=data)
         serializer.is_valid(raise_exception=True)
         data_serializer = serializer.validated_data
         response = LogoutBehavior(data=data_serializer).run()
