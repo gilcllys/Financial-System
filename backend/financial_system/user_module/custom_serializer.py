@@ -18,10 +18,9 @@ class RegisterCustomSerializer(serializers.Serializer):
 
 
 class LoginCustomSerializer(serializers.Serializer):
-    username = serializers.CharField(
+    email = serializers.EmailField(
         required=True,
-        allow_null=False,
-        max_length=124,
+        allow_null=False
     )
     password = serializers.CharField(
         required=True,

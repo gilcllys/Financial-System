@@ -34,7 +34,7 @@ class LoginBehavior():
 
     def verifyUser(self):
         return User.objects.get(
-            username=self.data.get('username'),
+            email=self.data.get('email'),
         )
 
     def run(self):
