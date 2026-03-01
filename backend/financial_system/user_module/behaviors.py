@@ -16,14 +16,21 @@ class RegisterBehavior():
         )
 
     def run(self):
-        if (self.registerUser()):
+        try:
+            user = self.registerUser()
             return Response(
-                'User created',
+                {
+                    'id': user.id,
+                    'email': user.email,
+                    'username': user.username,
+                },
                 status=status.HTTP_201_CREATED
             )
-        else:
+        except Exception as e:
             return Response(
-                'User failed creation',
+                {
+                    'detail': str(e),
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -33,28 +40,33 @@ class LoginBehavior():
         self.data = data
 
     def verifyUser(self):
-        return User.objects.get(
-            email=self.data.get('email'),
-        )
+        try:
+            return User.objects.get(email=self.data.get('email'))
+        except User.DoesNotExist:
+            return None
 
     def run(self):
         user = self.verifyUser()
-        if (self.verifyUser() and user.check_password(raw_password=self.data.get('password'))):
+        if user and user.check_password(raw_password=self.data.get('password')):
             refresh = RefreshToken.for_user(user)
             return Response(
                 {
-                    'status': 'Logged',
                     'refresh': str(refresh),
                     'access': str(refresh.access_token),
+                    'user': {
+                        'id': user.id,
+                        'email': user.email,
+                        'username': user.username,
+                    }
                 },
                 status=status.HTTP_200_OK
             )
         else:
             return Response(
                 {
-                    'status': 'Failed',
+                    'detail': 'Email ou senha incorretos',
                 },
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_401_UNAUTHORIZED
             )
 
 
