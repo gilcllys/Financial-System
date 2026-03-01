@@ -1,7 +1,8 @@
 // src/app/services/base.service.ts
-import { Injectable, inject } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import type { HttpParams } from '@angular/common/http';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Injectable, PLATFORM_ID, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
 import { throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -14,18 +15,31 @@ export class BaseService {
   protected httpOptions: {
     headers?: HttpHeaders;
     params?: HttpParams;
-    responseType?: 'json' | 'blob';
   } = {};
 
   private http = inject(HttpClient);
+  private platformId = inject(PLATFORM_ID);
+  private isBrowser = isPlatformBrowser(this.platformId);
+
+  /**
+   * Obtém o token de autenticação do localStorage
+   */
+  private getToken(): string | null {
+    if (!this.isBrowser) {
+      return null;
+    }
+    return localStorage.getItem('access_token');
+  }
+
   /**
    * Método para obter dados de uma API.
    * @param endpoint - O endpoint da API.
    * @returns Um Observable com os dados obtidos.
    */
   protected get<T>(endpoint: string): Observable<T> {
+    const token = this.getToken();
     this.httpOptions.headers = new HttpHeaders({
-      Authorization: `Bearer ${localStorage.getItem('token')}`,
+      Authorization: `Bearer ${token || ''}`,
     });
     return this.http
       .get<T>(`${API_BASE_URL}${endpoint}`, this.httpOptions)
@@ -39,8 +53,9 @@ export class BaseService {
    * @returns Um Observable com os dados obtidos.
    */
   protected post<T, B = T>(endpoint: string, body: B): Observable<T> {
+    const token = this.getToken();
     this.httpOptions.headers = new HttpHeaders({
-      Authorization: `Bearer ${localStorage.getItem('token')}`,
+      Authorization: `Bearer ${token || ''}`,
     });
     return this.http
       .post<T>(`${API_BASE_URL}${endpoint}`, body, this.httpOptions)
@@ -54,8 +69,9 @@ export class BaseService {
    * @returns Um Observable com os dados obtidos.
    */
   protected put<T, B = T>(endpoint: string, body: B): Observable<T> {
+    const token = this.getToken();
     this.httpOptions.headers = new HttpHeaders({
-      Authorization: `Bearer ${localStorage.getItem('token')}`,
+      Authorization: `Bearer ${token || ''}`,
     });
     return this.http
       .put<T>(`${API_BASE_URL}${endpoint}`, body, this.httpOptions)
@@ -68,8 +84,9 @@ export class BaseService {
    * @returns Um Observable com os dados obtidos.
    */
   protected delete<T>(endpoint: string): Observable<T> {
+    const token = this.getToken();
     this.httpOptions.headers = new HttpHeaders({
-      Authorization: `Bearer ${localStorage.getItem('token')}`,
+      Authorization: `Bearer ${token || ''}`,
     });
     return this.http
       .delete<T>(`${API_BASE_URL}${endpoint}`, this.httpOptions)

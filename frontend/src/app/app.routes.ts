@@ -1,12 +1,11 @@
 import type { Routes } from '@angular/router';
-import { LoginComponent } from './screens/login/login.component';
-import { RegisterComponent } from './screens/register/register.component';
 import { LayoutComponent } from './layouts/layout.component';
 import { DashboardComponent } from './screens/dashboard/dashboard.component';
-import { TransactionsComponent } from './screens/transactions/transactions.component';
-import { NewTransactionComponent } from './screens/transactions/new-transaction.component';
-import { BudgetsComponent } from './screens/budgets/budgets.component';
+import { LoginComponent } from './screens/login/login.component';
+import { NewTransactionComponent } from './screens/new-transaction/new-transaction.component';
+import { RegisterComponent } from './screens/register/register.component';
 import { ReportsComponent } from './screens/reports/reports.component';
+import { TransactionsComponent } from './screens/transactions/transactions.component';
 
 export const routes: Routes = [
   {

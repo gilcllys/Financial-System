@@ -1,1 +1,3 @@
-export const API_BASE_URL = 'https://api.example.com';
+import { environment } from '../../environments/environment.development';
+
+export const API_BASE_URL = environment.apiUrl;

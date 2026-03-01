@@ -1,21 +1,24 @@
-import type { OnInit } from '@angular/core';
-import { Component, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import type { OnInit } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import type {
   AbstractControl,
   ValidationErrors,
   ValidatorFn,
 } from '@angular/forms';
 import {
-  ReactiveFormsModule,
-  FormGroup,
   FormControl,
+  FormGroup,
+  ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
-import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
+import { UserRegister } from '../../models';
+import { AuthService } from '../../services/auth.service';
 
 /**
  * Validador customizado para comparar as senhas dentro do FormGroup
@@ -42,12 +45,15 @@ export const passwordMatchValidator: ValidatorFn = (
     MatFormFieldModule,
     MatProgressSpinnerModule,
     MatInputModule,
+    RouterLink,
   ],
   templateUrl: './register.component.html',
   styleUrl: './register.component.css',
 })
 export class RegisterComponent implements OnInit {
   private toastr = inject(ToastrService);
+  private authService = inject(AuthService);
+  private router = inject(Router);
 
   registerForm!: FormGroup;
   isLoading = signal(false);
@@ -69,6 +75,7 @@ export class RegisterComponent implements OnInit {
   ngOnInit(): void {
     this.registerForm = new FormGroup(
       {
+        fullName: new FormControl('', [Validators.required]),
         email: new FormControl('', [Validators.required, Validators.email]),
         userPassword: new FormControl('', [Validators.required]),
         confirmPassword: new FormControl('', [Validators.required]),
@@ -86,17 +93,37 @@ export class RegisterComponent implements OnInit {
   }
 
   onSubmit(): void {
-    if (this.registerForm.valid) {
-      this.isLoading.set(true);
-      console.log('Formulário enviado:', this.registerForm.value);
-
-      // Simulação de API
-      setTimeout(() => {
-        this.toastr.success('Conta criada com sucesso!', 'Sucesso');
-        this.isLoading.set(false);
-      }, 2000);
-    } else {
+    if (this.registerForm.invalid) {
       this.toastr.error('Por favor, preencha os requisitos da senha.', 'Erro');
+      return;
     }
+
+    this.isLoading.set(true);
+    const { fullName, email, userPassword } = this.registerForm.value;
+
+    // Cria uma instância da classe UserRegister
+    const userData = UserRegister.fromFormData(fullName, email, userPassword);
+
+    this.authService.registerUser(userData).subscribe({
+      next: (_response) => {
+        this.isLoading.set(false);
+        this.toastr.success(
+          'Conta criada com sucesso! Faça login para continuar.',
+          'Sucesso',
+        );
+        // Redireciona para a página de login
+        this.router.navigate(['/']);
+      },
+      error: (error) => {
+        this.isLoading.set(false);
+        const errorMessage =
+          error.error?.detail ||
+          error.error?.message ||
+          error.error?.email?.[0] ||
+          'Erro ao criar conta. Tente novamente.';
+        this.toastr.error(errorMessage, 'Erro');
+        console.error('Erro no registro:', error);
+      },
+    });
   }
 }
