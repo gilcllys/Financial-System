@@ -54,11 +54,11 @@ export class UserRegister {
  * Baseado em LoginCustomSerializer
  */
 export class UserLogin {
-  username: string;
+  email: string;
   password: string;
 
   constructor(data: Partial<UserLogin> = {}) {
-    this.username = data.username || '';
+    this.email = data.email || '';
     this.password = data.password || '';
   }
 
@@ -66,7 +66,7 @@ export class UserLogin {
    * Valida se os dados estão completos
    */
   isValid(): boolean {
-    return !!(this.username && this.password);
+    return !!(this.email && this.password);
   }
 
   /**
@@ -75,7 +75,7 @@ export class UserLogin {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   toJson(): any {
     return {
-      username: this.username,
+      email: this.email,
       password: this.password,
     };
   }
@@ -86,7 +86,7 @@ export class UserLogin {
    */
   static fromEmail(email: string, password: string): UserLogin {
     return new UserLogin({
-      username: email,
+      email: email,
       password,
     });
   }
