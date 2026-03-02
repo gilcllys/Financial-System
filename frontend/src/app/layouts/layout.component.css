@@ -1,3 +1,71 @@
+/* ========== THEME SUPPORT ========== */
+
+/* Container */
+.app-layout {
+  background-color: var(--bg-body);
+}
+
+/* Sidenav */
+aside {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-primary);
+}
+
+.app-header {
+  border-color: var(--border-primary);
+}
+
+.app-title {
+  color: var(--text-primary);
+}
+
+/* Menu Items */
+nav button {
+  color: var(--text-muted);
+}
+
+nav button:hover {
+  color: #10b981 !important;
+  background-color: rgba(16, 185, 129, 0.1) !important;
+}
+
+nav button.active {
+  color: #10b981 !important;
+  background-color: rgba(16, 185, 129, 0.1) !important;
+  border-left-color: #10b981 !important;
+}
+
+/* Footer */
+footer {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-primary);
+}
+
+footer p {
+  color: var(--text-disabled);
+}
+
+/* Menu Toggle Button */
+.menu-toggle-btn {
+  color: var(--text-muted);
+  background-color: var(--bg-secondary);
+}
+
+.menu-toggle-btn:hover {
+  color: #10b981;
+}
+
+/* User Info */
+.user-name {
+  color: var(--text-primary);
+}
+
+.user-email {
+  color: var(--text-disabled);
+}
+
+/* ========== EXISTING STYLES ========== */
+
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
   width: 8px;
@@ -8,12 +76,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* Navigation button styling */
@@ -51,7 +119,7 @@ nav span {
 .sidenav-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--overlay-bg);
   z-index: 40;
   opacity: 0;
   pointer-events: none;

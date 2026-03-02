@@ -1,4 +1,4 @@
-<div class="flex h-screen bg-black overflow-y-auto">
+<div class="app-layout flex h-screen overflow-y-auto">
   <!-- Mobile Overlay -->
   <div
     class="sidenav-overlay"
@@ -8,18 +8,18 @@
 
   <!-- Sidenav -->
   <aside
-    class="fixed left-0 top-0 h-screen bg-slate-800 border-r border-slate-700 flex flex-col transition-all duration-300 z-50 overflow-y-auto"
+    class="fixed left-0 top-0 h-screen border-r flex flex-col transition-all duration-300 z-50 overflow-y-auto"
     [class.w-64]="isSidenavOpen()"
     [class.w-20]="!isSidenavOpen()"
     [class.open]="isSidenavOpen()"
   >
-    <div class="p-6 border-b border-slate-700 flex-shrink-0">
+    <div class="app-header p-6 border-b flex-shrink-0">
       <div
         class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
       >
         <span class="text-3xl">💰</span>
         <span
-          class="text-lg font-semibold text-slate-100"
+          class="app-title text-lg font-semibold"
           [class.hidden]="!isSidenavOpen()"
           >FinanceApp</span
         >
@@ -32,10 +32,9 @@
           <button
             type="button"
             (click)="navigateTo(item.route)"
-            class="w-full flex items-center gap-3 px-3 py-2 text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 transition-all border-l-4 border-transparent rounded-lg"
+            class="w-full flex items-center gap-3 px-3 py-2 transition-all border-l-4 border-transparent rounded-lg"
             [ngClass]="{
-              'border-l-emerald-400 text-emerald-400 bg-emerald-400/10':
-                isActive(item.route),
+              active: isActive(item.route),
             }"
           >
             <mat-icon class="flex-shrink-0">{{ item.icon }}</mat-icon>
@@ -49,13 +48,26 @@
       </ul>
     </nav>
 
-    <div
-      class="border-t border-slate-700 p-4 flex flex-col gap-3 flex-shrink-0"
-    >
+    <div class="border-t p-4 flex flex-col gap-3 flex-shrink-0">
+      <!-- Botão de Tema -->
       <button
         type="button"
-        class="flex justify-center items-center p-2 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 transition-all"
-        title="Configurações"
+        (click)="toggleTheme()"
+        class="flex justify-center items-center p-2 rounded-lg transition-all"
+        [matTooltip]="getThemeLabel()"
+        matTooltipPosition="right"
+        style="color: var(--text-muted)"
+      >
+        <mat-icon>{{ getThemeIcon() }}</mat-icon>
+      </button>
+
+      <!-- Botão de Configurações -->
+      <button
+        type="button"
+        class="flex justify-center items-center p-2 rounded-lg transition-all"
+        matTooltip="Configurações"
+        matTooltipPosition="right"
+        style="color: var(--text-muted)"
       >
         <mat-icon>settings</mat-icon>
       </button>
@@ -67,12 +79,8 @@
           GC
         </div>
         <div class="overflow-hidden min-w-0">
-          <p class="text-sm font-semibold text-slate-100 truncate">
-            Gilcllys Costa
-          </p>
-          <p class="text-xs text-slate-500 truncate">
-            gilcllys&#64;example.com
-          </p>
+          <p class="user-name text-sm font-semibold truncate">Gilcllys Costa</p>
+          <p class="user-email text-xs truncate">gilcllys&#64;example.com</p>
         </div>
       </div>
     </div>
@@ -87,7 +95,7 @@
       <button
         type="button"
         (click)="toggleSidenav()"
-        class="p-2 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition-colors"
+        class="menu-toggle-btn p-2 rounded-lg transition-colors"
       >
         <mat-icon>{{ isSidenavOpen() ? 'menu_open' : 'menu' }}</mat-icon>
       </button>
@@ -97,11 +105,9 @@
       <router-outlet></router-outlet>
     </div>
 
-    <footer
-      class="bg-slate-800 border-t border-slate-700 p-4 mt-auto flex-shrink-0"
-    >
+    <footer class="border-t p-4 mt-auto flex-shrink-0">
       <div class="text-center">
-        <p class="text-xs text-slate-500">
+        <p class="text-xs">
           &copy; 2026 Financial App. Desenvolvido por Gilcllys Costa. Todos os
           direitos reservados.
         </p>

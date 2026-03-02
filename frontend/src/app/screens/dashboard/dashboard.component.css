@@ -1,5 +1,5 @@
 .dashboard-container {
-  color: #f1f5f9;
+  color: var(--text-primary);
   padding: 1rem;
 }
 
@@ -13,10 +13,10 @@
   font-size: 28px;
   font-weight: 600;
   margin: 0 0 16px 0;
-  color: #f1f5f9;
+  color: var(--text-primary);
 }
 
 .placeholder-text {
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 14px;
 }

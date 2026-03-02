@@ -1,29 +1,36 @@
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import type { OnInit } from '@angular/core';
 import {
-  Component,
-  signal,
-  inject,
-  HostListener,
-  PLATFORM_ID,
+    Component,
+    HostListener,
+    inject,
+    PLATFORM_ID,
+    signal,
 } from '@angular/core';
-import { isPlatformBrowser } from '@angular/common';
-import { CommonModule } from '@angular/common';
-import { Router, NavigationEnd } from '@angular/router';
-import { RouterOutlet } from '@angular/router';
-import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
+import { ThemeService } from '../services/theme.service';
 
 @Component({
   selector: 'app-layout',
   standalone: true,
-  imports: [CommonModule, MatIconModule, MatButtonModule, RouterOutlet],
+  imports: [
+    CommonModule,
+    MatIconModule,
+    MatButtonModule,
+    MatTooltipModule,
+    RouterOutlet,
+  ],
   templateUrl: './layout.component.html',
   styleUrl: './layout.component.css',
 })
 export class LayoutComponent implements OnInit {
   private router = inject(Router);
   private platformId = inject(PLATFORM_ID);
+  public themeService = inject(ThemeService);
   isSidenavOpen = signal(true);
   currentRoute = signal<string>('');
   isMobile = signal(false);
@@ -75,6 +82,18 @@ export class LayoutComponent implements OnInit {
 
   isActive(route: string): boolean {
     return this.currentRoute().includes(route);
+  }
+
+  toggleTheme() {
+    this.themeService.toggleTheme();
+  }
+
+  getThemeIcon(): string {
+    return this.themeService.isDarkTheme() ? 'light_mode' : 'dark_mode';
+  }
+
+  getThemeLabel(): string {
+    return this.themeService.isDarkTheme() ? 'Tema Claro' : 'Tema Escuro';
   }
 
   menuItems = [
