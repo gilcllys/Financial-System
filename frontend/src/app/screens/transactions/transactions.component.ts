@@ -1,110 +1,87 @@
-import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatTableModule } from '@angular/material/table';
-import { MatInputModule } from '@angular/material/input';
-import { MatFormFieldModule } from '@angular/material/form-field';
+import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatSelectModule } from '@angular/material/select';
-import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { MatSelectModule } from '@angular/material/select';
+import { MatTableModule } from '@angular/material/table';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
 
 export interface Transaction {
   id: number;
-  name: string;
-  value: number;
-  statement: string;
+  description: string;
+  category: string;
+  paymentMethod: string;
+  amount: number;
   date: string;
-  type: 'entrada' | 'saída';
+  type: 'income' | 'expense';
 }
 
 const transacoes: Transaction[] = [
   {
     id: 1,
-    name: 'Salário',
-    value: 3500.0,
-    statement: 'entrada',
-    date: '2026-01-10',
-    type: 'entrada',
+    description: 'Salário Mensal',
+    category: 'Renda',
+    paymentMethod: 'Transferência Bancária',
+    amount: 2600.0,
+    date: '2023-10-24',
+    type: 'income',
   },
   {
     id: 2,
-    name: 'Supermercado',
-    value: -245.5,
-    statement: 'saída',
-    date: '2026-01-09',
-    type: 'saída',
+    description: 'Supermercado',
+    category: 'Alimentação',
+    paymentMethod: 'Cartão de Crédito',
+    amount: -75.5,
+    date: '2023-10-25',
+    type: 'expense',
   },
   {
     id: 3,
-    name: 'Aluguel',
-    value: -1200.0,
-    statement: 'saída',
-    date: '2026-01-08',
-    type: 'saída',
+    description: 'Posto de Gasolina',
+    category: 'Transporte',
+    paymentMethod: 'Cartão de Débito',
+    amount: -45.0,
+    date: '2023-10-23',
+    type: 'expense',
   },
   {
     id: 4,
-    name: 'Freelance Design',
-    value: 800.0,
-    statement: 'entrada',
-    date: '2026-01-07',
-    type: 'entrada',
+    description: 'Conta de Internet',
+    category: 'Utilidades',
+    paymentMethod: 'Cartão de Crédito',
+    amount: -60.0,
+    date: '2023-10-22',
+    type: 'expense',
   },
   {
     id: 5,
-    name: 'Conta de Luz',
-    value: -189.75,
-    statement: 'saída',
-    date: '2026-01-06',
-    type: 'saída',
+    description: 'Jantar com amigos',
+    category: 'Entretenimento',
+    paymentMethod: 'Cartão de Crédito',
+    amount: -120.3,
+    date: '2023-10-20',
+    type: 'expense',
   },
   {
     id: 6,
-    name: 'Netflix',
-    value: -39.9,
-    statement: 'saída',
-    date: '2026-01-05',
-    type: 'saída',
-  },
-  {
-    id: 7,
-    name: 'Bônus Trabalho',
-    value: 500.0,
-    statement: 'entrada',
-    date: '2026-01-04',
-    type: 'entrada',
-  },
-  {
-    id: 8,
-    name: 'Restaurante',
-    value: -125.3,
-    statement: 'saída',
-    date: '2026-01-03',
-    type: 'saída',
-  },
-  {
-    id: 9,
-    name: 'Consultoria',
-    value: 450.0,
-    statement: 'entrada',
-    date: '2026-01-02',
-    type: 'entrada',
-  },
-  {
-    id: 10,
-    name: 'Combustível',
-    value: -85.0,
-    statement: 'saída',
-    date: '2026-01-01',
-    type: 'saída',
+    description: 'Pagamento de Aluguel',
+    category: 'Moradia',
+    paymentMethod: 'Transferência Bancária',
+    amount: -1200.0,
+    date: '2023-10-15',
+    type: 'expense',
   },
 ];
 
-interface TypeTransaction {
+interface FilterOption {
   value: string;
-  viewValue: string;
+  label: string;
 }
 
 @Component({
@@ -120,26 +97,79 @@ interface TypeTransaction {
     MatDatepickerModule,
     MatIconModule,
     MatButtonModule,
+    MatPaginatorModule,
+    MatTooltipModule,
   ],
   templateUrl: './transactions.component.html',
   styleUrl: './transactions.component.css',
   host: { style: 'display: contents' },
 })
 export class TransactionsComponent {
-  displayedColumns: string[] = ['id', 'name', 'value', 'statement', 'date'];
-  dataSource = transacoes;
-  selectedValue: string;
-  transaction_type: TypeTransaction[] = [
-    { value: 'type-0', viewValue: 'Entrada' },
-    { value: 'type-1', viewValue: 'Saída' },
+  displayedColumns: string[] = [
+    'date',
+    'description',
+    'category',
+    'paymentMethod',
+    'amount',
+    'actions',
   ];
+  dataSource = transacoes;
+
+  // Filtros
+  searchText = signal('');
+  startDate: Date | null = null;
+  endDate: Date | null = null;
+  selectedCategory = signal('all');
+  selectedPaymentMethod = signal('all');
+
+  categories: FilterOption[] = [
+    { value: 'all', label: 'Todas' },
+    { value: 'income', label: 'Renda' },
+    { value: 'groceries', label: 'Alimentação' },
+    { value: 'transport', label: 'Transporte' },
+    { value: 'utilities', label: 'Utilidades' },
+    { value: 'entertainment', label: 'Entretenimento' },
+    { value: 'rent', label: 'Moradia' },
+  ];
+
+  paymentMethods: FilterOption[] = [
+    { value: 'all', label: 'Todos' },
+    { value: 'credit', label: 'Cartão de Crédito' },
+    { value: 'debit', label: 'Cartão de Débito' },
+    { value: 'bank', label: 'Transferência Bancária' },
+    { value: 'cash', label: 'Dinheiro' },
+  ];
+
   private router = inject(Router);
 
-  constructor() {
-    this.selectedValue = '';
+  clearDateFilter() {
+    this.startDate = null;
+    this.endDate = null;
   }
 
   goToNewTransaction() {
     this.router.navigate(['/transactions/new']);
+  }
+
+  editTransaction(transaction: Transaction) {
+    console.log('Editar transação:', transaction);
+    // Implementar navegação para edição
+  }
+
+  deleteTransaction(transaction: Transaction) {
+    console.log('Deletar transação:', transaction);
+    // Implementar lógica de deleção
+  }
+
+  formatAmount(amount: number): string {
+    const formatted = Math.abs(amount).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    return amount >= 0 ? `+R$${formatted}` : `-R$${formatted}`;
+  }
+
+  isIncome(amount: number): boolean {
+    return amount >= 0;
   }
 }
