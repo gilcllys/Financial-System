@@ -29,10 +29,10 @@ Desktop.ini           # Windows
 # --------------------------
 # 3. Environment Variables
 # --------------------------
-.env*                  # Common for both backend and frontend
-.env.*.local          # Specific local environment files (e.g., .env.development.local)
 # Ignorar arquivos de configuração de ambiente
-backend/.env
+.env
+.env.*
+!.env.example
 # --------------------------
 # 4. Logs
 # --------------------------
