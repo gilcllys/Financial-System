@@ -16,7 +16,14 @@ import os
 from dotenv import load_dotenv
 from urllib.parse import urlparse, parse_qsl
 
-load_dotenv()
+# Carregar .env.local (dev) com prioridade sobre .env (produção)
+env_local = Path(__file__).resolve().parent.parent.parent / '.env.local'
+env_file = Path(__file__).resolve().parent.parent.parent / '.env'
+
+if env_local.exists():
+    load_dotenv(env_local)
+else:
+    load_dotenv(env_file)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -29,9 +36,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
 
 
 # Application definition
@@ -93,12 +100,15 @@ DATABASES = {
         'PASSWORD': os.getenv("DB_PASSWORD"),
         'HOST': os.getenv("DB_HOST"),
         'PORT': os.getenv("DB_PORT"),
-        'OPTIONS': {
-            'sslmode': 'require',
-            'channel_binding': 'require',
-        },
     }
 }
+
+# SSL só em produção (Neon DB exige)
+if os.getenv("DB_SSL_MODE", "require") != "disable":
+    DATABASES['default']['OPTIONS'] = {
+        'sslmode': 'require',
+        'channel_binding': 'require',
+    }
 
 
 # Password validation

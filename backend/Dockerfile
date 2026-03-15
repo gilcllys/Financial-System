@@ -52,8 +52,10 @@ COPY . /app
 # Corrige permissões para garantir acesso aos arquivos
 RUN chmod -R 755 /app
 
-# # Coleta arquivos estáticos (essencial para produção)
-# # Certifique-se de ter STATIC_ROOT configurado no seu settings.py
+# Coleta arquivos estáticos (essencial para produção)
+# SECRET_KEY dummy para permitir collectstatic durante o build
+ARG SECRET_KEY=dummy-build-key
+ENV SECRET_KEY=${SECRET_KEY}
 RUN python financial_system/manage.py collectstatic --noinput
 
 # Expõe a porta padrão definida no fly.toml
