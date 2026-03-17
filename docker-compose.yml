@@ -31,9 +31,14 @@ services:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        NG_CONFIG: development
     ports:
       - "4200:4200"
+    env_file:
+      - ./frontend/.env.local
     depends_on:
       - backend
 

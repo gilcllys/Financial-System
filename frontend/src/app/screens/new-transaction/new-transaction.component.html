@@ -1,1 +1,153 @@
-<p>new-transaction works!  testeste s</p>
+<div class="new-transaction-container">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <button mat-icon-button class="back-btn" (click)="goBack()">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <h1 class="page-title">Nova Transação</h1>
+    </div>
+  </div>
+
+  <!-- Formulário -->
+  <div class="form-card">
+    <form [formGroup]="transactionForm" (ngSubmit)="onSubmit()">
+      <!-- Tipo de Transação -->
+      <div class="type-selector">
+        <button
+          type="button"
+          class="type-btn"
+          [class.active]="transactionType() === 'expense'"
+          [class.expense]="transactionType() === 'expense'"
+          (click)="setType('expense')"
+        >
+          <mat-icon>trending_down</mat-icon>
+          <span>Despesa</span>
+        </button>
+        <button
+          type="button"
+          class="type-btn"
+          [class.active]="transactionType() === 'income'"
+          [class.income]="transactionType() === 'income'"
+          (click)="setType('income')"
+        >
+          <mat-icon>trending_up</mat-icon>
+          <span>Receita</span>
+        </button>
+      </div>
+
+      <!-- Campos do Formulário -->
+      <div class="form-grid">
+        <!-- Descrição -->
+        <div class="form-field full-width">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Descrição</mat-label>
+            <input
+              matInput
+              placeholder="Ex: Aluguel, Salário..."
+              formControlName="description"
+            />
+          </mat-form-field>
+        </div>
+
+        <!-- Valor -->
+        <div class="form-field">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Valor (R$)</mat-label>
+            <input
+              matInput
+              type="number"
+              placeholder="0,00"
+              formControlName="amount"
+              min="0.01"
+              step="0.01"
+            />
+          </mat-form-field>
+        </div>
+
+        <!-- Categoria -->
+        <div class="form-field">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Categoria</mat-label>
+            <mat-select formControlName="categoryId">
+              @for (category of categories(); track category.id) {
+                <mat-option [value]="category.id">{{ category.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <!-- Data -->
+        <div class="form-field">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Data</mat-label>
+            <input matInput [matDatepicker]="picker" formControlName="date" />
+            <mat-datepicker-toggle
+              matIconSuffix
+              [for]="picker"
+            ></mat-datepicker-toggle>
+            <mat-datepicker #picker></mat-datepicker>
+          </mat-form-field>
+        </div>
+
+        <!-- Quantidade -->
+        <div class="form-field">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Quantidade</mat-label>
+            <input
+              matInput
+              type="number"
+              formControlName="quantity"
+              min="1"
+              step="1"
+            />
+          </mat-form-field>
+        </div>
+      </div>
+
+      <!-- Parcelamento -->
+      <div class="installment-section">
+        <div class="installment-toggle">
+          <mat-slide-toggle formControlName="isInstallment" color="primary">
+            Parcelado
+          </mat-slide-toggle>
+        </div>
+
+        @if (transactionForm.get('isInstallment')?.value) {
+          <div class="installment-field">
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Número de Parcelas</mat-label>
+              <input
+                matInput
+                type="number"
+                formControlName="installments"
+                min="2"
+                step="1"
+              />
+            </mat-form-field>
+          </div>
+        }
+      </div>
+
+      <!-- Botão Submit -->
+      <div class="form-actions">
+        @if (isLoading()) {
+          <div class="flex justify-center py-3">
+            <mat-spinner diameter="40"></mat-spinner>
+          </div>
+        } @else {
+          <button
+            type="submit"
+            mat-fab
+            extended
+            class="submit-btn"
+            [disabled]="transactionForm.invalid"
+          >
+            <mat-icon>check</mat-icon>
+            Salvar Transação
+          </button>
+        }
+      </div>
+    </form>
+  </div>
+</div>

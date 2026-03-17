@@ -1,5 +1,5 @@
 import { registerLocaleData } from '@angular/common';
-import { provideHttpClient, withFetch } from '@angular/common/http';
+import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import localePt from '@angular/common/locales/pt';
 import type { ApplicationConfig } from '@angular/core';
 import { LOCALE_ID, provideZoneChangeDetection } from '@angular/core';
@@ -9,17 +9,18 @@ import { provideRouter } from '@angular/router';
 import { provideToastr } from 'ngx-toastr';
 
 import {
-  provideClientHydration,
-  withEventReplay,
+    provideClientHydration,
+    withEventReplay,
 } from '@angular/platform-browser';
 import { routes } from './app.routes';
+import { authInterceptor } from './interceptors/auth.interceptor';
 
 registerLocaleData(localePt); // Registra os dados de localidade do Brasil
 export const appConfig: ApplicationConfig = {
   providers: [
     provideAnimations(),
     provideToastr(),
-    provideHttpClient(withFetch()),
+    provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideClientHydration(withEventReplay()),

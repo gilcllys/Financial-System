@@ -6,8 +6,10 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
+ARG NG_CONFIG=production
+
 COPY . .
-RUN npx ng build
+RUN npx ng build --configuration=${NG_CONFIG}
 
 # Stage 2: Nginx
 FROM nginx:alpine
