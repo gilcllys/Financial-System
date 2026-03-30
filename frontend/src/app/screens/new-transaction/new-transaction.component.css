@@ -1,0 +1,212 @@
+/* Container Principal */
+.new-transaction-container {
+  padding: 1rem;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+  .new-transaction-container {
+    padding: 2rem;
+  }
+}
+
+/* Header */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.back-btn {
+  color: var(--text-muted);
+  transition: color 0.2s ease;
+}
+
+.back-btn:hover {
+  color: var(--text-primary);
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .page-title {
+    font-size: 1.5rem;
+  }
+}
+
+/* Card do Formulário */
+.form-card {
+  background-color: var(--bg-card);
+  border-radius: 1rem;
+  padding: 2rem;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-primary);
+}
+
+@media (max-width: 640px) {
+  .form-card {
+    padding: 1.25rem;
+  }
+}
+
+/* Seletor de Tipo */
+.type-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.type-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  border: 2px solid var(--border-primary);
+  background-color: var(--bg-secondary);
+  color: var(--text-muted);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.type-btn:hover {
+  border-color: var(--border-secondary);
+  background-color: var(--bg-hover);
+}
+
+.type-btn.active.expense {
+  border-color: var(--color-error);
+  background-color: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.type-btn.active.income {
+  border-color: var(--color-success);
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+/* Grid do Formulário */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .form-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+}
+
+.form-field {
+  width: 100%;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+/* Fix label nos form fields */
+::ng-deep .form-field .mat-mdc-floating-label {
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: unset;
+  max-width: 100%;
+}
+
+::ng-deep .form-field .mat-mdc-form-field-infix {
+  width: 100%;
+  min-width: 180px;
+}
+
+/* Seção de Parcelamento */
+.installment-section {
+  margin-top: 0.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.installment-toggle {
+  display: flex;
+  align-items: center;
+}
+
+.installment-field {
+  max-width: 300px;
+}
+
+/* Botão de Submit */
+.form-actions {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.submit-btn {
+  background-color: var(--accent-primary) !important;
+  color: #ffffff !important;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+  transition: all 0.3s ease;
+}
+
+.submit-btn:hover {
+  background-color: var(--accent-hover) !important;
+  box-shadow: 0 6px 16px rgba(14, 165, 233, 0.4);
+  transform: translateY(-2px);
+}
+
+.submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+::ng-deep .submit-btn.mat-mdc-fab.mat-mdc-fab-extended {
+  padding: 0 2rem;
+  height: 48px;
+}
+
+@media (max-width: 640px) {
+  .form-actions {
+    justify-content: stretch;
+  }
+
+  .submit-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Material Slide Toggle */
+::ng-deep .mat-mdc-slide-toggle .mdc-switch__track {
+  background-color: var(--border-secondary) !important;
+}
+
+::ng-deep .mat-mdc-slide-toggle.mat-mdc-slide-toggle-checked .mdc-switch__track {
+  background-color: var(--accent-primary) !important;
+}

@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import type { OnInit } from '@angular/core';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -11,73 +12,17 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
+import type { Expense } from '../../models';
+import { ExpenseService } from '../../services/expense.service';
 
 export interface Transaction {
   id: number;
   description: string;
   category: string;
-  paymentMethod: string;
   amount: number;
   date: string;
   type: 'income' | 'expense';
 }
-
-const transacoes: Transaction[] = [
-  {
-    id: 1,
-    description: 'Salário Mensal',
-    category: 'Renda',
-    paymentMethod: 'Transferência Bancária',
-    amount: 2600.0,
-    date: '2023-10-24',
-    type: 'income',
-  },
-  {
-    id: 2,
-    description: 'Supermercado',
-    category: 'Alimentação',
-    paymentMethod: 'Cartão de Crédito',
-    amount: -75.5,
-    date: '2023-10-25',
-    type: 'expense',
-  },
-  {
-    id: 3,
-    description: 'Posto de Gasolina',
-    category: 'Transporte',
-    paymentMethod: 'Cartão de Débito',
-    amount: -45.0,
-    date: '2023-10-23',
-    type: 'expense',
-  },
-  {
-    id: 4,
-    description: 'Conta de Internet',
-    category: 'Utilidades',
-    paymentMethod: 'Cartão de Crédito',
-    amount: -60.0,
-    date: '2023-10-22',
-    type: 'expense',
-  },
-  {
-    id: 5,
-    description: 'Jantar com amigos',
-    category: 'Entretenimento',
-    paymentMethod: 'Cartão de Crédito',
-    amount: -120.3,
-    date: '2023-10-20',
-    type: 'expense',
-  },
-  {
-    id: 6,
-    description: 'Pagamento de Aluguel',
-    category: 'Moradia',
-    paymentMethod: 'Transferência Bancária',
-    amount: -1200.0,
-    date: '2023-10-15',
-    type: 'expense',
-  },
-];
 
 interface FilterOption {
   value: string;
@@ -104,43 +49,62 @@ interface FilterOption {
   styleUrl: './transactions.component.css',
   host: { style: 'display: contents' },
 })
-export class TransactionsComponent {
+export class TransactionsComponent implements OnInit {
   displayedColumns: string[] = [
     'date',
     'description',
     'category',
-    'paymentMethod',
     'amount',
     'actions',
   ];
-  dataSource = transacoes;
+  dataSource: Transaction[] = [];
 
   // Filtros
   searchText = signal('');
   startDate: Date | null = null;
   endDate: Date | null = null;
   selectedCategory = signal('all');
-  selectedPaymentMethod = signal('all');
 
-  categories: FilterOption[] = [
-    { value: 'all', label: 'Todas' },
-    { value: 'income', label: 'Renda' },
-    { value: 'groceries', label: 'Alimentação' },
-    { value: 'transport', label: 'Transporte' },
-    { value: 'utilities', label: 'Utilidades' },
-    { value: 'entertainment', label: 'Entretenimento' },
-    { value: 'rent', label: 'Moradia' },
-  ];
-
-  paymentMethods: FilterOption[] = [
-    { value: 'all', label: 'Todos' },
-    { value: 'credit', label: 'Cartão de Crédito' },
-    { value: 'debit', label: 'Cartão de Débito' },
-    { value: 'bank', label: 'Transferência Bancária' },
-    { value: 'cash', label: 'Dinheiro' },
-  ];
+  categories: FilterOption[] = [{ value: 'all', label: 'Todas' }];
 
   private router = inject(Router);
+  private expenseService = inject(ExpenseService);
+
+  ngOnInit(): void {
+    this.loadExpenses();
+    this.loadCategories();
+  }
+
+  private loadExpenses(): void {
+    this.expenseService.getExpenses().subscribe({
+      next: (expenses: Expense[]) => {
+        this.dataSource = expenses.map((e) => ({
+          id: e.id,
+          description: e.description,
+          category: e.category?.name || `Cat. ${e.categoryId}`,
+          amount: e.amount,
+          date:
+            e.date instanceof Date
+              ? e.date.toISOString().split('T')[0]
+              : String(e.date),
+          type: e.amount >= 0 ? ('income' as const) : ('expense' as const),
+        }));
+      },
+      error: (err) => console.error('Erro ao carregar transações:', err),
+    });
+  }
+
+  private loadCategories(): void {
+    this.expenseService.getCategories().subscribe({
+      next: (cats) => {
+        this.categories = [
+          { value: 'all', label: 'Todas' },
+          ...cats.map((c) => ({ value: String(c.id), label: c.name })),
+        ];
+      },
+      error: (err) => console.error('Erro ao carregar categorias:', err),
+    });
+  }
 
   clearDateFilter() {
     this.startDate = null;
@@ -153,12 +117,10 @@ export class TransactionsComponent {
 
   editTransaction(transaction: Transaction) {
     console.log('Editar transação:', transaction);
-    // Implementar navegação para edição
   }
 
   deleteTransaction(transaction: Transaction) {
     console.log('Deletar transação:', transaction);
-    // Implementar lógica de deleção
   }
 
   formatAmount(amount: number): string {

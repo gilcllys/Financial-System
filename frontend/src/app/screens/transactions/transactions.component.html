@@ -67,16 +67,6 @@
           }
         </mat-select>
       </mat-form-field>
-
-      <!-- Método de Pagamento -->
-      <mat-form-field appearance="outline" class="filter-field">
-        <mat-label>Pagamento</mat-label>
-        <mat-select [(ngModel)]="selectedPaymentMethod">
-          @for (method of paymentMethods; track method.value) {
-          <mat-option [value]="method.value">{{ method.label }}</mat-option>
-          }
-        </mat-select>
-      </mat-form-field>
     </div>
   </div>
 
@@ -119,19 +109,6 @@
           data-label="Categoria"
         >
           {{ transaction.category }}
-        </td>
-      </ng-container>
-
-      <!-- Coluna Método de Pagamento -->
-      <ng-container matColumnDef="paymentMethod">
-        <th mat-header-cell *matHeaderCellDef class="header-cell">Pagamento</th>
-        <td
-          mat-cell
-          *matCellDef="let transaction"
-          class="data-cell"
-          data-label="Pagamento"
-        >
-          {{ transaction.paymentMethod }}
         </td>
       </ng-container>
 
