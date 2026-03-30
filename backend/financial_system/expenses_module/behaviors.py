@@ -37,8 +37,8 @@ class CreateExpenseBehavior:
     def create_single_expense(self) -> Expense:
         """Cria uma única despesa (à vista)"""
         expense = Expense.objects.create(
-            user_id=self.user_id,
-            category_id=self.category_id,
+            user_id_id=self.user_id,
+            category_id_id=self.category_id,
             description=self.description,
             quantity=self.quantity,
             amount=self.amount,
@@ -67,8 +67,8 @@ class CreateExpenseBehavior:
             description_with_installment = f"{self.description} - Parcela {installment_number}/{self.installments}"
 
             expense = Expense.objects.create(
-                user_id=self.user_id,
-                category_id=self.category_id,
+                user_id_id=self.user_id,
+                category_id_id=self.category_id,
                 description=description_with_installment,
                 quantity=self.quantity,
                 amount=installment_amount,
