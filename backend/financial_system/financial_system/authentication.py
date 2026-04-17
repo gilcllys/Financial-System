@@ -42,15 +42,45 @@ def get_keycloak_jwks():
     return jwks
 
 
+def _introspect_token(token: str) -> dict:
+    """
+    Valida o token via endpoint de introspection do Keycloak.
+
+    Usado quando o cliente é confidential (private) — autentica com
+    client_id + client_secret, garantindo que tokens revogados sejam rejeitados.
+    """
+    introspect_url = (
+        f"{settings.KEYCLOAK_SERVER_URL}"
+        f"/realms/{settings.KEYCLOAK_REALM}"
+        f"/protocol/openid-connect/token/introspect"
+    )
+    try:
+        response = requests.post(
+            introspect_url,
+            data={'token': token},
+            auth=(settings.KEYCLOAK_CLIENT_ID, settings.KEYCLOAK_CLIENT_SECRET),
+            timeout=5,
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        logger.error("Falha ao chamar introspection do Keycloak: %s", e)
+        raise AuthenticationFailed(
+            "Não foi possível validar as credenciais de autenticação."
+        )
+
+
 class KeycloakAuthentication(BaseAuthentication):
     """
     Autentica requisições validando o Bearer token JWT emitido pelo Keycloak.
 
-    Fluxo:
-      1. Extrai o token do header Authorization: Bearer <token>
-      2. Busca (ou usa cache) das chaves públicas JWKS do Keycloak
-      3. Valida assinatura, expiração e audience
-      4. Cria ou recupera um Django User shadow pelo campo 'sub' do token
+    Estratégia dupla:
+      1. Validação offline via JWKS (rápida, sem round-trip ao Keycloak)
+      2. Introspection via client_secret (confirma token ativo e não revogado)
+
+    Quando KEYCLOAK_CLIENT_SECRET está configurado, a introspection é usada
+    como validação primária (cliente confidential). Caso contrário, cai para
+    validação JWKS pura.
     """
 
     def authenticate(self, request):
@@ -59,11 +89,26 @@ class KeycloakAuthentication(BaseAuthentication):
             return None
 
         token = auth_header.split(' ', 1)[1].strip()
-        payload = self._decode_token(token)
+
+        if getattr(settings, 'KEYCLOAK_CLIENT_SECRET', None):
+            payload = self._validate_via_introspection(token)
+        else:
+            payload = self._decode_via_jwks(token)
+
         user = self._get_or_create_shadow_user(payload)
         return (user, token)
 
-    def _decode_token(self, token):
+    def _validate_via_introspection(self, token: str) -> dict:
+        """Valida token pelo endpoint de introspection (cliente confidential)."""
+        result = _introspect_token(token)
+
+        if not result.get('active', False):
+            raise AuthenticationFailed("Token inativo ou revogado.")
+
+        return result
+
+    def _decode_via_jwks(self, token: str) -> dict:
+        """Valida token offline pelas chaves públicas JWKS (cliente público)."""
         jwks = get_keycloak_jwks()
         decode_errors = []
 
@@ -84,13 +129,12 @@ class KeycloakAuthentication(BaseAuthentication):
             except jwt.InvalidTokenError as exc:
                 decode_errors.append(str(exc))
 
-        # Nenhuma chave validou — invalida cache para forçar re-fetch no próximo request
         cache.delete(JWKS_CACHE_KEY)
         raise AuthenticationFailed(
             f"Token inválido. Detalhes: {'; '.join(decode_errors)}"
         )
 
-    def _get_or_create_shadow_user(self, payload):
+    def _get_or_create_shadow_user(self, payload: dict) -> User:
         sub = payload.get('sub')
         if not sub:
             raise AuthenticationFailed("Token não contém o campo 'sub'.")
