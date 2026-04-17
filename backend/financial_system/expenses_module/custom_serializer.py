@@ -2,10 +2,6 @@ from rest_framework import serializers
 
 
 class CreateExpenseCustomSerializer(serializers.Serializer):
-    user_id = serializers.IntegerField(
-        required=True,
-        allow_null=False
-    )
     category_id = serializers.IntegerField(
         required=True,
         allow_null=False

@@ -30,17 +30,17 @@ services:
       db:
         condition: service_healthy
 
-  frontend:
-    build:
-      context: ./frontend
-      args:
-        NG_CONFIG: development
-    ports:
-      - "4200:4200"
-    env_file:
-      - ./frontend/.env.local
-    depends_on:
-      - backend
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     args:
+  #       NG_CONFIG: development
+  #   ports:
+  #     - "4200:4200"
+  #   env_file:
+  #     - ./frontend/.env.local
+  #   depends_on:
+  #     - backend
 
 volumes:
   pgdata:

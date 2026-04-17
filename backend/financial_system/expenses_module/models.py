@@ -1,5 +1,4 @@
 from django.db import models
-from django.contrib.auth.models import User
 
 
 class BaseModel(models.Model):
@@ -31,12 +30,12 @@ class ExpenseCategory(BaseModel):
 
 
 class CreditCard(BaseModel):
-    user_id = models.ForeignKey(
-        to=User,
-        db_column='user_id',
+    keycloak_user_id = models.CharField(
+        max_length=36,
+        db_column='keycloak_user_id',
         db_index=True,
         null=False,
-        on_delete=models.DO_NOTHING
+        help_text='UUID do usuário no Keycloak (sub claim)',
     )
     name = models.CharField(
         max_length=100,
@@ -72,12 +71,12 @@ class Expense(BaseModel):
         ('cartao', 'Cartão'),
     ]
 
-    user_id = models.ForeignKey(
-        to=User,
-        db_column='user _id',
+    keycloak_user_id = models.CharField(
+        max_length=36,
+        db_column='keycloak_user_id',
         db_index=True,
         null=False,
-        on_delete=models.DO_NOTHING
+        help_text='UUID do usuário no Keycloak (sub claim)',
     )
     category_id = models.ForeignKey(
         to='ExpenseCategory',
