@@ -6,6 +6,8 @@ router = routers.SimpleRouter()
 router.register(r'expense', viewsets.ExpenseViewSet, basename='expense')
 router.register(r'expense_category',
                 viewsets.ExpenseCategoryViewSet, basename='expense_category')
+router.register(r'credit_card',
+                viewsets.CreditCardViewSet, basename='credit_card')
 router.register(r'supermach_expense',
                 viewsets.SupermachExpenseViewSet, basename='supermach_expense')
 router.register(r'supermach_expense_item',

@@ -23,6 +23,11 @@ class ExpenseCategoryViewSet(viewsets.ModelViewSet):
     queryset = models.ExpenseCategory.objects.all()
 
 
+class CreditCardViewSet(viewsets.ModelViewSet):
+    serializer_class = serializer.CreditCardSerializer
+    queryset = models.CreditCard.objects.all()
+
+
 class SupermachExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = serializer.SupermachExpenseSerializer
     queryset = models.SupermachExepense.objects.all()

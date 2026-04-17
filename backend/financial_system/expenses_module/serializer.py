@@ -8,6 +8,12 @@ class ExpenseCategorySerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class CreditCardSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.CreditCard
+        fields = '__all__'
+
+
 class ExpenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Expense

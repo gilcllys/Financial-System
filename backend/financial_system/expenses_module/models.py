@@ -30,7 +30,48 @@ class ExpenseCategory(BaseModel):
         verbose_name_plural = "Expense Categories"
 
 
+class CreditCard(BaseModel):
+    user_id = models.ForeignKey(
+        to=User,
+        db_column='user_id',
+        db_index=True,
+        null=False,
+        on_delete=models.DO_NOTHING
+    )
+    name = models.CharField(
+        max_length=100,
+        db_column='name',
+        db_index=True,
+        null=False,
+    )
+    due_date = models.IntegerField(
+        db_column='due_date',
+        null=False,
+        help_text='Dia do vencimento da fatura (1-31)',
+    )
+    best_purchase_date = models.IntegerField(
+        db_column='best_purchase_date',
+        null=False,
+        help_text='Melhor dia para compra (1-31)',
+    )
+    last_four_digits = models.CharField(
+        max_length=4,
+        db_column='last_four_digits',
+        null=False,
+    )
+
+    class Meta:
+        db_table = 'credit_cards'
+        verbose_name = "Credit Card"
+        verbose_name_plural = "Credit Cards"
+
+
 class Expense(BaseModel):
+    PAYMENT_METHOD_CHOICES = [
+        ('dinheiro', 'Dinheiro'),
+        ('cartao', 'Cartão'),
+    ]
+
     user_id = models.ForeignKey(
         to=User,
         db_column='user _id',
@@ -45,7 +86,22 @@ class Expense(BaseModel):
         null=False,
         on_delete=models.DO_NOTHING
     )
-
+    payment_method = models.CharField(
+        max_length=10,
+        choices=PAYMENT_METHOD_CHOICES,
+        db_column='payment_method',
+        db_index=True,
+        default='dinheiro',
+        null=False,
+    )
+    credit_card = models.ForeignKey(
+        to='CreditCard',
+        db_column='credit_card_id',
+        db_index=True,
+        null=True,
+        blank=True,
+        on_delete=models.DO_NOTHING,
+    )
     description = models.CharField(
         max_length=255,
         db_column='description',
