@@ -1,8 +1,8 @@
 asgiref==3.10.0
+cryptography>=41.0.0
 Django==5.2.7
 django-cors-headers==4.9.0
 djangorestframework==3.16.1
-djangorestframework_simplejwt==5.5.1
 dotenv==0.9.9
 drf-yasg==1.21.11
 gunicorn==23.0.0
@@ -14,6 +14,7 @@ python-dateutil==2.9.0
 python-dotenv==1.2.1
 pytz==2025.2
 PyYAML==6.0.3
+requests==2.32.3
 sqlparse==0.5.3
 typing_extensions==4.15.0
 uritemplate==4.2.0
