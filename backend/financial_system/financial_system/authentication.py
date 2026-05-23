@@ -27,21 +27,21 @@ class KeycloakPrincipal:
     is_active = True
 
     def __init__(self, payload: dict):
-        self.keycloak_user_id: str = payload.get('sub', '')
+        self.tenant_id: str = payload.get('sub', '')
         self.email: str = payload.get('email', '')
         self.first_name: str = payload.get('given_name', '')
         self.last_name: str = payload.get('family_name', '')
 
     @property
     def is_authenticated(self):
-        return bool(self.keycloak_user_id)
+        return bool(self.tenant_id)
 
     @property
     def pk(self):
-        return self.keycloak_user_id
+        return self.tenant_id
 
     def __str__(self):
-        return self.keycloak_user_id
+        return self.tenant_id
 
 
 def _fetch_jwks():
@@ -103,7 +103,7 @@ class KeycloakAuthentication(BaseAuthentication):
     Autentica requisições validando o Bearer token JWT emitido pelo Keycloak.
 
     Retorna um KeycloakPrincipal com os claims do token — sem persistência
-    em banco. O keycloak_user_id (sub) é usado diretamente nos modelos.
+    em banco. O tenant_id (sub) é usado diretamente nos modelos.
 
     Estratégia dupla:
       - KEYCLOAK_CLIENT_SECRET configurado → introspection (cliente confidential)
@@ -123,7 +123,7 @@ class KeycloakAuthentication(BaseAuthentication):
             payload = self._decode_via_jwks(token)
 
         principal = KeycloakPrincipal(payload)
-        if not principal.keycloak_user_id:
+        if not principal.tenant_id:
             raise AuthenticationFailed("Token não contém o campo 'sub'.")
 
         return (principal, token)

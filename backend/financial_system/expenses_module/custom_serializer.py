@@ -33,3 +33,7 @@ class CreateExpenseCustomSerializer(serializers.Serializer):
         required=False,
         default=1
     )
+    need_pay_vitoria = serializers.BooleanField(
+        required=False,
+        default=False
+    )

@@ -10,7 +10,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return models.Expense.objects.filter(
-            keycloak_user_id=self.request.user.keycloak_user_id
+            tenant_id=self.request.user.tenant_id
         )
 
     @action(detail=False, methods=['post'], url_path='create-expense')
@@ -19,7 +19,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         s = custom_serializer.CreateExpenseCustomSerializer(data=data)
         s.is_valid(raise_exception=True)
         payload = dict(s.validated_data)
-        payload['keycloak_user_id'] = request.user.keycloak_user_id
+        payload['tenant_id'] = request.user.tenant_id
         response = CreateExpenseBehavior(data=payload).run()
         return response
 
@@ -35,11 +35,11 @@ class CreditCardViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return models.CreditCard.objects.filter(
-            keycloak_user_id=self.request.user.keycloak_user_id
+            tenant_id=self.request.user.tenant_id
         )
 
     def perform_create(self, serializer):
-        serializer.save(keycloak_user_id=self.request.user.keycloak_user_id)
+        serializer.save(tenant_id=self.request.user.tenant_id)
 
 
 class SupermachExpenseViewSet(viewsets.ModelViewSet):

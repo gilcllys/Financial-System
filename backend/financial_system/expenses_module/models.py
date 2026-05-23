@@ -30,12 +30,12 @@ class ExpenseCategory(BaseModel):
 
 
 class CreditCard(BaseModel):
-    keycloak_user_id = models.CharField(
+    tenant_id = models.CharField(
         max_length=36,
-        db_column='keycloak_user_id',
+        db_column='tenant_id',
         db_index=True,
         null=False,
-        help_text='UUID do usuário no Keycloak (sub claim)',
+        help_text='Identificador único do tenant/usuário vindo do Keycloak (sub claim)',
     )
     name = models.CharField(
         max_length=100,
@@ -71,12 +71,12 @@ class Expense(BaseModel):
         ('cartao', 'Cartão'),
     ]
 
-    keycloak_user_id = models.CharField(
+    tenant_id = models.CharField(
         max_length=36,
-        db_column='keycloak_user_id',
+        db_column='tenant_id',
         db_index=True,
         null=False,
-        help_text='UUID do usuário no Keycloak (sub claim)',
+        help_text='Identificador único do tenant/usuário vindo do Keycloak (sub claim)',
     )
     category_id = models.ForeignKey(
         to='ExpenseCategory',
@@ -100,6 +100,13 @@ class Expense(BaseModel):
         null=True,
         blank=True,
         on_delete=models.DO_NOTHING,
+    )
+    need_pay_vitoria = models.BooleanField(
+        db_column='need_pay_vitoria',
+        null=True,
+        blank=True,
+        default=False,
+        help_text='Indica se essa despesa foi feita no lado da Vitória e precisa ser paga depois',
     )
     description = models.CharField(
         max_length=255,

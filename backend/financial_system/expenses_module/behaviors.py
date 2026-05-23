@@ -11,13 +11,13 @@ class CreateExpenseBehavior:
     """
     Behavior para criar despesas (expenses) com suporte a parcelamento.
 
-    O keycloak_user_id é extraído automaticamente do token autenticado
+    O tenant_id é extraído automaticamente do token autenticado
     e não precisa ser enviado no corpo da requisição.
     """
 
     def __init__(self, data):
         self.data = data
-        self.keycloak_user_id = data.get('keycloak_user_id')
+        self.tenant_id = data.get('tenant_id')
         self.category_id = data.get('category_id')
         self.description = data.get('description')
         self.amount = Decimal(str(data.get('amount', 0)))
@@ -25,6 +25,7 @@ class CreateExpenseBehavior:
         self.quantity = data.get('quantity', 1)
         self.installments = data.get('installments', 1)
         self.is_installment = data.get('is_installment', False)
+        self.need_pay_vitoria = data.get('need_pay_vitoria', False)
 
     def is_incoming(self) -> bool:
         return self.amount > 0
@@ -34,12 +35,13 @@ class CreateExpenseBehavior:
 
     def create_single_expense(self) -> Expense:
         return Expense.objects.create(
-            keycloak_user_id=self.keycloak_user_id,
+            tenant_id=self.tenant_id,
             category_id_id=self.category_id,
             description=self.description,
             quantity=self.quantity,
             amount=self.amount,
-            date=self.date
+            date=self.date,
+            need_pay_vitoria=self.need_pay_vitoria,
         )
 
     def create_installment_expenses(self) -> List[Expense]:
@@ -56,12 +58,13 @@ class CreateExpenseBehavior:
                 f"{self.description} - Parcela {installment_number}/{self.installments}"
             )
             expense = Expense.objects.create(
-                keycloak_user_id=self.keycloak_user_id,
+                tenant_id=self.tenant_id,
                 category_id_id=self.category_id,
                 description=description_with_installment,
                 quantity=self.quantity,
                 amount=installment_amount,
-                date=current_date
+                date=current_date,
+                need_pay_vitoria=self.need_pay_vitoria,
             )
             expenses.append(expense)
             current_date = current_date + relativedelta(months=1)
