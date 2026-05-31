@@ -26,6 +26,9 @@ services:
       - "8000:8000"
     env_file:
       - ./backend/.env.local
+    networks:
+      - default
+      - iam_network
     depends_on:
       db:
         condition: service_healthy
@@ -44,3 +47,8 @@ services:
 
 volumes:
   pgdata:
+
+networks:
+  iam_network:
+    external: true
+    name: identity-and-access-management_default

@@ -126,6 +126,7 @@ KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "master")
 KEYCLOAK_CLIENT_ID = os.getenv("KEYCLOAK_CLIENT_ID", "financial-backend")
 KEYCLOAK_ALGORITHMS = os.getenv("KEYCLOAK_ALGORITHMS", "RS256").split(",")
 KEYCLOAK_CLIENT_SECRET = os.getenv("KEYCLOAK_CLIENT_SECRET", None)
+KEYCLOAK_VERIFY_SSL = os.getenv("KEYCLOAK_VERIFY_SSL", "True").lower() not in ("false", "0", "no")
 
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = True

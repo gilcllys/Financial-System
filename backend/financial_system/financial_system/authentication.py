@@ -51,7 +51,7 @@ def _fetch_jwks():
         f"/protocol/openid-connect/certs"
     )
     try:
-        response = requests.get(jwks_url, timeout=5)
+        response = requests.get(jwks_url, timeout=5, verify=settings.KEYCLOAK_VERIFY_SSL)
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
@@ -87,6 +87,7 @@ def _introspect_token(token: str) -> dict:
             introspect_url,
             data={'token': token},
             auth=(settings.KEYCLOAK_CLIENT_ID, settings.KEYCLOAK_CLIENT_SECRET),
+            verify=settings.KEYCLOAK_VERIFY_SSL,
             timeout=5,
         )
         response.raise_for_status()
