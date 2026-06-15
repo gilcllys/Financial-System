@@ -48,7 +48,3 @@ services:
 volumes:
   pgdata:
 
-networks:
-  iam_network:
-    external: true
-    name: identity-and-access-management_default
