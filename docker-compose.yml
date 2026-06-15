@@ -28,7 +28,6 @@ services:
       - ./backend/.env.local
     networks:
       - default
-      - iam_network
     depends_on:
       db:
         condition: service_healthy

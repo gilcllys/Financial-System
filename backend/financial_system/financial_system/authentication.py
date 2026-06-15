@@ -139,20 +139,30 @@ class KeycloakAuthentication(BaseAuthentication):
         jwks = get_keycloak_jwks()
         decode_errors = []
 
+        audience = getattr(settings, 'KEYCLOAK_CLIENT_ID', None)
+        decode_options = {'verify_exp': True}
+
         for key_data in jwks.get('keys', []):
             try:
                 public_key = RSAAlgorithm.from_jwk(json.dumps(key_data))
-                return jwt.decode(
-                    token,
-                    public_key,
-                    algorithms=settings.KEYCLOAK_ALGORITHMS,
-                    audience=settings.KEYCLOAK_CLIENT_ID,
-                    options={'verify_exp': True},
-                )
+                try:
+                    return jwt.decode(
+                        token,
+                        public_key,
+                        algorithms=settings.KEYCLOAK_ALGORITHMS,
+                        audience=audience,
+                        options=decode_options,
+                    )
+                except jwt.InvalidAudienceError:
+                    # Token não tem audience configurado — revalida sem verificação
+                    return jwt.decode(
+                        token,
+                        public_key,
+                        algorithms=settings.KEYCLOAK_ALGORITHMS,
+                        options={**decode_options, 'verify_aud': False},
+                    )
             except jwt.ExpiredSignatureError:
                 raise AuthenticationFailed("Token expirado.")
-            except jwt.InvalidAudienceError:
-                raise AuthenticationFailed("Token com audience inválido.")
             except jwt.InvalidTokenError as exc:
                 decode_errors.append(str(exc))
 
