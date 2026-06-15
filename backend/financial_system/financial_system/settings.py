@@ -33,7 +33,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
-    'expenses_module',
+    'catalog',
+    'cards',
+    'expenses',
+    'debts',
+    'supermarket',
 ]
 
 MIDDLEWARE = [
