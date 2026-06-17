@@ -102,6 +102,14 @@ export const routes: Routes = [
           import('./features/supermarket/supermarket-detail/supermarket-detail.component').then(m => m.SupermarketDetailComponent),
       },
 
+      // Histórico (todos os gastos, sem filtro de mês padrão)
+      {
+        path: 'history',
+        loadComponent: () =>
+          import('./features/expenses/expense-list/expense-list.component').then(m => m.ExpenseListComponent),
+        data: { historyMode: true },
+      },
+
       // Analytics
       {
         path: 'analytics',

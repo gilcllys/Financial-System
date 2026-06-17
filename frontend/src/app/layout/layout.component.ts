@@ -18,6 +18,7 @@ import { AuthService } from '../core/auth/auth.service';
         <!-- Desktop nav -->
         <nav class="navbar__nav" aria-label="Main navigation">
           <a routerLink="/expenses" routerLinkActive="active" class="navbar__link">Gastos</a>
+          <a routerLink="/history" routerLinkActive="active" class="navbar__link">Histórico</a>
           <a routerLink="/cards" routerLinkActive="active" class="navbar__link">Cartões</a>
           <a routerLink="/installments" routerLinkActive="active" class="navbar__link">Parcelamentos</a>
           <a routerLink="/supermarket" routerLinkActive="active" class="navbar__link">Supermercado</a>

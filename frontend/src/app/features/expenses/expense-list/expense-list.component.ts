@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { RouterLink, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
 import { ExpenseService } from '../../../core/services/expense.service';
@@ -17,6 +17,10 @@ import { Expense, ExpenseCategory, PaymentMethod } from '../../../core/models';
 export class ExpenseListComponent implements OnInit, OnDestroy {
   private expenseService = inject(ExpenseService);
   private categoryService = inject(CategoryService);
+  private route = inject(ActivatedRoute);
+
+  // Em modo histórico não filtra por mês/ano por padrão
+  historyMode = false;
   private destroy$ = new Subject<void>();
   private searchSubject = new Subject<string>();
 
@@ -30,8 +34,8 @@ export class ExpenseListComponent implements OnInit, OnDestroy {
   currentPage = signal(1);
   pageSize = 20;
 
-  // Filtros — padrão: mês e ano atual
-  filterMonth = signal(new Date().getMonth() + 1);
+  // Filtros — padrão: mês/ano atual (desativado no modo histórico)
+  filterMonth = signal(0);
   filterYear = signal(new Date().getFullYear());
   filterCategory = signal<number | ''>('');
   filterPayment = signal<PaymentMethod | ''>('');
@@ -59,6 +63,11 @@ export class ExpenseListComponent implements OnInit, OnDestroy {
   years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
 
   ngOnInit(): void {
+    this.historyMode = !!this.route.snapshot.data['historyMode'];
+    if (!this.historyMode) {
+      // Tela de Gastos: filtra mês atual por padrão
+      this.filterMonth.set(new Date().getMonth() + 1);
+    }
     this.categoryService.list().subscribe({ next: cats => this.categories.set(cats) });
     // Debounce na busca por texto: 400ms
     this.searchSubject.pipe(
