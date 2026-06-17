@@ -7,7 +7,7 @@ import { Expense, CreateExpensePayload, ExpenseFilters } from '../models';
 @Injectable({ providedIn: 'root' })
 export class ExpenseService {
   private http = inject(HttpClient);
-  private base = `${environment.apiBaseUrl}/api/expenses`;
+  private base = `${environment.apiBaseUrl}/api/expenses/expenses`;
 
   list(filters?: ExpenseFilters): Observable<Expense[]> {
     let params = new HttpParams();

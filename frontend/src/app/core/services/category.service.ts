@@ -7,7 +7,7 @@ import { ExpenseCategory } from '../models';
 @Injectable({ providedIn: 'root' })
 export class CategoryService {
   private http = inject(HttpClient);
-  private base = `${environment.apiBaseUrl}/api/catalog`;
+  private base = `${environment.apiBaseUrl}/api/catalog/categories`;
 
   list(): Observable<ExpenseCategory[]> {
     return this.http.get<ExpenseCategory[]>(`${this.base}/`);

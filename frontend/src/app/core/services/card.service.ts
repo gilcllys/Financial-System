@@ -7,7 +7,7 @@ import { CreditCard, CreateCreditCardPayload } from '../models';
 @Injectable({ providedIn: 'root' })
 export class CardService {
   private http = inject(HttpClient);
-  private base = `${environment.apiBaseUrl}/api/cards`;
+  private base = `${environment.apiBaseUrl}/api/cards/credit-cards`;
 
   list(): Observable<CreditCard[]> {
     return this.http.get<CreditCard[]>(`${this.base}/`);
