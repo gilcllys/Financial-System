@@ -1,0 +1,116 @@
+<div class="page-header">
+  <div class="page-header__left">
+    <h1 class="page-header__title">Gastos</h1>
+    <p class="page-header__subtitle">Gerencie suas despesas e receitas</p>
+  </div>
+  <a routerLink="/expenses/new" class="btn btn--primary desktop-only">+ Novo Gasto</a>
+</div>
+
+<!-- Filters -->
+<div class="filter-bar" role="search" aria-label="Filtros de gastos">
+  <select class="form-select" [(ngModel)]="filterMonth" [ngModel]="filterMonth()" (ngModelChange)="filterMonth.set($event)" aria-label="Mês">
+    @for (m of months; track m.value) {
+      <option [value]="m.value">{{ m.label }}</option>
+    }
+  </select>
+  <select class="form-select" [(ngModel)]="filterYear" [ngModel]="filterYear()" (ngModelChange)="filterYear.set($event)" aria-label="Ano">
+    @for (y of years; track y) {
+      <option [value]="y">{{ y }}</option>
+    }
+  </select>
+  <select class="form-select" [ngModel]="filterCategory()" (ngModelChange)="filterCategory.set($event)" aria-label="Categoria">
+    <option value="">Todas as categorias</option>
+    @for (cat of categories(); track cat.id) {
+      <option [value]="cat.id">{{ cat.name }}</option>
+    }
+  </select>
+  <select class="form-select" [ngModel]="filterPayment()" (ngModelChange)="filterPayment.set($event)" aria-label="Método de pagamento">
+    <option value="">Todos os métodos</option>
+    <option value="dinheiro">Dinheiro</option>
+    <option value="cartao">Cartão</option>
+  </select>
+</div>
+
+<!-- Summary cards -->
+<div class="summary-row" role="region" aria-label="Resumo do período">
+  <div class="summary-card">
+    <span class="summary-card__label">Receitas</span>
+    <span class="summary-card__value value-up">{{ formatAmount(totalIncome()) }}</span>
+  </div>
+  <div class="summary-card">
+    <span class="summary-card__label">Despesas</span>
+    <span class="summary-card__value value-down">{{ formatAmount(totalExpenses()) }}</span>
+  </div>
+  <div class="summary-card">
+    <span class="summary-card__label">Saldo</span>
+    <span class="summary-card__value" [class]="amountClass(balance())">
+      {{ amountPrefix(balance()) }} {{ formatAmount(balance()) }}
+    </span>
+  </div>
+</div>
+
+<!-- Content -->
+@if (loading()) {
+  <div class="loading-wrapper" aria-live="polite">
+    <span class="spinner"></span> Carregando gastos...
+  </div>
+} @else if (filteredExpenses().length === 0) {
+  <div class="empty-state">
+    <div class="empty-state__icon">💸</div>
+    <p class="empty-state__title">Nenhum gasto encontrado</p>
+    <p class="empty-state__text">Tente ajustar os filtros ou adicione um novo gasto.</p>
+    <a routerLink="/expenses/new" class="btn btn--primary" style="margin-top: 16px">+ Novo Gasto</a>
+  </div>
+} @else {
+  <!-- Desktop table -->
+  <div class="data-table-wrapper" aria-label="Lista de gastos">
+    <table class="data-table" role="table">
+      <thead>
+        <tr>
+          <th scope="col">Descrição</th>
+          <th scope="col">Categoria</th>
+          <th scope="col">Data</th>
+          <th scope="col">Método</th>
+          <th scope="col" class="text-right">Valor</th>
+          <th scope="col">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (e of filteredExpenses(); track e.id) {
+          <tr>
+            <td class="expense-desc">
+              <span class="expense-desc__text">{{ e.description }}</span>
+            </td>
+            <td>
+              <span class="badge">{{ categoryName(e.category_id) }}</span>
+            </td>
+            <td class="mono text-muted">{{ e.date | date:'dd/MM/yyyy' : '+0000' }}</td>
+            <td>
+              <span class="badge" [class.badge--primary]="e.payment_method === 'cartao'">
+                {{ e.payment_method === 'cartao' ? '💳 Cartão' : '💵 Dinheiro' }}
+              </span>
+            </td>
+            <td class="text-right">
+              <span [class]="amountClass(e.amount)" class="mono">
+                {{ amountPrefix(e.amount) }} {{ formatAmount(e.amount) }}
+              </span>
+            </td>
+            <td>
+              <div class="action-buttons">
+                <a [routerLink]="['/expenses', e.id, 'edit']" class="btn btn--ghost btn--sm" [attr.aria-label]="'Editar gasto ' + e.description">✏️</a>
+                <button
+                  class="btn btn--ghost btn--sm"
+                  (click)="delete(e.id)"
+                  [disabled]="deletingId() === e.id"
+                  [attr.aria-label]="'Excluir gasto ' + e.description"
+                >
+                  @if (deletingId() === e.id) { <span class="spinner"></span> } @else { 🗑️ }
+                </button>
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

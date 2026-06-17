@@ -1,0 +1,22 @@
+.desktop-only {
+  @media (max-width: 1023px) { display: none; }
+}
+
+.text-right { text-align: right; }
+.text-muted { color: var(--color-muted); font-size: 13px; }
+
+.expense-desc {
+  &__text {
+    display: block;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+}
+
+.action-buttons {
+  display: flex;
+  gap: var(--space-xxs);
+}

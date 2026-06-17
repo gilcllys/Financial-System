@@ -11,6 +11,7 @@ DEFAULT_CATEGORIES = [
     ('Assinaturas', 'Gastos com serviços de assinatura'),
     ('Gastos com carro', 'Gastos com combustível, manutenção e IPVA'),
     ('Diversos', 'Outros gastos não categorizados'),
+    ('Sem categoria', 'Gastos que ainda não foram categorizados'),
 ]
 
 

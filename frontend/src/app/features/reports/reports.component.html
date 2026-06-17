@@ -1,0 +1,72 @@
+<div class="page-header">
+  <div class="page-header__left">
+    <h1 class="page-header__title">Relatório Mensal</h1>
+    <p class="page-header__subtitle">Visão geral das suas finanças</p>
+  </div>
+</div>
+
+<!-- Month/Year selector -->
+<div class="filter-bar" role="search" aria-label="Seletor de período">
+  <select class="form-select" [ngModel]="selectedMonth()" (ngModelChange)="selectedMonth.set($event)" aria-label="Mês">
+    @for (m of months; track m.value) {
+      <option [value]="m.value">{{ m.label }}</option>
+    }
+  </select>
+  <select class="form-select" [ngModel]="selectedYear()" (ngModelChange)="selectedYear.set($event)" aria-label="Ano">
+    @for (y of years; track y) {
+      <option [value]="y">{{ y }}</option>
+    }
+  </select>
+</div>
+
+@if (loading()) {
+  <div class="loading-wrapper" aria-live="polite"><span class="spinner"></span> Carregando...</div>
+} @else {
+  <!-- Summary -->
+  <div class="summary-row" role="region" [attr.aria-label]="'Resumo do mês ' + monthLabel()">
+    <div class="summary-card">
+      <span class="summary-card__label">Receitas</span>
+      <span class="summary-card__value value-up">{{ formatAmount(totalIncome()) }}</span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-card__label">Despesas</span>
+      <span class="summary-card__value value-down">{{ formatAmount(totalExpenses()) }}</span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-card__label">Saldo</span>
+      <span class="summary-card__value" [class]="amountClass(balance())">
+        {{ amountPrefix(balance()) }} {{ formatAmount(balance()) }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Breakdown by category -->
+  <div class="card" style="margin-top: var(--space-base)">
+    <div class="card__header">
+      <h2 class="card__title">Por Categoria</h2>
+      <span class="badge">{{ filtered().length }} transações</span>
+    </div>
+
+    @if (breakdown().length === 0) {
+      <div class="empty-state">
+        <div class="empty-state__icon">📊</div>
+        <p class="empty-state__title">Sem dados para este período</p>
+        <p class="empty-state__text">Adicione gastos para ver o relatório.</p>
+      </div>
+    } @else {
+      <div class="breakdown-list" role="list" aria-label="Gastos por categoria">
+        @for (item of breakdown(); track item.category.id) {
+          <div class="breakdown-item" role="listitem">
+            <div class="breakdown-item__info">
+              <span class="breakdown-item__name">{{ item.category.name }}</span>
+              <span class="breakdown-item__count">{{ item.count }} {{ item.count === 1 ? 'transação' : 'transações' }}</span>
+            </div>
+            <span class="breakdown-item__total mono" [class]="amountClass(item.total)">
+              {{ amountPrefix(item.total) }} {{ formatAmount(item.total) }}
+            </span>
+          </div>
+        }
+      </div>
+    }
+  </div>
+}

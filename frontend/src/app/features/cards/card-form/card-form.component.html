@@ -1,0 +1,69 @@
+<div class="page-header">
+  <div class="page-header__left">
+    <h1 class="page-header__title">{{ isEdit() ? 'Editar Cartão' : 'Novo Cartão' }}</h1>
+  </div>
+  <a routerLink="/cards" class="btn btn--secondary btn--sm">← Voltar</a>
+</div>
+
+@if (loading()) {
+  <div class="loading-wrapper"><span class="spinner"></span> Carregando...</div>
+} @else {
+  <div class="card" style="max-width: 560px">
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate aria-label="Formulário de cartão">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="card-name">Nome do Cartão *</label>
+          <input id="card-name" class="form-input" [class.error]="hasError('name')"
+            type="text" formControlName="name" placeholder="Ex: Nubank" />
+          @if (hasError('name')) {
+            <span class="form-error" role="alert">Nome é obrigatório (mín. 2 caracteres).</span>
+          }
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="last-four">Últimos 4 dígitos *</label>
+          <input id="last-four" class="form-input mono" [class.error]="hasError('last_four_digits')"
+            type="text" formControlName="last_four_digits" maxlength="4" placeholder="1234"
+            inputmode="numeric" pattern="[0-9]{4}" />
+          @if (hasError('last_four_digits')) {
+            <span class="form-error" role="alert">Informe exatamente 4 dígitos numéricos.</span>
+          }
+        </div>
+      </div>
+
+      <div class="form-row form-row--2col">
+        <div class="form-group">
+          <label class="form-label" for="due-date">Dia do Vencimento * <span class="form-hint">(1–31)</span></label>
+          <input id="due-date" class="form-input mono" [class.error]="hasError('due_date')"
+            type="number" min="1" max="31" formControlName="due_date" placeholder="10" />
+          @if (hasError('due_date')) {
+            <span class="form-error" role="alert">Informe um dia válido (1–31).</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="best-date">Melhor dia para compra * <span class="form-hint">(1–31)</span></label>
+          <input id="best-date" class="form-input mono" [class.error]="hasError('best_purchase_date')"
+            type="number" min="1" max="31" formControlName="best_purchase_date" placeholder="17" />
+          @if (hasError('best_purchase_date')) {
+            <span class="form-error" role="alert">Informe um dia válido (1–31).</span>
+          }
+        </div>
+      </div>
+
+      @if (errorMessage()) {
+        <div class="form-error-box" role="alert">{{ errorMessage() }}</div>
+      }
+
+      <div class="form-actions">
+        <a routerLink="/cards" class="btn btn--secondary">Cancelar</a>
+        <button type="submit" class="btn btn--primary" [disabled]="saving()">
+          @if (saving()) { <span class="spinner"></span> } Salvar
+        </button>
+      </div>
+    </form>
+  </div>
+}

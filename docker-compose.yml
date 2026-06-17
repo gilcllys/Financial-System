@@ -1,4 +1,6 @@
 services:
+
+  # ─── Banco de Dados ────────────────────────────────────────────────────────
   db:
     image: postgres:16-alpine
     environment:
@@ -15,6 +17,7 @@ services:
       timeout: 5s
       retries: 5
 
+  # ─── Backend (Django) ──────────────────────────────────────────────────────
   backend:
     build: ./backend
     command: >
@@ -26,24 +29,26 @@ services:
       - "8000:8000"
     env_file:
       - ./backend/.env.local
-    networks:
-      - default
+    environment:
+      # Keycloak hospedado no EC2 (acessível tanto pelo backend quanto pelo browser)
+      KEYCLOAK_SERVER_URL: https://ec2-54-147-150-5.compute-1.amazonaws.com
+      KEYCLOAK_REALM: projetos-pessoais
+      KEYCLOAK_CLIENT_ID: financial-frontend
+      DB_HOST: db
+      DB_SSL_MODE: disable
     depends_on:
       db:
         condition: service_healthy
 
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     args:
-  #       NG_CONFIG: development
-  #   ports:
-  #     - "4200:4200"
-  #   env_file:
-  #     - ./frontend/.env.local
-  #   depends_on:
-  #     - backend
+  # ─── Frontend (Angular + Nginx) ────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
 
 volumes:
   pgdata:
-

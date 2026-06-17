@@ -1,0 +1,40 @@
+.breakdown-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.breakdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-base);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-hairline-soft);
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &__info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+
+  &__count {
+    font-size: 12px;
+    color: var(--color-muted);
+  }
+
+  &__total {
+    font-size: 16px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+}
