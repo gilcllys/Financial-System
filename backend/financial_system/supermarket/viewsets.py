@@ -47,3 +47,9 @@ class SupermarketExpenseItemViewSet(viewsets.ModelViewSet):
         """[SEC-A01] Defense-in-depth: valida parent ownership e fixa tenant_id."""
         self._assert_parent_ownership(serializer.validated_data)
         serializer.save(tenant_id=self.request.user.tenant_id)
+
+    def perform_destroy(self, instance):
+        if instance.tenant_id != self.request.user.tenant_id:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Você não tem permissão para excluir este recurso.")
+        instance.delete()

@@ -50,6 +50,12 @@ class VitoriaDebtViewSet(viewsets.ModelViewSet):
     # ------------------------------------------------------------------
 
     @action(detail=False, methods=['get'], url_path='summary')
+    def perform_destroy(self, instance):
+        if instance.tenant_id != self.request.user.tenant_id:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Você não tem permissão para excluir este recurso.")
+        instance.delete()
+
     def summary(self, request):
         """
         GET /api/debts/vitoria-debts/summary/

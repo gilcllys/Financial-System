@@ -20,7 +20,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 # [SEC-A05] DEBUG padrão False — nunca True em produção sem override explícito
-DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
+_debug_env = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
+_allowed = os.getenv("ALLOWED_HOSTS", "*")
+# Segurança: bloqueia DEBUG=True se ALLOWED_HOSTS não for wildcard (produção)
+DEBUG = _debug_env if ("*" in _allowed) else False
 
 # [SEC-A05] ALLOWED_HOSTS sem wildcard como padrão
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]

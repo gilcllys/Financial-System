@@ -100,17 +100,31 @@ class ExpenseViewSet(viewsets.ModelViewSet):
                 qs = qs.filter(payment_method=payment_method)
 
         # --- search (description icontains) --------------------------
+        # [SEC-A03] Limita o tamanho da query para prevenir DoS via queries longas
+        # (icontains é parameterizado pelo ORM — seguro contra SQL injection)
         search = params.get('search')
         if search:
-            qs = qs.filter(description__icontains=search.strip())
+            search = search.strip()[:200]
+            if search:
+                qs = qs.filter(description__icontains=search)
 
         return qs
+
+    def perform_update(self, serializer):
+        """[SEC-A01] Defense-in-depth: garante que tenant_id não muda em updates."""
+        serializer.save(tenant_id=self.request.user.tenant_id)
 
     # ------------------------------------------------------------------
     # Custom actions — CRUD helpers
     # ------------------------------------------------------------------
 
     @action(detail=False, methods=['post'], url_path='create-expense')
+    def perform_destroy(self, instance):
+        if instance.tenant_id != self.request.user.tenant_id:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Você não tem permissão para excluir este recurso.")
+        instance.delete()
+
     def create_expense(self, request):
         s = serializer.CreateExpenseInputSerializer(data=request.data)
         s.is_valid(raise_exception=True)

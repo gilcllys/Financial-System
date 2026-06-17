@@ -1,9 +1,11 @@
 asgiref==3.10.0
-cryptography>=41.0.0
+# [SEC-A08] Versão pinada com upper bound — evita breaking changes de major version
+cryptography>=41.0.0,<45.0.0
 Django==5.2.7
 django-cors-headers==4.9.0
 djangorestframework==3.16.1
-dotenv==0.9.9
+# [SEC-A08] 'dotenv==0.9.9' removido — pacote diferente de python-dotenv, obsoleto e
+#            conflitante. Usar apenas python-dotenv abaixo.
 drf-yasg==1.21.11
 gunicorn==23.0.0
 inflection==0.5.1
@@ -18,5 +20,6 @@ requests==2.32.3
 sqlparse==0.5.3
 typing_extensions==4.15.0
 uritemplate==4.2.0
-whitenoise>=6.0.0
-dj-database-url>=2.0.0
+# [SEC-A08] Upper bound para evitar breaking changes
+whitenoise>=6.0.0,<7.0.0
+dj-database-url>=2.0.0,<3.0.0

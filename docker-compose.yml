@@ -7,8 +7,10 @@ services:
       POSTGRES_DB: financial_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
+    # [SEC-A05] Porta 5432 NÃO exposta ao host — acesso apenas via rede interna Docker.
+    # Em dev local, descomente SOMENTE se precisar de acesso direto ao banco:
+    # ports:
+    #   - "127.0.0.1:5432:5432"   # bind em loopback, NUNCA em 0.0.0.0
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -59,6 +61,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      # [SEC-A05] Healthcheck do backend — verifica se o Gunicorn está respondendo
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/')\" 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
     deploy:
       resources:
         limits:
@@ -75,6 +84,12 @@ services:
       - "4200:80"
     depends_on:
       - backend
+    healthcheck:
+      # [SEC-A05] Healthcheck do frontend — verifica se o Nginx está servindo
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:80/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     deploy:
       resources:
         limits:
