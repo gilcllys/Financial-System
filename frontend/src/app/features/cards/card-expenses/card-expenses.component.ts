@@ -28,7 +28,7 @@ export class CardExpensesComponent implements OnInit {
   ngOnInit(): void {
     const id = +this.route.snapshot.paramMap.get('id')!;
     this.cardService.get(id).subscribe({ next: c => this.card.set(c) });
-    this.expenseService.list({ credit_card_id: id }).subscribe({
+    this.expenseService.listByCard(id).subscribe({
       next: data => { this.expenses.set(data); this.loading.set(false); },
       error: () => this.loading.set(false),
     });

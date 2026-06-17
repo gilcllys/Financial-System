@@ -64,8 +64,8 @@ export class InstallmentsComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.expenseService.list().subscribe({
-      next: data => { this.expenses.set(data); this.loading.set(false); },
+    this.expenseService.list({ page_size: 500 }).subscribe({
+      next: res => { const data = res.results; this.expenses.set(data); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
   }

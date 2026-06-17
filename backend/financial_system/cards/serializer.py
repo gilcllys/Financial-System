@@ -6,3 +6,4 @@ class CreditCardSerializer(serializers.ModelSerializer):
     class Meta:
         model = CreditCard
         fields = '__all__'
+        read_only_fields = ['tenant_id']

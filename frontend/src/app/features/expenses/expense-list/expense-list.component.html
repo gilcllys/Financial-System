@@ -6,32 +6,49 @@
   <a routerLink="/expenses/new" class="btn btn--primary desktop-only">+ Novo Gasto</a>
 </div>
 
-<!-- Filters -->
+<!-- Barra de busca -->
+<div class="search-bar">
+  <span class="search-bar__icon">🔍</span>
+  <input
+    class="search-bar__input"
+    type="search"
+    placeholder="Buscar por descrição..."
+    [value]="searchTerm()"
+    (input)="onSearchInput($any($event.target).value)"
+    aria-label="Buscar gastos"
+  />
+  @if (searchTerm()) {
+    <button class="search-bar__clear" (click)="onSearchInput('')" aria-label="Limpar busca">✕</button>
+  }
+</div>
+
+<!-- Filtros -->
 <div class="filter-bar" role="search" aria-label="Filtros de gastos">
-  <select class="form-select" [(ngModel)]="filterMonth" [ngModel]="filterMonth()" (ngModelChange)="filterMonth.set($event)" aria-label="Mês">
+  <select class="form-select" [ngModel]="filterMonth()" (ngModelChange)="filterMonth.set(+$event); onFilterChange()" aria-label="Mês">
+    <option [value]="0">Todos os meses</option>
     @for (m of months; track m.value) {
       <option [value]="m.value">{{ m.label }}</option>
     }
   </select>
-  <select class="form-select" [(ngModel)]="filterYear" [ngModel]="filterYear()" (ngModelChange)="filterYear.set($event)" aria-label="Ano">
+  <select class="form-select" [ngModel]="filterYear()" (ngModelChange)="filterYear.set(+$event); onFilterChange()" aria-label="Ano">
     @for (y of years; track y) {
       <option [value]="y">{{ y }}</option>
     }
   </select>
-  <select class="form-select" [ngModel]="filterCategory()" (ngModelChange)="filterCategory.set($event)" aria-label="Categoria">
+  <select class="form-select" [ngModel]="filterCategory()" (ngModelChange)="filterCategory.set($event); onFilterChange()" aria-label="Categoria">
     <option value="">Todas as categorias</option>
     @for (cat of categories(); track cat.id) {
       <option [value]="cat.id">{{ cat.name }}</option>
     }
   </select>
-  <select class="form-select" [ngModel]="filterPayment()" (ngModelChange)="filterPayment.set($event)" aria-label="Método de pagamento">
+  <select class="form-select" [ngModel]="filterPayment()" (ngModelChange)="filterPayment.set($event); onFilterChange()" aria-label="Método">
     <option value="">Todos os métodos</option>
-    <option value="dinheiro">Dinheiro</option>
-    <option value="cartao">Cartão</option>
+    <option value="dinheiro">💵 Dinheiro</option>
+    <option value="cartao">💳 Cartão</option>
   </select>
 </div>
 
-<!-- Summary cards -->
+<!-- Resumo -->
 <div class="summary-row" role="region" aria-label="Resumo do período">
   <div class="summary-card">
     <span class="summary-card__label">Receitas</span>
@@ -47,14 +64,18 @@
       {{ amountPrefix(balance()) }} {{ formatAmount(balance()) }}
     </span>
   </div>
+  <div class="summary-card">
+    <span class="summary-card__label">Total registros</span>
+    <span class="summary-card__value">{{ totalCount() }}</span>
+  </div>
 </div>
 
-<!-- Content -->
+<!-- Conteúdo -->
 @if (loading()) {
   <div class="loading-wrapper" aria-live="polite">
     <span class="spinner"></span> Carregando gastos...
   </div>
-} @else if (filteredExpenses().length === 0) {
+} @else if (expenses().length === 0) {
   <div class="empty-state">
     <div class="empty-state__icon">💸</div>
     <p class="empty-state__title">Nenhum gasto encontrado</p>
@@ -62,7 +83,6 @@
     <a routerLink="/expenses/new" class="btn btn--primary" style="margin-top: 16px">+ Novo Gasto</a>
   </div>
 } @else {
-  <!-- Desktop table -->
   <div class="data-table-wrapper" aria-label="Lista de gastos">
     <table class="data-table" role="table">
       <thead>
@@ -76,7 +96,7 @@
         </tr>
       </thead>
       <tbody>
-        @for (e of filteredExpenses(); track e.id) {
+        @for (e of expenses(); track e.id) {
           <tr>
             <td class="expense-desc">
               <span class="expense-desc__text">{{ e.description }}</span>
@@ -84,7 +104,7 @@
             <td>
               <span class="badge">{{ categoryName(e.category_id) }}</span>
             </td>
-            <td class="mono text-muted">{{ e.date | date:'dd/MM/yyyy' : '+0000' }}</td>
+            <td class="mono text-muted">{{ e.date | slice:8:10 }}/{{ e.date | slice:5:7 }}/{{ e.date | slice:0:4 }}</td>
             <td>
               <span class="badge" [class.badge--primary]="e.payment_method === 'cartao'">
                 {{ e.payment_method === 'cartao' ? '💳 Cartão' : '💵 Dinheiro' }}
@@ -97,12 +117,12 @@
             </td>
             <td>
               <div class="action-buttons">
-                <a [routerLink]="['/expenses', e.id, 'edit']" class="btn btn--ghost btn--sm" [attr.aria-label]="'Editar gasto ' + e.description">✏️</a>
+                <a [routerLink]="['/expenses', e.id, 'edit']" class="btn btn--ghost btn--sm" [attr.aria-label]="'Editar ' + e.description">✏️</a>
                 <button
                   class="btn btn--ghost btn--sm"
                   (click)="delete(e.id)"
                   [disabled]="deletingId() === e.id"
-                  [attr.aria-label]="'Excluir gasto ' + e.description"
+                  [attr.aria-label]="'Excluir ' + e.description"
                 >
                   @if (deletingId() === e.id) { <span class="spinner"></span> } @else { 🗑️ }
                 </button>
@@ -113,4 +133,22 @@
       </tbody>
     </table>
   </div>
+
+  <!-- Paginação -->
+  @if (totalPages() > 1) {
+    <nav class="pagination" aria-label="Paginação">
+      <button class="pagination__btn" (click)="goToPage(currentPage() - 1)" [disabled]="currentPage() === 1" aria-label="Página anterior">‹</button>
+      @for (p of pageNumbers(); track p) {
+        <button
+          class="pagination__btn"
+          [class.pagination__btn--active]="p === currentPage()"
+          (click)="goToPage(p)"
+          [attr.aria-label]="'Página ' + p"
+          [attr.aria-current]="p === currentPage() ? 'page' : null"
+        >{{ p }}</button>
+      }
+      <button class="pagination__btn" (click)="goToPage(currentPage() + 1)" [disabled]="currentPage() === totalPages()" aria-label="Próxima página">›</button>
+      <span class="pagination__info">{{ currentPage() }} de {{ totalPages() }} ({{ totalCount() }} registros)</span>
+    </nav>
+  }
 }

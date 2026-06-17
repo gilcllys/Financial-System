@@ -79,6 +79,43 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/installments/installments.component').then(m => m.InstallmentsComponent),
       },
+
+      // Supermarket
+      {
+        path: 'supermarket',
+        loadComponent: () =>
+          import('./features/supermarket/supermarket-list/supermarket-list.component').then(m => m.SupermarketListComponent),
+      },
+      {
+        path: 'supermarket/new',
+        loadComponent: () =>
+          import('./features/supermarket/supermarket-form/supermarket-form.component').then(m => m.SupermarketFormComponent),
+      },
+      {
+        path: 'supermarket/:id/edit',
+        loadComponent: () =>
+          import('./features/supermarket/supermarket-form/supermarket-form.component').then(m => m.SupermarketFormComponent),
+      },
+      {
+        path: 'supermarket/:id',
+        loadComponent: () =>
+          import('./features/supermarket/supermarket-detail/supermarket-detail.component').then(m => m.SupermarketDetailComponent),
+      },
+
+      // Analytics
+      {
+        path: 'analytics',
+        loadComponent: () =>
+          import('./features/analytics/analytics.component').then(m => m.AnalyticsComponent),
+      },
+
+      // Vitória Debts
+      {
+        path: 'vitoria',
+        loadComponent: () =>
+          import('./features/vitoria/vitoria.component').then(m => m.VitoriaComponent),
+      },
+
     ],
   },
 

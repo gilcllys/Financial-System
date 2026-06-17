@@ -1,0 +1,161 @@
+@if (loading()) {
+  <div class="loading-wrapper" aria-live="polite">
+    <span class="spinner"></span> Carregando compra...
+  </div>
+} @else if (!expense()) {
+  <div class="empty-state">
+    <div class="empty-state__icon">😕</div>
+    <p class="empty-state__title">Compra não encontrada</p>
+    <a routerLink="/supermarket" class="btn btn--primary" style="margin-top: 16px">← Voltar</a>
+  </div>
+} @else {
+
+  <!-- ── Cabeçalho da Compra ── -->
+  <div class="page-header">
+    <div class="page-header__left">
+      <h1 class="page-header__title">{{ expense()!.store_name }}</h1>
+      <p class="page-header__subtitle">
+        📅 {{ formatDate(expense()!.date) }}
+        @if (expense()!.address) { &nbsp;·&nbsp; 📍 {{ expense()!.address }} }
+      </p>
+    </div>
+    <div class="header-actions">
+      <a [routerLink]="['/supermarket', expense()!.id, 'edit']" class="btn btn--secondary btn--sm">✏️ Editar</a>
+      <a routerLink="/supermarket" class="btn btn--ghost btn--sm">← Voltar</a>
+    </div>
+  </div>
+
+  <!-- ── Card de Total ── -->
+  <div class="total-banner" aria-live="polite" aria-label="Total da compra">
+    <span class="total-banner__label">Total da Compra</span>
+    <span class="total-banner__value">{{ formatCurrency(localTotal()) }}</span>
+    <span class="total-banner__sub">{{ expense()!.items.length }} {{ expense()!.items.length === 1 ? 'item' : 'itens' }}</span>
+  </div>
+
+  <!-- ── Alertas ── -->
+  @if (errorMessage()) {
+    <div class="alert alert--error" role="alert">{{ errorMessage() }}</div>
+  }
+  @if (successMessage()) {
+    <div class="alert alert--success" role="status" aria-live="polite">{{ successMessage() }}</div>
+  }
+
+  <!-- ── Formulário Inline de Novo Item ── -->
+  <div class="card item-form-card" aria-label="Adicionar novo item">
+    <h2 class="section-title">➕ Adicionar Item</h2>
+    <form [formGroup]="itemForm" (ngSubmit)="addItem()" novalidate class="item-form">
+      <div class="item-form__fields">
+        <div class="form-group item-form__desc">
+          <label class="form-label" for="item-desc">Descrição *</label>
+          <input
+            id="item-desc"
+            class="form-input"
+            [class.error]="hasItemError('description')"
+            type="text"
+            formControlName="description"
+            placeholder="Ex: Arroz 5kg"
+            autocomplete="off"
+          />
+          @if (hasItemError('description')) {
+            <span class="form-error" role="alert">Descrição é obrigatória.</span>
+          }
+        </div>
+
+        <div class="form-group item-form__qty">
+          <label class="form-label" for="item-qty">Qtd *</label>
+          <input
+            id="item-qty"
+            class="form-input mono"
+            [class.error]="hasItemError('quantity')"
+            type="number"
+            min="1"
+            step="1"
+            formControlName="quantity"
+            placeholder="1"
+          />
+          @if (hasItemError('quantity')) {
+            <span class="form-error" role="alert">Mín. 1.</span>
+          }
+        </div>
+
+        <div class="form-group item-form__price">
+          <label class="form-label" for="item-price">Preço Unit. *</label>
+          <input
+            id="item-price"
+            class="form-input mono"
+            [class.error]="hasItemError('unit_price')"
+            type="number"
+            min="0.01"
+            step="0.01"
+            formControlName="unit_price"
+            placeholder="0,00"
+          />
+          @if (hasItemError('unit_price')) {
+            <span class="form-error" role="alert">Informe o preço.</span>
+          }
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        class="btn btn--primary item-form__submit"
+        [disabled]="addingItem()"
+        aria-label="Adicionar item"
+      >
+        @if (addingItem()) { <span class="spinner"></span> } @else { + Adicionar }
+      </button>
+    </form>
+  </div>
+
+  <!-- ── Lista de Itens ── -->
+  <div class="card items-card">
+    <h2 class="section-title">🛍️ Itens da Compra</h2>
+
+    @if (expense()!.items.length === 0) {
+      <div class="empty-items">
+        <p>Nenhum item adicionado ainda. Use o formulário acima para começar.</p>
+      </div>
+    } @else {
+      <div class="data-table-wrapper" aria-label="Itens da compra">
+        <table class="data-table" role="table">
+          <thead>
+            <tr>
+              <th scope="col">Descrição</th>
+              <th scope="col" class="text-center">Qtd</th>
+              <th scope="col" class="text-right">Preço Unit.</th>
+              <th scope="col" class="text-right">Subtotal</th>
+              <th scope="col" class="text-center">Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of expense()!.items; track item.id) {
+              <tr>
+                <td class="item-desc">{{ item.description }}</td>
+                <td class="text-center mono">{{ item.quantity }}</td>
+                <td class="text-right mono">{{ formatCurrency(item.unit_price) }}</td>
+                <td class="text-right mono subtotal">{{ formatCurrency(itemSubtotal(item)) }}</td>
+                <td class="text-center">
+                  <button
+                    class="btn btn--ghost btn--sm"
+                    (click)="deleteItem(item)"
+                    [disabled]="deletingItemId() === item.id"
+                    [attr.aria-label]="'Remover ' + item.description"
+                  >
+                    @if (deletingItemId() === item.id) { <span class="spinner"></span> } @else { 🗑️ }
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr class="totals-row">
+              <td colspan="3" class="totals-row__label">Total</td>
+              <td class="text-right mono totals-row__value" aria-live="polite">{{ formatCurrency(localTotal()) }}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    }
+  </div>
+}

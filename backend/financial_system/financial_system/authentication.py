@@ -133,6 +133,21 @@ class KeycloakAuthentication(BaseAuthentication):
         result = _introspect_token(token)
         if not result.get('active', False):
             raise AuthenticationFailed("Token inativo ou revogado.")
+
+        # [SEC-A07] Valida o issuer mesmo no path de introspection
+        expected_issuer = (
+            f"{settings.KEYCLOAK_SERVER_URL.rstrip('/')}"
+            f"/realms/{settings.KEYCLOAK_REALM}"
+        )
+        token_iss = result.get('iss', '')
+        if token_iss and token_iss != expected_issuer:
+            logger.warning(
+                "Token rejeitado via introspection: issuer inválido '%s'. Esperado: '%s'.",
+                token_iss,
+                expected_issuer,
+            )
+            raise AuthenticationFailed("Token emitido por emissor não confiável.")
+
         return result
 
     def _decode_via_jwks(self, token: str) -> dict:
@@ -140,33 +155,55 @@ class KeycloakAuthentication(BaseAuthentication):
         decode_errors = []
 
         audience = getattr(settings, 'KEYCLOAK_CLIENT_ID', None)
-        decode_options = {'verify_exp': True}
+        # [SEC-A07] Verifica a claim 'aud' por padrão; desative KEYCLOAK_VERIFY_AUDIENCE
+        #           apenas se o Keycloak não emitir a claim e não houver alternativa.
+        verify_audience = getattr(settings, 'KEYCLOAK_VERIFY_AUDIENCE', True)
+
+        # [SEC-A07] Constrói o issuer esperado para validação da claim 'iss'
+        expected_issuer = (
+            f"{settings.KEYCLOAK_SERVER_URL.rstrip('/')}"
+            f"/realms/{settings.KEYCLOAK_REALM}"
+        )
+
+        decode_options = {
+            'verify_exp': True,
+            'verify_aud': verify_audience,
+        }
 
         for key_data in jwks.get('keys', []):
             try:
                 public_key = RSAAlgorithm.from_jwk(json.dumps(key_data))
-                try:
-                    return jwt.decode(
-                        token,
-                        public_key,
-                        algorithms=settings.KEYCLOAK_ALGORITHMS,
-                        audience=audience,
-                        options=decode_options,
-                    )
-                except jwt.InvalidAudienceError:
-                    # Token não tem audience configurado — revalida sem verificação
-                    return jwt.decode(
-                        token,
-                        public_key,
-                        algorithms=settings.KEYCLOAK_ALGORITHMS,
-                        options={**decode_options, 'verify_aud': False},
-                    )
+                return jwt.decode(
+                    token,
+                    public_key,
+                    algorithms=settings.KEYCLOAK_ALGORITHMS,
+                    audience=audience if verify_audience else None,
+                    issuer=expected_issuer,
+                    options=decode_options,
+                )
             except jwt.ExpiredSignatureError:
                 raise AuthenticationFailed("Token expirado.")
+            except jwt.InvalidAudienceError:
+                # [SEC-A07] NÃO fazer fallback sem audience — rejeitar imediatamente
+                logger.warning(
+                    "Token rejeitado: audience inválido para cliente '%s'.", audience,
+                )
+                raise AuthenticationFailed(
+                    "Token não autorizado para este recurso (audience inválido)."
+                )
+            except jwt.InvalidIssuerError:
+                logger.warning(
+                    "Token rejeitado: issuer inválido. Esperado: '%s'.", expected_issuer,
+                )
+                raise AuthenticationFailed("Token emitido por emissor não confiável.")
             except jwt.InvalidTokenError as exc:
                 decode_errors.append(str(exc))
 
+        # Força refresh do cache JWKS — pode ter ocorrido rotação de chave
         cache.delete(JWKS_CACHE_KEY)
-        raise AuthenticationFailed(
-            f"Token inválido. Detalhes: {'; '.join(decode_errors)}"
+        logger.warning(
+            "Falha ao validar token JWT contra todas as chaves JWKS. Erros: %s",
+            '; '.join(decode_errors),
         )
+        # [SEC-A09] Não expõe detalhes técnicos na resposta ao cliente
+        raise AuthenticationFailed("Token inválido.")

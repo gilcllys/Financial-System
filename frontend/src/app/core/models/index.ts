@@ -74,3 +74,44 @@ export interface ExpenseFilters {
   payment_method?: PaymentMethod;
   credit_card_id?: number;
 }
+
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
+// ─── Supermarket Models ────────────────────────────────────────────────────────
+
+export interface SupermarketExpenseItem {
+  id: number;
+  tenant_id: string;
+  supermarket_expense: number;
+  description: string;
+  quantity: number;
+  unit_price: number; // normalizado para number (parseFloat)
+}
+
+export interface SupermarketExpense {
+  id: number;
+  tenant_id: string;
+  store_name: string;
+  date: string; // ISO date YYYY-MM-DD
+  address?: string;
+  total: number;
+  items: SupermarketExpenseItem[];
+}
+
+export interface CreateSupermarketExpensePayload {
+  store_name: string;
+  date: string;
+  address?: string;
+}
+
+export interface CreateSupermarketItemPayload {
+  supermarket_expense: number;
+  description: string;
+  quantity: number;
+  unit_price: number;
+}

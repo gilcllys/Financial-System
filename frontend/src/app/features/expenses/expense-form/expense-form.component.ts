@@ -29,9 +29,12 @@ export class ExpenseFormComponent implements OnInit {
   isEdit = signal(false);
   editId = signal<number | null>(null);
 
+  // true = receita (entrada), false = despesa (saída)
+  isIncome = signal(false);
+
   form = this.fb.group({
     description: ['', [Validators.required, Validators.minLength(2)]],
-    amount: [null as number | null, [Validators.required]],
+    amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
     date: [this.todayStr(), Validators.required],
     category_id: [null as number | null, Validators.required],
     payment_method: ['dinheiro' as 'dinheiro' | 'cartao', Validators.required],
@@ -57,10 +60,25 @@ export class ExpenseFormComponent implements OnInit {
     }
   }
 
+  toggleType(income: boolean): void {
+    this.isIncome.set(income);
+  }
+
   private setupConditionals(): void {
     this.form.get('is_installment')!.valueChanges.subscribe(val => {
-      const ctrl = this.form.get('installments')!;
-      if (val) { ctrl.enable(); } else { ctrl.disable(); ctrl.setValue(1); }
+      const installmentsCtrl = this.form.get('installments')!;
+      const quantityCtrl = this.form.get('quantity')!;
+      if (val) {
+        // Parcelado ativo: habilita parcelas, trava quantity em 1
+        installmentsCtrl.enable();
+        quantityCtrl.setValue(1);
+        quantityCtrl.disable();
+      } else {
+        // Parcelado desativo: desabilita parcelas, libera quantity
+        installmentsCtrl.disable();
+        installmentsCtrl.setValue(1);
+        quantityCtrl.enable();
+      }
     });
 
     this.form.get('payment_method')!.valueChanges.subscribe(val => {
@@ -80,9 +98,11 @@ export class ExpenseFormComponent implements OnInit {
     this.loading.set(true);
     this.expenseService.get(id).subscribe({
       next: expense => {
+        // Define o toggle baseado no sinal do amount
+        this.isIncome.set(expense.amount >= 0);
         this.form.patchValue({
           description: expense.description,
-          amount: expense.amount,
+          amount: Math.abs(expense.amount),
           date: expense.date,
           category_id: expense.category_id,
           payment_method: expense.payment_method,
@@ -104,10 +124,14 @@ export class ExpenseFormComponent implements OnInit {
     this.errorMessage.set('');
 
     const v = this.form.getRawValue();
+    const absAmount = Math.abs(v.amount!);
+    // Receita = positivo, Despesa = negativo
+    const signedAmount = this.isIncome() ? absAmount : -absAmount;
+
     const payload = {
       category_id: v.category_id!,
       description: v.description!,
-      amount: v.amount!,
+      amount: signedAmount,
       date: v.date!,
       quantity: v.quantity!,
       payment_method: v.payment_method!,

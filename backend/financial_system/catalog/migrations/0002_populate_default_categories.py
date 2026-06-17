@@ -12,6 +12,7 @@ DEFAULT_CATEGORIES = [
     ('Gastos com carro', 'Gastos com combustível, manutenção e IPVA'),
     ('Diversos', 'Outros gastos não categorizados'),
     ('Sem categoria', 'Gastos que ainda não foram categorizados'),
+    ('Transporte', 'Gastos com transporte público e deslocamento'),
 ]
 
 

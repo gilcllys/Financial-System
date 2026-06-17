@@ -33,23 +33,56 @@
         </div>
       </div>
 
+      <!-- Tipo: Receita ou Despesa -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Tipo *</label>
+          <div class="type-toggle" role="group" aria-label="Tipo de lançamento">
+            <button
+              type="button"
+              class="type-toggle__btn"
+              [class.type-toggle__btn--expense]="!isIncome()"
+              [class.active]="!isIncome()"
+              (click)="toggleType(false)"
+            >
+              📤 Despesa (saída)
+            </button>
+            <button
+              type="button"
+              class="type-toggle__btn"
+              [class.type-toggle__btn--income]="isIncome()"
+              [class.active]="isIncome()"
+              (click)="toggleType(true)"
+            >
+              📥 Receita (entrada)
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Amount + Date -->
       <div class="form-row form-row--2col">
         <div class="form-group">
           <label class="form-label" for="amount">
-            Valor * <span class="form-hint">(negativo = despesa, positivo = receita)</span>
+            Valor *
+            <span class="form-hint type-hint" [class.type-hint--income]="isIncome()" [class.type-hint--expense]="!isIncome()">
+              {{ isIncome() ? '+ Receita' : '- Despesa' }}
+            </span>
           </label>
           <input
             id="amount"
             class="form-input mono"
             [class.error]="hasError('amount')"
+            [class.input--income]="isIncome()"
+            [class.input--expense]="!isIncome()"
             type="number"
             step="0.01"
+            min="0.01"
             formControlName="amount"
-            placeholder="-250.00"
+            placeholder="250.00"
           />
           @if (hasError('amount')) {
-            <span class="form-error" role="alert">Valor é obrigatório.</span>
+            <span class="form-error" role="alert">Valor é obrigatório (maior que zero).</span>
           }
         </div>
 
@@ -159,7 +192,14 @@
       <!-- Quantity -->
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label" for="quantity">Quantidade</label>
+          <label class="form-label" for="quantity">
+            Quantidade
+            @if (isInstallment) {
+              <span class="form-hint"> — fixo em 1 quando parcelado</span>
+            } @else {
+              <span class="form-hint"> — cria N registros independentes</span>
+            }
+          </label>
           <input
             id="quantity"
             class="form-input mono"

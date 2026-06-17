@@ -68,3 +68,9 @@ class Expense(BaseModel):
         db_table = 'expenses'
         verbose_name = 'Expense'
         verbose_name_plural = 'Expenses'
+        indexes = [
+            # Filtros mais frequentes: tenant + mês/ano (analytics, listagem)
+            models.Index(fields=['tenant_id', 'date'], name='expenses_tenant_date_idx'),
+            # Filtros por cartão: tenant + credit_card (fatura, analytics by-card)
+            models.Index(fields=['tenant_id', 'credit_card'], name='expenses_tenant_card_idx'),
+        ]

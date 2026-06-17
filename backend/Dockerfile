@@ -61,6 +61,28 @@ RUN python financial_system/manage.py collectstatic --noinput
 # Expõe a porta padrão definida no fly.toml
 EXPOSE 8080
 
-# Comando para produção usando Gunicorn
-# O formato é: modulo_onde_esta_o_wsgi.wsgi:application
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--pythonpath", "financial_system", "financial_system.wsgi:application"]
+# Número de workers: (2 * vCPU) + 1
+#   t3.micro (1 vCPU) → 3 workers
+#   t3.small (2 vCPU) → 5 workers
+# Sobrescreva via env GUNICORN_WORKERS no docker-compose ou ECS task definition.
+ENV GUNICORN_WORKERS=3
+
+# Comando para produção usando Gunicorn otimizado para EC2
+# --max-requests / --max-requests-jitter: recicla workers periodicamente,
+#   evitando vazamentos de memória em processos de longa duração.
+# --keepalive: reutiliza conexões TCP entre Nginx e Gunicorn (ou ALB).
+# --timeout: mata worker travado após 30s (evita starvation de slots).
+CMD ["sh", "-c", \
+     "gunicorn \
+     --bind 0.0.0.0:8080 \
+     --workers ${GUNICORN_WORKERS} \
+     --worker-class sync \
+     --worker-connections 1000 \
+     --timeout 30 \
+     --keepalive 5 \
+     --max-requests 1000 \
+     --max-requests-jitter 100 \
+     --pythonpath financial_system \
+     --access-logfile - \
+     --error-logfile - \
+     financial_system.wsgi:application"]

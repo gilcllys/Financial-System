@@ -58,6 +58,14 @@ class CreateExpenseBehavior:
         return self._build_expense(self.description, self.amount, self.date)
 
     @transaction.atomic
+    def _create_multiple(self) -> List[Expense]:
+        """Cria self.quantity registros independentes com o mesmo valor e data."""
+        return [
+            self._build_expense(self.description, self.amount, self.date)
+            for _ in range(self.quantity)
+        ]
+
+    @transaction.atomic
     def _create_installments(self) -> List[Expense]:
         expenses = []
         installment_amount = self.amount / self.installments
@@ -75,6 +83,7 @@ class CreateExpenseBehavior:
     def run(self) -> Response:
         try:
             if self.is_installment and self.installments > 1:
+                # Parcelado: ignora quantity, cria N parcelas
                 expenses = self._create_installments()
                 return Response(
                     {
@@ -84,6 +93,28 @@ class CreateExpenseBehavior:
                         'installments': self.installments,
                         'total_amount': float(self.amount),
                         'installment_amount': float(self.amount / self.installments),
+                        'expenses': [
+                            {
+                                'id': e.id,
+                                'description': e.description,
+                                'amount': float(e.amount),
+                                'date': e.date.isoformat(),
+                            }
+                            for e in expenses
+                        ],
+                    },
+                    status=status.HTTP_201_CREATED,
+                )
+            elif self.quantity > 1:
+                # Quantidade > 1: cria N registros independentes
+                expenses = self._create_multiple()
+                return Response(
+                    {
+                        'success': True,
+                        'message': f'{len(expenses)} gastos criados com sucesso',
+                        'is_installment': False,
+                        'quantity': self.quantity,
+                        'total_amount': float(self.amount * self.quantity),
                         'expenses': [
                             {
                                 'id': e.id,

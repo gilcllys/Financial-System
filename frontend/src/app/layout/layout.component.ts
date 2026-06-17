@@ -20,7 +20,10 @@ import { AuthService } from '../core/auth/auth.service';
           <a routerLink="/expenses" routerLinkActive="active" class="navbar__link">Gastos</a>
           <a routerLink="/cards" routerLinkActive="active" class="navbar__link">Cartões</a>
           <a routerLink="/installments" routerLinkActive="active" class="navbar__link">Parcelamentos</a>
+          <a routerLink="/supermarket" routerLinkActive="active" class="navbar__link">Supermercado</a>
           <a routerLink="/reports" routerLinkActive="active" class="navbar__link">Relatórios</a>
+          <a routerLink="/analytics" routerLinkActive="active" class="navbar__link">Análises</a>
+          <a routerLink="/vitoria" routerLinkActive="active" class="navbar__link">💑 Casal</a>
           <a routerLink="/categories" routerLinkActive="active" class="navbar__link">Categorias</a>
         </nav>
 
@@ -57,6 +60,9 @@ import { AuthService } from '../core/auth/auth.service';
           <a routerLink="/installments" routerLinkActive="active" class="navbar__mobile-link" (click)="closeMobileMenu()">
             <span class="nav-icon">📅</span> Parcelamentos
           </a>
+          <a routerLink="/supermarket" routerLinkActive="active" class="navbar__mobile-link" (click)="closeMobileMenu()">
+            <span class="nav-icon">🛒</span> Supermercado
+          </a>
           <a routerLink="/reports" routerLinkActive="active" class="navbar__mobile-link" (click)="closeMobileMenu()">
             <span class="nav-icon">📊</span> Relatórios
           </a>
@@ -89,13 +95,17 @@ import { AuthService } from '../core/auth/auth.service';
         <span class="bottom-nav__icon">💳</span>
         <span class="bottom-nav__label">Cartões</span>
       </a>
-      <a routerLink="/reports" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
-        <span class="bottom-nav__icon">📊</span>
-        <span class="bottom-nav__label">Relatórios</span>
+      <a routerLink="/supermarket" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
+        <span class="bottom-nav__icon">🛒</span>
+        <span class="bottom-nav__label">Mercado</span>
       </a>
-      <a routerLink="/categories" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
-        <span class="bottom-nav__icon">🏷️</span>
-        <span class="bottom-nav__label">Categorias</span>
+      <a routerLink="/analytics" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
+        <span class="bottom-nav__icon">📈</span>
+        <span class="bottom-nav__label">Análises</span>
+      </a>
+      <a routerLink="/vitoria" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
+        <span class="bottom-nav__icon">💑</span>
+        <span class="bottom-nav__label">Casal</span>
       </a>
     </nav>
 

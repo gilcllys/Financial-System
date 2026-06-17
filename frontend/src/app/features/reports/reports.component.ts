@@ -74,8 +74,8 @@ export class ReportsComponent implements OnInit {
 
   ngOnInit(): void {
     this.categoryService.list().subscribe({ next: cats => this.categories.set(cats) });
-    this.expenseService.list().subscribe({
-      next: data => { this.expenses.set(data); this.loading.set(false); },
+    this.expenseService.list({ page_size: 500 }).subscribe({
+      next: res => { const data = res.results; this.expenses.set(data); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
   }

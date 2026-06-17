@@ -99,3 +99,52 @@ legend {
   padding: 0;
   margin-bottom: var(--space-xs);
 }
+
+// ── Toggle Receita / Despesa ──────────────────────────────────────────────────
+.type-toggle {
+  display: flex;
+  gap: 8px;
+
+  &__btn {
+    flex: 1;
+    height: 48px;
+    border: 2px solid var(--color-hairline);
+    border-radius: var(--rounded-md);
+    background: var(--color-surface-soft);
+    color: var(--color-body);
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      border-color: var(--color-muted);
+    }
+
+    &--expense.active {
+      background: #fff0f0;
+      border-color: var(--color-semantic-down);
+      color: var(--color-semantic-down);
+      font-weight: 600;
+    }
+
+    &--income.active {
+      background: #f0fff7;
+      border-color: var(--color-semantic-up);
+      color: var(--color-semantic-up);
+      font-weight: 600;
+    }
+  }
+}
+
+.type-hint {
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 600;
+
+  &--income { color: var(--color-semantic-up); }
+  &--expense { color: var(--color-semantic-down); }
+}
+
+.input--income { border-color: var(--color-semantic-up) !important; }
+.input--expense { border-color: var(--color-semantic-down) !important; }

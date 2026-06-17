@@ -1,52 +1,51 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
 import { ExpenseService } from '../../../core/services/expense.service';
 import { CategoryService } from '../../../core/services/category.service';
+import { SlicePipe } from '@angular/common';
 import { Expense, ExpenseCategory, PaymentMethod } from '../../../core/models';
-import { CurrencyPipe, DatePipe } from '@angular/common';
 
 @Component({
   selector: 'app-expense-list',
   standalone: true,
-  imports: [RouterLink, FormsModule, CurrencyPipe, DatePipe],
+  imports: [RouterLink, FormsModule, SlicePipe],
   templateUrl: './expense-list.component.html',
   styleUrls: ['./expense-list.component.scss'],
 })
-export class ExpenseListComponent implements OnInit {
+export class ExpenseListComponent implements OnInit, OnDestroy {
   private expenseService = inject(ExpenseService);
   private categoryService = inject(CategoryService);
+  private destroy$ = new Subject<void>();
+  private searchSubject = new Subject<string>();
 
   expenses = signal<Expense[]>([]);
   categories = signal<ExpenseCategory[]>([]);
   loading = signal(true);
   deletingId = signal<number | null>(null);
 
-  // Filters
+  // Paginação
+  totalCount = signal(0);
+  currentPage = signal(1);
+  pageSize = 20;
+
+  // Filtros — padrão: mês e ano atual
   filterMonth = signal(new Date().getMonth() + 1);
   filterYear = signal(new Date().getFullYear());
   filterCategory = signal<number | ''>('');
   filterPayment = signal<PaymentMethod | ''>('');
+  searchTerm = signal('');
 
-  filteredExpenses = computed(() => {
-    return this.expenses().filter(e => {
-      const d = new Date(e.date + 'T00:00:00');
-      const monthMatch = d.getMonth() + 1 === this.filterMonth();
-      const yearMatch = d.getFullYear() === this.filterYear();
-      const catMatch = !this.filterCategory() || e.category_id === +this.filterCategory();
-      const payMatch = !this.filterPayment() || e.payment_method === this.filterPayment();
-      return monthMatch && yearMatch && catMatch && payMatch;
-    });
-  });
+  totalPages = computed(() => Math.ceil(this.totalCount() / this.pageSize));
+  pageNumbers = computed(() => Array.from({ length: this.totalPages() }, (_, i) => i + 1));
 
   totalIncome = computed(() =>
-    this.filteredExpenses().filter(e => e.amount > 0).reduce((s, e) => s + e.amount, 0)
+    this.expenses().filter(e => e.amount > 0).reduce((s, e) => s + e.amount, 0)
   );
-
   totalExpenses = computed(() =>
-    this.filteredExpenses().filter(e => e.amount < 0).reduce((s, e) => s + e.amount, 0)
+    this.expenses().filter(e => e.amount < 0).reduce((s, e) => s + e.amount, 0)
   );
-
   balance = computed(() => this.totalIncome() + this.totalExpenses());
 
   months = [
@@ -57,20 +56,61 @@ export class ExpenseListComponent implements OnInit {
     { value: 9, label: 'Setembro' }, { value: 10, label: 'Outubro' },
     { value: 11, label: 'Novembro' }, { value: 12, label: 'Dezembro' },
   ];
-
   years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
 
   ngOnInit(): void {
-    this.loadAll();
+    this.categoryService.list().subscribe({ next: cats => this.categories.set(cats) });
+    // Debounce na busca por texto: 400ms
+    this.searchSubject.pipe(
+      debounceTime(400),
+      distinctUntilChanged(),
+      takeUntil(this.destroy$)
+    ).subscribe(() => {
+      this.currentPage.set(1);
+      this.loadExpenses();
+    });
+    this.loadExpenses();
   }
 
-  private loadAll(): void {
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  loadExpenses(): void {
     this.loading.set(true);
-    this.categoryService.list().subscribe({ next: cats => this.categories.set(cats) });
-    this.expenseService.list().subscribe({
-      next: data => { this.expenses.set(data); this.loading.set(false); },
+    this.expenseService.list({
+      month: this.filterMonth() || undefined,
+      year: this.filterYear() || undefined,
+      category_id: this.filterCategory() ? +this.filterCategory() : undefined,
+      payment_method: this.filterPayment() || undefined,
+      search: this.searchTerm() || undefined,
+      page: this.currentPage(),
+      page_size: this.pageSize,
+    }).subscribe({
+      next: res => {
+        this.expenses.set(res.results);
+        this.totalCount.set(res.count);
+        this.loading.set(false);
+      },
       error: () => this.loading.set(false),
     });
+  }
+
+  onFilterChange(): void {
+    this.currentPage.set(1);
+    this.loadExpenses();
+  }
+
+  onSearchInput(value: string): void {
+    this.searchTerm.set(value);
+    this.searchSubject.next(value);
+  }
+
+  goToPage(page: number): void {
+    if (page < 1 || page > this.totalPages()) return;
+    this.currentPage.set(page);
+    this.loadExpenses();
   }
 
   delete(id: number): void {
@@ -79,6 +119,7 @@ export class ExpenseListComponent implements OnInit {
     this.expenseService.delete(id).subscribe({
       next: () => {
         this.expenses.update(list => list.filter(e => e.id !== id));
+        this.totalCount.update(c => c - 1);
         this.deletingId.set(null);
       },
       error: () => this.deletingId.set(null),
@@ -93,11 +134,6 @@ export class ExpenseListComponent implements OnInit {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(amount));
   }
 
-  amountClass(amount: number): string {
-    return amount >= 0 ? 'value-up' : 'value-down';
-  }
-
-  amountPrefix(amount: number): string {
-    return amount >= 0 ? '+' : '-';
-  }
+  amountClass(amount: number): string { return amount >= 0 ? 'value-up' : 'value-down'; }
+  amountPrefix(amount: number): string { return amount >= 0 ? '+' : '-'; }
 }
