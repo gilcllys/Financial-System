@@ -91,7 +91,7 @@ jobs:
             printf 'GUNICORN_WORKERS=%s\n'     '${{ vars.GUNICORN_WORKERS }}'       >> ./backend/.env
 
             echo "🐳 Starting containers..."
-            docker compose up -d --build
+            docker compose --env-file ./backend/.env up -d --build
 
             echo "🔄 Reloading host nginx..."
             sudo nginx -t && sudo systemctl reload nginx
