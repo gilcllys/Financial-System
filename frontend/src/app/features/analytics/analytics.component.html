@@ -1,0 +1,107 @@
+<div class="page-header">
+  <div class="page-header__left">
+    <h1 class="page-header__title">Análises</h1>
+    <p class="page-header__subtitle">Visualize seus gastos em gráficos</p>
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="filter-bar">
+  <select class="form-select" [ngModel]="selectedMonth()" (ngModelChange)="selectedMonth.set(+$event); onFilterChange()" aria-label="Mês">
+    @for (m of months; track m.value) {
+      <option [value]="m.value">{{ m.label }}</option>
+    }
+  </select>
+  <select class="form-select" [ngModel]="selectedYear()" (ngModelChange)="selectedYear.set(+$event); onFilterChange()" aria-label="Ano">
+    @for (y of years; track y) {
+      <option [value]="y">{{ y }}</option>
+    }
+  </select>
+</div>
+
+@if (loading()) {
+  <div class="loading-wrapper"><span class="spinner"></span> Carregando análises...</div>
+} @else {
+  <!-- Gráfico 1: Receitas x Despesas por Mês -->
+  <div class="chart-card">
+    <div class="chart-card__header">
+      <h2 class="chart-card__title">📊 Receitas × Despesas — {{ selectedYear() }}</h2>
+      <p class="chart-card__subtitle">Comparativo mensal de entradas e saídas</p>
+    </div>
+    <div class="chart-card__body">
+      <canvas #monthlyChart></canvas>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <!-- Gráfico 2: Por Categoria (Donut) -->
+    <div class="chart-card">
+      <div class="chart-card__header">
+        <h2 class="chart-card__title">🏷️ Por Categoria — {{ currentMonthName() }}</h2>
+        <p class="chart-card__subtitle">Distribuição das despesas por categoria</p>
+      </div>
+      <div class="chart-card__body chart-card__body--donut">
+        @if (categoryData().length === 0) {
+          <div class="empty-chart">Sem despesas neste período</div>
+        } @else {
+          <canvas #categoryChart></canvas>
+        }
+      </div>
+      <!-- Top categorias -->
+      @if (categoryData().length > 0) {
+        <div class="category-list">
+          @for (cat of categoryData().slice(0, 5); track cat.category_id) {
+            <div class="category-row">
+              <span class="category-row__name">{{ cat.category_name }}</span>
+              <span class="category-row__pct">{{ cat.percentage.toFixed(1) }}%</span>
+              <span class="category-row__total value-down">{{ formatCurrency(cat.total) }}</span>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <!-- Gráfico 3: Por Cartão -->
+    <div class="chart-card">
+      <div class="chart-card__header">
+        <h2 class="chart-card__title">💳 Por Cartão — {{ currentMonthName() }}</h2>
+        <p class="chart-card__subtitle">Gasto total em cada cartão</p>
+      </div>
+      <div class="chart-card__body">
+        @if (cardData().length === 0) {
+          <div class="empty-chart">Sem gastos em cartão neste período</div>
+        } @else {
+          <canvas #cardChart></canvas>
+        }
+      </div>
+    </div>
+  </div>
+
+  <!-- Gráfico 4: Gasto Diário -->
+  <div class="chart-card">
+    <div class="chart-card__header">
+      <h2 class="chart-card__title">📅 Gasto Diário — {{ currentMonthName() }} {{ selectedYear() }}</h2>
+      <p class="chart-card__subtitle">Movimentação dia a dia no mês</p>
+    </div>
+    <!-- KPIs diários -->
+    @if (dailyData().length > 0) {
+      <div class="daily-kpis">
+        <div class="kpi-card">
+          <span class="kpi-card__label">Média diária</span>
+          <span class="kpi-card__value value-down">{{ formatCurrency(avgDaily()) }}</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-card__label">Maior dia</span>
+          <span class="kpi-card__value value-down">{{ formatCurrency(maxDaily()) }}</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-card__label">Dias com gasto</span>
+          <span class="kpi-card__value">{{ daysWithExpense() }}</span>
+        </div>
+      </div>
+    }
+    <div class="chart-card__body chart-card__body--wide">
+      <canvas #dailyChart></canvas>
+    </div>
+  </div>
+}

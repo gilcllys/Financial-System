@@ -1,0 +1,239 @@
+<div class="page-header">
+  <div class="page-header__left">
+    <h1 class="page-header__title">{{ isEdit() ? 'Editar Gasto' : 'Novo Gasto' }}</h1>
+    <p class="page-header__subtitle">{{ isEdit() ? 'Atualize as informações do gasto' : 'Registre uma nova despesa ou receita' }}</p>
+  </div>
+  <a routerLink="/expenses" class="btn btn--secondary btn--sm">← Voltar</a>
+</div>
+
+@if (loading()) {
+  <div class="loading-wrapper" aria-live="polite">
+    <span class="spinner"></span> Carregando...
+  </div>
+} @else {
+  <div class="card">
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate aria-label="Formulário de gasto">
+
+      <!-- Description -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="description">Descrição *</label>
+          <input
+            id="description"
+            class="form-input"
+            [class.error]="hasError('description')"
+            type="text"
+            formControlName="description"
+            placeholder="Ex: Compra no supermercado"
+            autocomplete="off"
+          />
+          @if (hasError('description')) {
+            <span class="form-error" role="alert">Descrição é obrigatória (mín. 2 caracteres).</span>
+          }
+        </div>
+      </div>
+
+      <!-- Tipo: Receita ou Despesa -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Tipo *</label>
+          <div class="type-toggle" role="group" aria-label="Tipo de lançamento">
+            <button
+              type="button"
+              class="type-toggle__btn"
+              [class.type-toggle__btn--expense]="!isIncome()"
+              [class.active]="!isIncome()"
+              (click)="toggleType(false)"
+            >
+              📤 Despesa (saída)
+            </button>
+            <button
+              type="button"
+              class="type-toggle__btn"
+              [class.type-toggle__btn--income]="isIncome()"
+              [class.active]="isIncome()"
+              (click)="toggleType(true)"
+            >
+              📥 Receita (entrada)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Amount + Date -->
+      <div class="form-row form-row--2col">
+        <div class="form-group">
+          <label class="form-label" for="amount">
+            Valor *
+            <span class="form-hint type-hint" [class.type-hint--income]="isIncome()" [class.type-hint--expense]="!isIncome()">
+              {{ isIncome() ? '+ Receita' : '- Despesa' }}
+            </span>
+          </label>
+          <input
+            id="amount"
+            class="form-input mono"
+            [class.error]="hasError('amount')"
+            [class.input--income]="isIncome()"
+            [class.input--expense]="!isIncome()"
+            type="number"
+            step="0.01"
+            min="0.01"
+            formControlName="amount"
+            placeholder="250.00"
+          />
+          @if (hasError('amount')) {
+            <span class="form-error" role="alert">Valor é obrigatório (maior que zero).</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="date">Data *</label>
+          <input
+            id="date"
+            class="form-input"
+            type="date"
+            formControlName="date"
+            [class.error]="hasError('date')"
+          />
+        </div>
+      </div>
+
+      <!-- Category -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="category_id">Categoria *</label>
+          <select
+            id="category_id"
+            class="form-select"
+            [class.error]="hasError('category_id')"
+            formControlName="category_id"
+          >
+            <option [value]="null" disabled>Selecione uma categoria</option>
+            @for (cat of categories(); track cat.id) {
+              <option [value]="cat.id">{{ cat.name }}</option>
+            }
+          </select>
+          @if (hasError('category_id')) {
+            <span class="form-error" role="alert">Categoria é obrigatória.</span>
+          }
+        </div>
+      </div>
+
+      <!-- Payment Method -->
+      <div class="form-row">
+        <fieldset class="form-group">
+          <legend class="form-label">Método de Pagamento *</legend>
+          <div class="radio-group" role="radiogroup">
+            <label class="radio-option">
+              <input type="radio" formControlName="payment_method" value="dinheiro" />
+              <span class="radio-btn">💵 Dinheiro</span>
+            </label>
+            <label class="radio-option">
+              <input type="radio" formControlName="payment_method" value="cartao" />
+              <span class="radio-btn">💳 Cartão</span>
+            </label>
+          </div>
+        </fieldset>
+      </div>
+
+      <!-- Credit Card (conditional) -->
+      @if (isCartao) {
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="credit_card_id">Cartão de Crédito *</label>
+            <select
+              id="credit_card_id"
+              class="form-select"
+              [class.error]="hasError('credit_card_id')"
+              formControlName="credit_card_id"
+            >
+              <option [value]="null" disabled>Selecione o cartão</option>
+              @for (card of cards(); track card.id) {
+                <option [value]="card.id">{{ card.name }} •••• {{ card.last_four_digits }}</option>
+              }
+            </select>
+            @if (hasError('credit_card_id')) {
+              <span class="form-error" role="alert">Selecione o cartão.</span>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Installment toggle -->
+      <div class="form-row">
+        <label class="toggle-label" for="is_installment">
+          <span class="toggle-text">É parcelado?</span>
+          <span class="toggle-switch" role="switch" [attr.aria-checked]="isInstallment">
+            <input type="checkbox" id="is_installment" formControlName="is_installment" />
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </span>
+        </label>
+      </div>
+
+      <!-- Number of installments (conditional) -->
+      @if (isInstallment) {
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="installments">Número de Parcelas *</label>
+            <input
+              id="installments"
+              class="form-input mono"
+              type="number"
+              min="2"
+              max="60"
+              formControlName="installments"
+              placeholder="Ex: 12"
+            />
+            <span class="form-hint">Entre 2 e 60 parcelas</span>
+          </div>
+        </div>
+      }
+
+      <!-- Quantity -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="quantity">
+            Quantidade
+            @if (isInstallment) {
+              <span class="form-hint"> — fixo em 1 quando parcelado</span>
+            } @else {
+              <span class="form-hint"> — cria N registros independentes</span>
+            }
+          </label>
+          <input
+            id="quantity"
+            class="form-input mono"
+            type="number"
+            min="1"
+            formControlName="quantity"
+          />
+        </div>
+      </div>
+
+      <!-- Need pay Vitoria toggle -->
+      <div class="form-row">
+        <label class="toggle-label" for="need_pay_vitoria">
+          <span class="toggle-text">Marcar para pagar para Vitória?</span>
+          <span class="toggle-switch" role="switch" [attr.aria-checked]="form.value.need_pay_vitoria">
+            <input type="checkbox" id="need_pay_vitoria" formControlName="need_pay_vitoria" />
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </span>
+        </label>
+      </div>
+
+      <!-- Error message -->
+      @if (errorMessage()) {
+        <div class="form-error-box" role="alert">{{ errorMessage() }}</div>
+      }
+
+      <!-- Actions -->
+      <div class="form-actions">
+        <a routerLink="/expenses" class="btn btn--secondary">Cancelar</a>
+        <button type="submit" class="btn btn--primary" [disabled]="saving()">
+          @if (saving()) { <span class="spinner"></span> } Salvar
+        </button>
+      </div>
+
+    </form>
+  </div>
+}

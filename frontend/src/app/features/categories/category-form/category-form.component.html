@@ -1,0 +1,46 @@
+<div class="page-header">
+  <div class="page-header__left">
+    <h1 class="page-header__title">{{ isEdit() ? 'Editar Categoria' : 'Nova Categoria' }}</h1>
+  </div>
+  <a routerLink="/categories" class="btn btn--secondary btn--sm">← Voltar</a>
+</div>
+
+@if (loading()) {
+  <div class="loading-wrapper"><span class="spinner"></span> Carregando...</div>
+} @else {
+  <div class="card" style="max-width: 480px">
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate aria-label="Formulário de categoria">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="cat-name">Nome *</label>
+          <input id="cat-name" class="form-input" [class.error]="hasError('name')"
+            type="text" formControlName="name" placeholder="Ex: Alimentação" />
+          @if (hasError('name')) {
+            <span class="form-error" role="alert">Nome é obrigatório (mín. 2 caracteres).</span>
+          }
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="cat-desc">Descrição</label>
+          <textarea id="cat-desc" class="form-textarea form-input"
+            formControlName="description"
+            placeholder="Descreva esta categoria..."></textarea>
+        </div>
+      </div>
+
+      @if (errorMessage()) {
+        <div class="form-error-box" role="alert">{{ errorMessage() }}</div>
+      }
+
+      <div class="form-actions">
+        <a routerLink="/categories" class="btn btn--secondary">Cancelar</a>
+        <button type="submit" class="btn btn--primary" [disabled]="saving()">
+          @if (saving()) { <span class="spinner"></span> } Salvar
+        </button>
+      </div>
+    </form>
+  </div>
+}

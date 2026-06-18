@@ -1,0 +1,70 @@
+<div class="page-header">
+  <div class="page-header__left">
+    <h1 class="page-header__title">Categorias</h1>
+    <p class="page-header__subtitle">Organize seus gastos por categoria</p>
+  </div>
+  <a routerLink="/categories/new" class="btn btn--primary">+ Nova Categoria</a>
+</div>
+
+@if (loading()) {
+  <div class="loading-wrapper"><span class="spinner"></span> Carregando categorias...</div>
+} @else {
+  <!-- Custom categories -->
+  @if (customCategories().length > 0) {
+    <section aria-labelledby="custom-label">
+      <div class="section-header">
+        <h2 id="custom-label" class="section-title">Personalizadas</h2>
+        <span class="badge badge--custom">{{ customCategories().length }}</span>
+      </div>
+      <div class="category-grid">
+        @for (cat of customCategories(); track cat.id) {
+          <div class="category-card">
+            <div class="category-card__header">
+              <span class="badge badge--custom">Personalizada</span>
+              <div class="category-card__actions">
+                <a [routerLink]="['/categories', cat.id, 'edit']" class="btn btn--ghost btn--sm" [attr.aria-label]="'Editar ' + cat.name">✏️</a>
+                <button
+                  class="btn btn--ghost btn--sm"
+                  (click)="delete(cat)"
+                  [disabled]="deletingId() === cat.id"
+                  [attr.aria-label]="'Excluir ' + cat.name"
+                >
+                  @if (deletingId() === cat.id) { <span class="spinner"></span> } @else { 🗑️ }
+                </button>
+              </div>
+            </div>
+            <h3 class="category-card__name">{{ cat.name }}</h3>
+            @if (cat.description) {
+              <p class="category-card__desc">{{ cat.description }}</p>
+            }
+          </div>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- System categories -->
+  <section aria-labelledby="system-label" style="margin-top: var(--space-lg)">
+    <div class="section-header">
+      <h2 id="system-label" class="section-title">Categorias do Sistema</h2>
+      <span class="badge badge--system">{{ systemCategories().length }}</span>
+    </div>
+    @if (systemCategories().length === 0) {
+      <p class="text-muted" style="padding: var(--space-base)">Nenhuma categoria do sistema.</p>
+    } @else {
+      <div class="category-grid">
+        @for (cat of systemCategories(); track cat.id) {
+          <div class="category-card category-card--system">
+            <div class="category-card__header">
+              <span class="badge badge--system">Sistema</span>
+            </div>
+            <h3 class="category-card__name">{{ cat.name }}</h3>
+            @if (cat.description) {
+              <p class="category-card__desc">{{ cat.description }}</p>
+            }
+          </div>
+        }
+      </div>
+    }
+  </section>
+}

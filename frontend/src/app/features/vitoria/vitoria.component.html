@@ -1,0 +1,77 @@
+<div class="page-header">
+  <div class="page-header__left">
+    <h1 class="page-header__title">💑 Gastos de Casal</h1>
+    <p class="page-header__subtitle">Despesas que você deve para a Vitória</p>
+  </div>
+</div>
+
+@if (loading()) {
+  <div class="loading-wrapper"><span class="spinner"></span> Carregando...</div>
+} @else {
+  <!-- Summary cards -->
+  @if (summary(); as s) {
+    <div class="summary-row">
+      <div class="summary-card summary-card--danger">
+        <span class="summary-card__label">A pagar</span>
+        <span class="summary-card__value value-down">{{ formatCurrency(s.total_pending) }}</span>
+        <span class="summary-card__sub">{{ s.count_pending }} item(s)</span>
+      </div>
+      <div class="summary-card summary-card--success">
+        <span class="summary-card__label">Já pago</span>
+        <span class="summary-card__value value-up">{{ formatCurrency(s.total_paid) }}</span>
+        <span class="summary-card__sub">{{ s.count_paid }} item(s)</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-card__label">Total geral</span>
+        <span class="summary-card__value">{{ formatCurrency(s.total_pending + s.total_paid) }}</span>
+        <span class="summary-card__sub">{{ s.count_pending + s.count_paid }} item(s)</span>
+      </div>
+    </div>
+  }
+
+  <!-- Toggle mostrar pagos -->
+  <div class="toggle-row">
+    <label class="toggle-label">
+      <span class="toggle-text">Mostrar já pagos</span>
+      <span class="toggle-switch">
+        <input type="checkbox" [checked]="showPaid()" (change)="showPaid.set(!showPaid())" />
+        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      </span>
+    </label>
+  </div>
+
+  @if (visibleDebts().length === 0) {
+    <div class="empty-state">
+      <div class="empty-state__icon">🎉</div>
+      <p class="empty-state__title">Tudo em dia!</p>
+      <p class="empty-state__text">Nenhum gasto pendente com a Vitória.</p>
+    </div>
+  } @else {
+    <div class="debt-list">
+      @for (debt of visibleDebts(); track debt.id) {
+        <div class="debt-card" [class.debt-card--paid]="debt.is_paid">
+          <div class="debt-card__info">
+            <span class="debt-card__desc">{{ debt.expense_description }}</span>
+            <span class="debt-card__meta">
+              {{ debt.expense_category_name }} · {{ formatDate(debt.expense_date) }}
+            </span>
+          </div>
+          <div class="debt-card__right">
+            <span class="debt-card__amount value-down mono">{{ formatCurrency(debt.expense_amount) }}</span>
+            @if (debt.is_paid) {
+              <span class="badge badge--success">✓ Pago</span>
+            } @else {
+              <button
+                class="btn btn--primary btn--sm"
+                (click)="markPaid(debt)"
+                [disabled]="markingId() === debt.id"
+              >
+                @if (markingId() === debt.id) { <span class="spinner"></span> } @else { Marcar pago }
+              </button>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+}

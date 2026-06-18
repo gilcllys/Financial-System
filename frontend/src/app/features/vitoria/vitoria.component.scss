@@ -1,0 +1,58 @@
+.toggle-row {
+  margin-bottom: 20px;
+}
+
+.debt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.debt-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-lg);
+  transition: opacity 0.2s;
+
+  &--paid { opacity: 0.55; }
+
+  &__info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  &__desc { font-weight: 600; color: var(--color-ink); font-size: 15px; }
+  &__meta { font-size: 12px; color: var(--color-muted); }
+
+  &__right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  &__amount { font-size: 16px; font-weight: 600; }
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    align-items: flex-start;
+    &__right { width: 100%; justify-content: space-between; }
+  }
+}
+
+.summary-card {
+  &--danger { border-color: var(--color-semantic-down); }
+  &--success { border-color: var(--color-semantic-up); }
+  &__sub { font-size: 12px; color: var(--color-muted); margin-top: 2px; display: block; }
+}
+
+.badge--success {
+  background: #f0fff7;
+  color: var(--color-semantic-up);
+  border: 1px solid var(--color-semantic-up);
+  border-radius: var(--rounded-pill);
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}

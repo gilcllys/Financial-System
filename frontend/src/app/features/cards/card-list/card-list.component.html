@@ -1,0 +1,62 @@
+<div class="page-header">
+  <div class="page-header__left">
+    <h1 class="page-header__title">Cartões de Crédito</h1>
+    <p class="page-header__subtitle">Gerencie seus cartões</p>
+  </div>
+  <a routerLink="/cards/new" class="btn btn--primary">+ Novo Cartão</a>
+</div>
+
+@if (loading()) {
+  <div class="loading-wrapper" aria-live="polite">
+    <span class="spinner"></span> Carregando cartões...
+  </div>
+} @else if (cards().length === 0) {
+  <div class="empty-state">
+    <div class="empty-state__icon">💳</div>
+    <p class="empty-state__title">Nenhum cartão cadastrado</p>
+    <p class="empty-state__text">Adicione um cartão para registrar compras parceladas.</p>
+    <a routerLink="/cards/new" class="btn btn--primary" style="margin-top: 16px">+ Novo Cartão</a>
+  </div>
+} @else {
+  <div class="cards-grid" role="list" aria-label="Lista de cartões">
+    @for (card of cards(); track card.id) {
+      <div class="credit-card-item" role="listitem">
+        <div class="credit-card-item__header">
+          <div class="credit-card-item__icon" aria-hidden="true">💳</div>
+          <div class="credit-card-item__info">
+            <h3 class="credit-card-item__name">{{ card.name }}</h3>
+            <span class="credit-card-item__digits mono">•••• {{ card.last_four_digits }}</span>
+          </div>
+        </div>
+
+        <div class="credit-card-item__details">
+          <div class="detail-item">
+            <span class="detail-item__label">Vencimento</span>
+            <span class="detail-item__value mono">Dia {{ card.due_date }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-item__label">Melhor compra</span>
+            <span class="detail-item__value mono">Dia {{ card.best_purchase_date }}</span>
+          </div>
+        </div>
+
+        <div class="credit-card-item__actions">
+          <a [routerLink]="['/cards', card.id, 'expenses']" class="btn btn--secondary btn--sm">
+            Ver Gastos
+          </a>
+          <a [routerLink]="['/cards', card.id, 'edit']" class="btn btn--ghost btn--sm" [attr.aria-label]="'Editar ' + card.name">
+            ✏️ Editar
+          </a>
+          <button
+            class="btn btn--ghost btn--sm"
+            (click)="delete(card)"
+            [disabled]="deletingId() === card.id"
+            [attr.aria-label]="'Excluir ' + card.name"
+          >
+            @if (deletingId() === card.id) { <span class="spinner"></span> } @else { 🗑️ Excluir }
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+}

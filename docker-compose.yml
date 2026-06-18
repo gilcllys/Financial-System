@@ -1,12 +1,16 @@
 services:
+
+  # ─── Banco de Dados ────────────────────────────────────────────────────────
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: financial_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${DB_NAME:-financial_db}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    # [SEC-A05] Porta 5432 NÃO exposta ao host — acesso apenas via rede interna Docker.
+    # Em dev local, descomente SOMENTE se precisar de acesso direto ao banco:
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"   # bind em loopback, NUNCA em 0.0.0.0
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -14,33 +18,67 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
 
+  # ─── Backend (Django + Gunicorn) ───────────────────────────────────────────
   backend:
     build: ./backend
-    command: >
-      sh -c "python financial_system/manage.py migrate --noinput &&
-             python financial_system/manage.py runserver 0.0.0.0:8000"
-    volumes:
-      - ./backend:/app
     ports:
       - "8000:8000"
     env_file:
-      - ./backend/.env.local
+      - ./backend/.env
+    environment:
+      # Keycloak hospedado no EC2 (acessível tanto pelo backend quanto pelo browser)
+      KEYCLOAK_SERVER_URL: https://ec2-54-147-150-5.compute-1.amazonaws.com
+      KEYCLOAK_REALM: projetos-pessoais
+      KEYCLOAK_CLIENT_ID: financial-backend
+      DB_HOST: db
+      DB_SSL_MODE: disable
+      # Workers: t3.micro (1 vCPU) → 3; t3.small (2 vCPU) → 5
+      GUNICORN_WORKERS: "3"
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      # [SEC-A05] Healthcheck do backend — verifica se o Gunicorn está respondendo
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/')\" 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          memory: 400M
+        reservations:
+          memory: 200M
 
+  # ─── Frontend (Angular + Nginx) ────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
-      args:
-        NG_CONFIG: development
+      dockerfile: Dockerfile
     ports:
-      - "4200:4200"
-    env_file:
-      - ./frontend/.env.local
+      - "4200:80"
     depends_on:
       - backend
+    healthcheck:
+      # [SEC-A05] Healthcheck do frontend — verifica se o Nginx está servindo
+      test: ["CMD-SHELL", "curl -f http://localhost/ -o /dev/null -s || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+        reservations:
+          memory: 32M
 
 volumes:
   pgdata:

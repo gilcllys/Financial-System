@@ -1,0 +1,69 @@
+<div class="page-header">
+  <div class="page-header__left">
+    <h1 class="page-header__title">🛒 Supermercado</h1>
+    <p class="page-header__subtitle">Histórico de compras de mercado</p>
+  </div>
+  <a routerLink="/supermarket/new" class="btn btn--primary desktop-only">+ Nova Compra</a>
+</div>
+
+@if (errorMessage()) {
+  <div class="alert alert--error" role="alert">{{ errorMessage() }}</div>
+}
+
+@if (loading()) {
+  <div class="loading-wrapper" aria-live="polite">
+    <span class="spinner"></span> Carregando compras...
+  </div>
+} @else if (expenses().length === 0) {
+  <div class="empty-state">
+    <div class="empty-state__icon">🛒</div>
+    <p class="empty-state__title">Nenhuma compra registrada</p>
+    <p class="empty-state__text">Registre sua primeira compra de supermercado.</p>
+    <a routerLink="/supermarket/new" class="btn btn--primary" style="margin-top: 16px">+ Nova Compra</a>
+  </div>
+} @else {
+  <div class="purchase-grid" aria-label="Lista de compras de supermercado">
+    @for (expense of expenses(); track expense.id) {
+      <div class="purchase-card">
+        <a [routerLink]="['/supermarket', expense.id]" class="purchase-card__body" [attr.aria-label]="'Ver detalhes de ' + expense.store_name">
+          <div class="purchase-card__header">
+            <span class="purchase-card__store">{{ expense.store_name }}</span>
+            <span class="purchase-card__total">{{ formatCurrency(expense.total) }}</span>
+          </div>
+          <div class="purchase-card__meta">
+            <span class="purchase-card__date">📅 {{ formatDate(expense.date) }}</span>
+            <span class="purchase-card__items">
+              🛍️ {{ expense.items.length }} {{ expense.items.length === 1 ? 'item' : 'itens' }}
+            </span>
+          </div>
+          @if (expense.address) {
+            <div class="purchase-card__address">
+              📍 {{ expense.address }}
+            </div>
+          }
+        </a>
+        <div class="purchase-card__actions">
+          <a
+            [routerLink]="['/supermarket', expense.id, 'edit']"
+            class="btn btn--ghost btn--sm"
+            [attr.aria-label]="'Editar compra em ' + expense.store_name"
+          >✏️</a>
+          <button
+            class="btn btn--ghost btn--sm"
+            (click)="delete(expense)"
+            [disabled]="deletingId() === expense.id"
+            [attr.aria-label]="'Excluir compra em ' + expense.store_name"
+          >
+            @if (deletingId() === expense.id) { <span class="spinner"></span> } @else { 🗑️ }
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+
+  <!-- FAB mobile -->
+  <div class="mobile-fab-placeholder" aria-hidden="true"></div>
+}
+
+<!-- Botão flutuante mobile -->
+<a routerLink="/supermarket/new" class="fab-sm mobile-only" aria-label="Nova compra">+</a>

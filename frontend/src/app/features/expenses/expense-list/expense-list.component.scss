@@ -1,0 +1,159 @@
+.desktop-only {
+  @media (max-width: 1023px) { display: none; }
+}
+
+.text-right { text-align: right; }
+.text-muted { color: var(--color-muted); font-size: 13px; }
+
+.expense-desc {
+  &__text {
+    display: block;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+}
+
+.action-buttons {
+  display: flex;
+  gap: var(--space-xxs);
+}
+
+// ── Barra de Busca ────────────────────────────────────────────────────────────
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-pill);
+  padding: 0 16px;
+  height: 48px;
+  margin-bottom: 16px;
+  transition: border-color 0.15s;
+
+  &:focus-within {
+    border-color: var(--color-primary);
+    background: var(--color-canvas);
+    box-shadow: 0 0 0 3px rgba(0, 82, 255, 0.08);
+  }
+
+  &__icon { font-size: 16px; flex-shrink: 0; }
+
+  &__input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 15px;
+    color: var(--color-ink);
+    outline: none;
+    &::placeholder { color: var(--color-muted); }
+  }
+
+  &__clear {
+    border: none;
+    background: transparent;
+    color: var(--color-muted);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px;
+    border-radius: 50%;
+    &:hover { background: var(--color-surface-strong); }
+  }
+}
+
+// ── Paginação ─────────────────────────────────────────────────────────────────
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+
+  &__btn {
+    min-width: 36px;
+    height: 36px;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--rounded-sm);
+    background: var(--color-canvas);
+    color: var(--color-body);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+
+    &:hover:not(:disabled) {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
+    &--active {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    &:disabled { opacity: 0.4; cursor: not-allowed; }
+  }
+
+  &__info {
+    margin-left: 8px;
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+}
+
+/* ── Eyebrow (mês atual) ── */
+.page-header__eyebrow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0052FF;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+/* ── Home charts grid ── */
+.home-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.home-chart-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+
+  &__title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0 0 12px;
+  }
+
+  &__body {
+    position: relative;
+    height: 200px;
+
+    canvas {
+      max-height: 200px;
+    }
+  }
+}
+
+@media (max-width: 767px) {
+  .home-charts {
+    grid-template-columns: 1fr;
+  }
+  .home-chart-card__body {
+    height: 180px;
+  }
+}

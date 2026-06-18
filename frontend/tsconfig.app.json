@@ -1,16 +1,14 @@
+/* To learn more about this file see: https://angular.io/config/tsconfig. */
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./out-tsc/app",
-    "types": ["node"]
+    "types": []
   },
-  "files": ["src/main.ts", "src/main.server.ts", "src/server.ts"],
-  "include": [
-    "src/**/*.ts", // <--- Adicione isso: inclui todos os arquivos TS
-    "src/**/*.d.ts"
+  "files": [
+    "src/main.ts"
   ],
-  "exclude": [
-    "src/test.ts", // Exclua arquivos de teste se houver
-    "src/**/*.spec.ts" // Exclua os specs (eles devem ficar no tsconfig.spec.json)
+  "include": [
+    "src/**/*.d.ts"
   ]
 }

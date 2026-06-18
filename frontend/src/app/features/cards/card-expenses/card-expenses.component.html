@@ -1,0 +1,58 @@
+<div class="page-header">
+  <div class="page-header__left">
+    @if (card()) {
+      <h1 class="page-header__title">{{ card()!.name }} <span class="mono text-muted">•••• {{ card()!.last_four_digits }}</span></h1>
+      <p class="page-header__subtitle">Vence dia {{ card()!.due_date }} · Melhor compra: dia {{ card()!.best_purchase_date }}</p>
+    }
+  </div>
+  <a routerLink="/cards" class="btn btn--secondary btn--sm">← Cartões</a>
+</div>
+
+<!-- Total -->
+<div class="summary-row" style="margin-bottom: var(--space-lg)">
+  <div class="summary-card">
+    <span class="summary-card__label">Total no Cartão</span>
+    <span class="summary-card__value" [class]="amountClass(total())">
+      {{ amountPrefix(total()) }} {{ formatAmount(total()) }}
+    </span>
+  </div>
+  <div class="summary-card">
+    <span class="summary-card__label">Transações</span>
+    <span class="summary-card__value mono">{{ expenses().length }}</span>
+  </div>
+</div>
+
+@if (loading()) {
+  <div class="loading-wrapper"><span class="spinner"></span> Carregando gastos...</div>
+} @else if (expenses().length === 0) {
+  <div class="empty-state">
+    <div class="empty-state__icon">🧾</div>
+    <p class="empty-state__title">Nenhum gasto neste cartão</p>
+    <p class="empty-state__text">Os gastos com este cartão aparecerão aqui.</p>
+  </div>
+} @else {
+  <div class="data-table-wrapper">
+    <table class="data-table" role="table" aria-label="Gastos do cartão">
+      <thead>
+        <tr>
+          <th scope="col">Descrição</th>
+          <th scope="col">Data</th>
+          <th scope="col" class="text-right">Valor</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (e of expenses(); track e.id) {
+          <tr>
+            <td style="font-weight: 500">{{ e.description }}</td>
+            <td class="mono" style="color: var(--color-muted); font-size: 13px">{{ e.date | date:'dd/MM/yyyy' : '+0000' }}</td>
+            <td class="text-right">
+              <span [class]="amountClass(e.amount)" class="mono">
+                {{ amountPrefix(e.amount) }} {{ formatAmount(e.amount) }}
+              </span>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

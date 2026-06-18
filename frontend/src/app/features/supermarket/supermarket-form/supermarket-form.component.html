@@ -1,0 +1,80 @@
+<div class="page-header">
+  <div class="page-header__left">
+    <h1 class="page-header__title">{{ isEdit() ? 'Editar Compra' : 'Nova Compra' }}</h1>
+    <p class="page-header__subtitle">{{ isEdit() ? 'Atualize os dados da compra' : 'Registre uma nova compra de supermercado' }}</p>
+  </div>
+  <a routerLink="/supermarket" class="btn btn--secondary btn--sm">← Voltar</a>
+</div>
+
+@if (loading()) {
+  <div class="loading-wrapper" aria-live="polite">
+    <span class="spinner"></span> Carregando...
+  </div>
+} @else {
+  <div class="card">
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate aria-label="Formulário de compra de supermercado">
+
+      <!-- Store Name -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="store_name">Nome da Loja *</label>
+          <input
+            id="store_name"
+            class="form-input"
+            [class.error]="hasError('store_name')"
+            type="text"
+            formControlName="store_name"
+            placeholder="Ex: Pão de Açúcar"
+            autocomplete="organization"
+          />
+          @if (hasError('store_name')) {
+            <span class="form-error" role="alert">Nome da loja é obrigatório (mín. 2 caracteres).</span>
+          }
+        </div>
+      </div>
+
+      <!-- Date + Address -->
+      <div class="form-row form-row--2col">
+        <div class="form-group">
+          <label class="form-label" for="date">Data *</label>
+          <input
+            id="date"
+            class="form-input"
+            [class.error]="hasError('date')"
+            type="date"
+            formControlName="date"
+          />
+          @if (hasError('date')) {
+            <span class="form-error" role="alert">Data é obrigatória.</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="address">Endereço <span class="form-hint--inline">(opcional)</span></label>
+          <input
+            id="address"
+            class="form-input"
+            type="text"
+            formControlName="address"
+            placeholder="Ex: Rua das Flores, 123"
+            autocomplete="street-address"
+          />
+        </div>
+      </div>
+
+      <!-- Error message -->
+      @if (errorMessage()) {
+        <div class="form-error-box" role="alert">{{ errorMessage() }}</div>
+      }
+
+      <!-- Actions -->
+      <div class="form-actions">
+        <a routerLink="/supermarket" class="btn btn--secondary">Cancelar</a>
+        <button type="submit" class="btn btn--primary" [disabled]="saving()">
+          @if (saving()) { <span class="spinner"></span> } Salvar
+        </button>
+      </div>
+
+    </form>
+  </div>
+}

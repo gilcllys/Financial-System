@@ -118,6 +118,9 @@ frontend/dist
 /frontend/node_modules
 npm-debug.log
 yarn-error.log
+Faturas/*
+extract_faturas.py
+populate_database.py
 
 # IDEs and editors
 .idea/
@@ -150,3 +153,4 @@ frontend/.angular
 .DS_Store
 Thumbs.db
 frontend/financial-system-ui/.angular
+.aider*
