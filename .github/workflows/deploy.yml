@@ -92,7 +92,11 @@ jobs:
 
             echo "🐳 Rebuilding and restarting containers..."
             docker compose down || true
-            docker compose up -d --build
+
+            echo "🗑️ Removing old DB volume to apply new password..."
+            docker volume rm financial-system_pgdata || true
+
+            docker compose --env-file ./backend/.env up -d --build
 
             echo "⏳ Waiting for backend to be healthy..."
             sleep 15

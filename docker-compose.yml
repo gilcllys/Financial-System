@@ -3,18 +3,20 @@ services:
   # ─── Banco de Dados ────────────────────────────────────────────────────────
   db:
     image: postgres:16-alpine
+    env_file:
+      - ./backend/.env
     environment:
       POSTGRES_DB: ${DB_NAME:-financial_db}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     # [SEC-A05] Porta 5432 NÃO exposta ao host — acesso apenas via rede interna Docker.
     # Em dev local, descomente SOMENTE se precisar de acesso direto ao banco:
-    ports:
-      - "127.0.0.1:5432:5432"   # bind em loopback, NUNCA em 0.0.0.0
+    # ports:
+    #   - "127.0.0.1:5432:5432"   # bind em loopback, NUNCA em 0.0.0.0
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d financial_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-financial_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
