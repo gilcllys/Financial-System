@@ -20,6 +20,23 @@ jobs:
             set -e
             cd ${{ vars.EC2_PROJECT_PATH }}
             git pull origin main
+
+            printf 'DEBUG=%s\n'                  '${{ vars.DEBUG }}'                  >  ./backend/.env
+            printf 'SECRET_KEY=%s\n'             '${{ secrets.SECRET_KEY }}'          >> ./backend/.env
+            printf 'ALLOWED_HOSTS=%s\n'          '${{ vars.ALLOWED_HOSTS }}'          >> ./backend/.env
+            printf 'CORS_ALLOWED_ORIGINS=%s\n'   '${{ vars.CORS_ALLOWED_ORIGINS }}'   >> ./backend/.env
+            printf 'KEYCLOAK_SERVER_URL=%s\n'    '${{ vars.KEYCLOAK_SERVER_URL }}'    >> ./backend/.env
+            printf 'KEYCLOAK_REALM=%s\n'         '${{ vars.KEYCLOAK_REALM }}'         >> ./backend/.env
+            printf 'KEYCLOAK_CLIENT_ID=%s\n'     '${{ vars.KEYCLOAK_CLIENT_ID }}'     >> ./backend/.env
+            printf 'KEYCLOAK_VERIFY_SSL=%s\n'    '${{ vars.KEYCLOAK_VERIFY_SSL }}'    >> ./backend/.env
+            printf 'DB_NAME=%s\n'                '${{ vars.DB_NAME }}'                >> ./backend/.env
+            printf 'DB_USERNAME=%s\n'            '${{ vars.DB_USERNAME }}'            >> ./backend/.env
+            printf 'DB_PASSWORD=%s\n'            '${{ secrets.DB_PASSWORD }}'         >> ./backend/.env
+            printf 'DB_HOST=%s\n'                '${{ vars.DB_HOST }}'                >> ./backend/.env
+            printf 'DB_PORT=%s\n'                '${{ vars.DB_PORT }}'                >> ./backend/.env
+            printf 'DB_SSL_MODE=disable\n'                                            >> ./backend/.env
+            printf 'GUNICORN_WORKERS=%s\n'       '${{ vars.GUNICORN_WORKERS }}'       >> ./backend/.env
+
             docker compose up -d --build
             sudo nginx -t && sudo systemctl reload nginx
             echo "✅ Deploy finished successfully!"
