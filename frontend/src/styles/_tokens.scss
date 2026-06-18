@@ -62,7 +62,9 @@
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.04);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
 
-  // Navbar height
-  --navbar-h: 64px;
+  // Layout dimensions
+  --navbar-h: 64px;          // kept for backward compat
+  --mobile-header-h: 56px;   // top bar visible only on mobile
+  --sidebar-w: 240px;        // fixed sidebar width (desktop)
   --bottom-nav-h: 64px;
 }

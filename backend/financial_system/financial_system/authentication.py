@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 
@@ -165,6 +166,9 @@ class KeycloakAuthentication(BaseAuthentication):
             f"/realms/{settings.KEYCLOAK_REALM}"
         )
 
+        # [SEC-A07] leeway de 60s tolera dessincronização de clock entre WSL/EC2
+        leeway = datetime.timedelta(seconds=60)
+
         decode_options = {
             'verify_exp': True,
             'verify_aud': verify_audience,
@@ -180,6 +184,7 @@ class KeycloakAuthentication(BaseAuthentication):
                     audience=audience if verify_audience else None,
                     issuer=expected_issuer,
                     options=decode_options,
+                    leeway=leeway,
                 )
             except jwt.ExpiredSignatureError:
                 raise AuthenticationFailed("Token expirado.")

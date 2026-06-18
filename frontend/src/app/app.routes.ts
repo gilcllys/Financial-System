@@ -110,6 +110,14 @@ export const routes: Routes = [
         data: { historyMode: true },
       },
 
+      // Sem Categoria (gastos com category_id = 11)
+      {
+        path: 'uncategorized',
+        loadComponent: () =>
+          import('./features/expenses/expense-list/expense-list.component').then(m => m.ExpenseListComponent),
+        data: { uncategorizedMode: true },
+      },
+
       // Analytics
       {
         path: 'analytics',

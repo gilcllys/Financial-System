@@ -1,40 +1,101 @@
-name: Deploy Production
+name: Deploy to AWS EC2
+
 on:
   push:
     branches:
       - main
-    paths:
-      - "backend/**"
-      - ".github/workflows/deploy.yml"
-
-env:
-  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
 jobs:
-  deploy_production:
-    name: Deploy backend to Fly.io
+  deploy:
     runs-on: ubuntu-latest
 
-    environment:
-      name: production
-      # URL atualizada com o novo nome do seu app
-      url: https://financial-backend-gilcllys.fly.dev
-
     steps:
-      - name: Get code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Validação do Dockerfile: Garante que o build funciona antes de tentar o deploy
-      - name: Build Docker Image (Dry Run)
+      - name: Validate required variables
         run: |
-          docker build -t production-check:latest .
-        working-directory: ./backend
+          missing=0
 
-      # Action corrigida para evitar o erro "repository not found"
-      - name: Setup Flyctl
-        uses: superfly/flyctl-actions/setup-flyctl@master
+          check() {
+            if [ -z "$1" ]; then
+              echo "❌ Missing: $2"
+              missing=1
+            fi
+          }
 
-      - name: Deploy to Fly.io
-        # O deploy agora aponta para o seu novo nome de app 'financial-backend-gilcllys'
-        run: flyctl deploy --remote-only --app financial-backend-gilcllys
-        working-directory: ./backend
+          echo "🔍 Validating EC2 connection variables..."
+          check "${{ vars.EC2_HOST }}"         EC2_HOST
+          check "${{ vars.EC2_USER }}"         EC2_USER
+          check "${{ vars.EC2_PROJECT_PATH }}" EC2_PROJECT_PATH
+          check "${{ secrets.EC2_SSH_KEY }}"   EC2_SSH_KEY
+
+          echo "🔍 Validating application variables..."
+          check "${{ vars.DEBUG }}"                    DEBUG
+          check "${{ vars.ALLOWED_HOSTS }}"            ALLOWED_HOSTS
+          check "${{ vars.CORS_ALLOWED_ORIGINS }}"     CORS_ALLOWED_ORIGINS
+          check "${{ vars.KEYCLOAK_SERVER_URL }}"      KEYCLOAK_SERVER_URL
+          check "${{ vars.KEYCLOAK_REALM }}"           KEYCLOAK_REALM
+          check "${{ vars.KEYCLOAK_CLIENT_ID }}"       KEYCLOAK_CLIENT_ID
+          check "${{ vars.KEYCLOAK_VERIFY_SSL }}"      KEYCLOAK_VERIFY_SSL
+          check "${{ vars.DB_NAME }}"                  DB_NAME
+          check "${{ vars.DB_USERNAME }}"              DB_USERNAME
+          check "${{ vars.DB_HOST }}"                  DB_HOST
+          check "${{ vars.DB_PORT }}"                  DB_PORT
+          check "${{ vars.GUNICORN_WORKERS }}"         GUNICORN_WORKERS
+          check "${{ secrets.SECRET_KEY }}"            SECRET_KEY
+          check "${{ secrets.DB_PASSWORD }}"           DB_PASSWORD
+
+          if [ $missing -eq 1 ]; then
+            echo "🚨 Aborting deploy due to missing variables!"
+            exit 1
+          fi
+
+          echo "✅ All required variables are set"
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ vars.EC2_HOST }}
+          username: ${{ vars.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+
+            echo "📁 Going to project folder..."
+            cd ${{ vars.EC2_PROJECT_PATH }}
+
+            echo "📦 Pulling latest code..."
+            git pull origin main
+
+            echo "📝 Creating backend .env file..."
+            cat > ./backend/.env << 'ENVEOF'
+            DEBUG=${{ vars.DEBUG }}
+            SECRET_KEY=${{ secrets.SECRET_KEY }}
+            ALLOWED_HOSTS=${{ vars.ALLOWED_HOSTS }}
+            CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS }}
+            KEYCLOAK_SERVER_URL=${{ vars.KEYCLOAK_SERVER_URL }}
+            KEYCLOAK_REALM=${{ vars.KEYCLOAK_REALM }}
+            KEYCLOAK_CLIENT_ID=${{ vars.KEYCLOAK_CLIENT_ID }}
+            KEYCLOAK_VERIFY_SSL=${{ vars.KEYCLOAK_VERIFY_SSL }}
+            DB_NAME=${{ vars.DB_NAME }}
+            DB_USERNAME=${{ vars.DB_USERNAME }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_HOST=${{ vars.DB_HOST }}
+            DB_PORT=${{ vars.DB_PORT }}
+            DB_SSL_MODE=disable
+            GUNICORN_WORKERS=${{ vars.GUNICORN_WORKERS }}
+            ENVEOF
+
+            echo "🔍 DEBUG - DB_NAME: $(grep DB_NAME ./backend/.env | cut -d= -f2)"
+            echo "🔍 DEBUG - DB_PASSWORD first 3 chars: $(grep DB_PASSWORD ./backend/.env | cut -d= -f2 | cut -c1-3)"
+
+            echo "🐳 Rebuilding and restarting containers..."
+            docker compose down || true
+            docker compose up -d --build
+
+            echo "⏳ Waiting for backend to be healthy..."
+            sleep 15
+            docker compose ps
+
+            echo "✅ Deploy finished successfully!"

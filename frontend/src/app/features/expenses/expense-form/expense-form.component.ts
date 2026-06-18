@@ -101,7 +101,7 @@ export class ExpenseFormComponent implements OnInit {
         // Define o toggle baseado no sinal do amount
         this.isIncome.set(expense.amount >= 0);
         this.form.patchValue({
-          description: expense.description,
+          description: expense.description?.replace(/^\[CASAL\]\s*/, '') ?? '',
           amount: Math.abs(expense.amount),
           date: expense.date,
           category_id: expense.category_id,
@@ -130,7 +130,7 @@ export class ExpenseFormComponent implements OnInit {
 
     const payload = {
       category_id: v.category_id!,
-      description: v.description!,
+      description: v.need_pay_vitoria ? `[CASAL] ${v.description!}` : v.description!,
       amount: signedAmount,
       date: v.date!,
       quantity: v.quantity!,

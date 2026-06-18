@@ -2,7 +2,7 @@ import calendar
 from datetime import date
 
 from django.db.models import Count, Q, Sum
-from django.db.models.functions import Abs, ExtractMonth
+from django.db.models.functions import Abs, ExtractDay, ExtractMonth
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
@@ -118,13 +118,17 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     # Custom actions — CRUD helpers
     # ------------------------------------------------------------------
 
-    @action(detail=False, methods=['post'], url_path='create-expense')
+    def perform_create(self, serializer):
+        """Injeta tenant_id do usuário autenticado ao criar via POST padrão."""
+        serializer.save(tenant_id=self.request.user.tenant_id)
+
     def perform_destroy(self, instance):
         if instance.tenant_id != self.request.user.tenant_id:
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("Você não tem permissão para excluir este recurso.")
         instance.delete()
 
+    @action(detail=False, methods=['post'], url_path='create-expense')
     def create_expense(self, request):
         s = serializer.CreateExpenseInputSerializer(data=request.data)
         s.is_valid(raise_exception=True)
@@ -392,3 +396,115 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             })
 
         return Response(result, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='home-charts')
+    def home_charts(self, request):
+        """
+        GET /api/expenses/expenses/home-charts/?month=6&year=2026
+
+        Endpoint otimizado para a tela Home/Gastos.
+        Retorna em UMA requisição:
+          - summary: total_income, total_expenses, balance, count
+          - by_category: gastos agrupados por categoria (doughnut)
+          - daily: gasto por dia do mês (bar chart)
+          - weekly: gasto agrupado por semana 1-4 (line chart)
+
+        Usa apenas 2 queries ao banco (category group + daily group).
+        """
+        import calendar as cal_module
+
+        today = date.today()
+        params = request.query_params
+
+        try:
+            month = int(params.get('month', today.month))
+            if not (1 <= month <= 12):
+                raise ValueError
+        except (ValueError, TypeError):
+            month = today.month
+
+        try:
+            year = int(params.get('year', today.year))
+            if year <= 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            year = today.year
+
+        tenant = request.user.tenant_id
+        base_qs = models.Expense.objects.filter(
+            tenant_id=tenant,
+            date__year=year,
+            date__month=month,
+        )
+
+        # ── Query 1: agrupamento por categoria (apenas despesas) ──────────
+        cat_rows = (
+            base_qs
+            .filter(amount__lt=0)
+            .values('category_id', 'category__name')
+            .annotate(total=Sum(Abs('amount')), count=Count('id'))
+            .order_by('-total')
+        )
+        cat_grand = sum(float(r['total'] or 0) for r in cat_rows)
+        by_category = [
+            {
+                'category_id': r['category_id'],
+                'category_name': r['category__name'] or 'Sem categoria',
+                'total': round(float(r['total'] or 0), 2),
+                'count': r['count'],
+                'percentage': round(
+                    float(r['total'] or 0) / cat_grand * 100 if cat_grand else 0, 2
+                ),
+            }
+            for r in cat_rows
+        ]
+
+        # ── Query 2: agrupamento por dia ───────────────────────────────────
+        day_rows = (
+            base_qs
+            .filter(amount__lt=0)
+            .annotate(day_num=ExtractDay('date'))
+            .values('day_num')
+            .annotate(total=Sum(Abs('amount')), count=Count('id'))
+            .order_by('day_num')
+        )
+        day_map = {r['day_num']: r for r in day_rows}
+
+        _, days_in_month = cal_module.monthrange(year, month)
+
+        daily = []
+        weeks = [0.0, 0.0, 0.0, 0.0]
+        for day in range(1, days_in_month + 1):
+            row = day_map.get(day, {})
+            total = round(float(row.get('total') or 0), 2)
+            daily.append({'day': day, 'total': total, 'count': row.get('count', 0)})
+            w = min((day - 1) // 7, 3)
+            weeks[w] += total
+
+        weekly = [
+            {'week': i + 1, 'label': f'Semana {i + 1}', 'total': round(weeks[i], 2)}
+            for i in range(4)
+        ]
+
+        # ── Summary: income / expenses / balance ───────────────────────────
+        agg = base_qs.aggregate(
+            income=Sum('amount', filter=Q(amount__gt=0)),
+            expenses=Sum(Abs('amount'), filter=Q(amount__lt=0)),
+            count=Count('id'),
+        )
+        income   = round(float(agg['income']   or 0), 2)
+        expenses = round(float(agg['expenses'] or 0), 2)
+
+        return Response({
+            'month': month,
+            'year': year,
+            'summary': {
+                'income':   income,
+                'expenses': expenses,
+                'balance':  round(income - expenses, 2),
+                'count':    agg['count'] or 0,
+            },
+            'by_category': by_category,
+            'daily':  daily,
+            'weekly': weekly,
+        }, status=status.HTTP_200_OK)

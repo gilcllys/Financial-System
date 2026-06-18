@@ -4,9 +4,9 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: financial_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${DB_NAME:-financial_db}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     # [SEC-A05] Porta 5432 NÃO exposta ao host — acesso apenas via rede interna Docker.
     # Em dev local, descomente SOMENTE se precisar de acesso direto ao banco:
     ports:

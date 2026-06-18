@@ -1,107 +1,22 @@
-// ─── Navbar ───────────────────────────────────────────────────────────────────
-.navbar {
+// ─── Mobile Header ────────────────────────────────────────────────────────────
+// Visible only on mobile (<768px). Desktop users see the persistent sidebar.
+.mobile-header {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 200;
-  height: var(--navbar-h);
-  background: var(--color-canvas);
+  z-index: 300;
+  height: var(--mobile-header-h);
+  background: rgba(255, 255, 255, 0.95);
   border-bottom: 1px solid var(--color-hairline);
   backdrop-filter: blur(8px);
-  background: rgba(255, 255, 255, 0.92);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-base);
+  gap: var(--space-sm);
 
-  &__inner {
-    height: 100%;
-    display: flex;
-    align-items: center;
-    gap: var(--space-base);
-  }
-
-  &__brand {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    text-decoration: none;
-    flex-shrink: 0;
-  }
-
-  &__logo {
-    font-size: 22px;
-    line-height: 1;
-  }
-
-  &__name {
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--color-ink);
-    letter-spacing: -0.3px;
-  }
-
-  &__nav {
+  @media (min-width: 768px) {
     display: none;
-    align-items: center;
-    gap: var(--space-xs);
-    flex: 1;
-
-    @media (min-width: 768px) {
-      display: flex;
-    }
-  }
-
-  &__link {
-    padding: var(--space-xs) var(--space-sm);
-    border-radius: var(--rounded-pill);
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--color-body);
-    text-decoration: none;
-    transition: color 0.15s ease, background 0.15s ease;
-    white-space: nowrap;
-
-    &:hover {
-      color: var(--color-ink);
-      background: var(--color-surface-soft);
-      text-decoration: none;
-    }
-
-    &.active {
-      color: var(--color-primary);
-      background: rgba(0, 82, 255, 0.08);
-      font-weight: 600;
-    }
-  }
-
-  &__user {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    margin-left: auto;
-    flex-shrink: 0;
-  }
-
-  &__username {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--color-body);
-    max-width: 140px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    display: none;
-
-    @media (min-width: 640px) {
-      display: block;
-    }
-  }
-
-  // Logout btn hidden on mobile – moved to hamburger menu
-  > .navbar__inner > .navbar__user > .btn--secondary {
-    display: none;
-
-    @media (min-width: 768px) {
-      display: inline-flex;
-    }
   }
 
   &__hamburger {
@@ -116,56 +31,33 @@
     background: transparent;
     border: none;
     cursor: pointer;
+    flex-shrink: 0;
     transition: background 0.15s;
 
     &:hover {
       background: var(--color-surface-soft);
     }
-
-    @media (min-width: 768px) {
-      display: none;
-    }
   }
 
-  &__mobile-menu {
-    position: absolute;
-    top: var(--navbar-h);
-    left: 0;
-    right: 0;
-    background: var(--color-canvas);
-    border-bottom: 1px solid var(--color-hairline);
-    padding: var(--space-sm) var(--space-base);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xxs);
-    box-shadow: var(--shadow-lg);
-    animation: slideDown 0.15s ease;
-  }
-
-  &__mobile-link {
+  &__brand {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-sm) var(--space-base);
-    border-radius: var(--rounded-md);
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--color-body);
+    gap: var(--space-xs);
     text-decoration: none;
-    transition: background 0.12s ease, color 0.12s ease;
 
-    &:hover, &.active {
-      background: var(--color-surface-soft);
-      color: var(--color-primary);
-      text-decoration: none;
-    }
+    &:hover { text-decoration: none; }
   }
 
-  &__mobile-user {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-sm) 0;
+  &__logo {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  &__name {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--color-ink);
+    letter-spacing: -0.3px;
   }
 }
 
@@ -175,34 +67,303 @@
   height: 2px;
   background: var(--color-ink);
   border-radius: 1px;
-  transition: transform 0.2s ease;
 }
 
-.nav-icon {
-  font-size: 18px;
+// ─── Sidebar Overlay (mobile backdrop) ────────────────────────────────────────
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 350;
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.2s ease;
+
+  @media (min-width: 768px) {
+    display: none;
+  }
 }
 
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-8px); }
-  to   { opacity: 1; transform: translateY(0); }
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
-// ─── Bottom Nav ───────────────────────────────────────────────────────────────
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-w);
+  background: #ffffff;
+  border-right: 1px solid #E5E7EB;
+  display: flex;
+  flex-direction: column;
+  z-index: 400;
+  overflow: hidden;
+
+  // ── Mobile: hidden off-screen, slides in as a drawer
+  @media (max-width: 767px) {
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-lg);
+
+    &--open {
+      transform: translateX(0);
+    }
+  }
+
+  // ── Desktop: always visible, no transition needed
+  @media (min-width: 768px) {
+    transform: none !important;
+    transition: none !important;
+  }
+
+  // ── Brand area
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-lg) var(--space-base);
+    border-bottom: 1px solid #F3F4F6;
+    flex-shrink: 0;
+  }
+
+  &__brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    text-decoration: none;
+
+    &:hover { text-decoration: none; }
+  }
+
+  &__logo-icon {
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  &__logo-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--color-ink);
+    letter-spacing: -0.3px;
+  }
+
+  // Close button only on mobile
+  &__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--rounded-sm);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--color-muted);
+    font-size: 14px;
+    transition: background 0.15s, color 0.15s;
+
+    &:hover {
+      background: var(--color-surface-soft);
+      color: var(--color-ink);
+    }
+
+    @media (min-width: 768px) {
+      display: none;
+    }
+  }
+
+  // ── Nav
+  &__nav {
+    flex: 1;
+    padding: var(--space-sm) var(--space-xs);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+  }
+
+  &__divider {
+    height: 1px;
+    background: #F3F4F6;
+    margin: var(--space-xs) var(--space-xs);
+  }
+
+  &__link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 9px var(--space-sm);
+    border-radius: var(--rounded-sm);
+    border-left: 3px solid transparent;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    text-decoration: none;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+    position: relative;
+
+    &:hover {
+      background: #F3F4F6;
+      color: var(--color-ink);
+      text-decoration: none;
+    }
+
+    // Active state (set by routerLinkActive)
+    &--active {
+      background: #EFF6FF !important;
+      color: #0052FF !important;
+      border-left-color: #0052FF !important;
+      font-weight: 600;
+    }
+
+    // Warning variant (Sem Categoria)
+    &--warning {
+      color: #92400e;
+
+      &:hover {
+        background: #FEF3C7;
+        color: #78350f;
+      }
+
+      &.sidebar__link--active {
+        background: #FEF3C7 !important;
+        color: #92400e !important;
+        border-left-color: #F59E0B !important;
+      }
+    }
+  }
+
+  &__link-icon {
+    font-size: 17px;
+    line-height: 1;
+    flex-shrink: 0;
+    width: 22px;
+    text-align: center;
+  }
+
+  &__link-label {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // ── Badge (uncategorized count)
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: var(--rounded-pill);
+    background: var(--color-semantic-down);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    flex-shrink: 0;
+    animation: badgePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes badgePop {
+    from { transform: scale(0.6); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+
+  // ── User footer
+  &__footer {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-base);
+    border-top: 1px solid #F3F4F6;
+    background: #F9FAFB;
+    flex-shrink: 0;
+  }
+
+  &__avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--rounded-full);
+    background: var(--color-primary);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    user-select: none;
+  }
+
+  &__user-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  &__user-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__user-email {
+    font-size: 11px;
+    color: var(--color-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__logout {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--rounded-sm);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--color-muted);
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+
+    &:hover {
+      background: var(--color-surface-strong);
+      color: var(--color-semantic-down);
+    }
+  }
+}
+
+// ─── Bottom Nav (mobile only) ──────────────────────────────────────────────────
 .bottom-nav {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   height: var(--bottom-nav-h);
-  background: var(--color-canvas);
+  background: rgba(255, 255, 255, 0.94);
   border-top: 1px solid var(--color-hairline);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: stretch;
   z-index: 200;
-  backdrop-filter: blur(8px);
-  background: rgba(255, 255, 255, 0.94);
 
-  @media (min-width: 1024px) {
+  // Hide on desktop (sidebar handles navigation)
+  @media (min-width: 768px) {
     display: none;
   }
 
@@ -246,3 +407,4 @@
     letter-spacing: 0.2px;
   }
 }
+

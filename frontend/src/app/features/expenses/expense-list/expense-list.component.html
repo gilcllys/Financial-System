@@ -1,7 +1,17 @@
 <div class="page-header">
   <div class="page-header__left">
-    <h1 class="page-header__title">{{ historyMode ? 'Histórico' : 'Gastos' }}</h1>
-    <p class="page-header__subtitle">{{ historyMode ? 'Todos os seus lançamentos' : 'Gastos do mês atual' }}</p>
+    @if (!historyMode && !uncategorizedMode) {
+      <p class="page-header__eyebrow">📅 Mês atual</p>
+      <h1 class="page-header__title">{{ currentMonthName }} {{ currentYear }}</h1>
+      <p class="page-header__subtitle">Seus gastos de {{ currentMonthName }}</p>
+    } @else {
+      <h1 class="page-header__title">
+        {{ uncategorizedMode ? 'Sem Categoria' : 'Histórico' }}
+      </h1>
+      <p class="page-header__subtitle">
+        {{ uncategorizedMode ? 'Gastos não classificados — edite para categorizar' : 'Todos os seus lançamentos' }}
+      </p>
+    }
   </div>
   <a routerLink="/expenses/new" class="btn btn--primary desktop-only">+ Novo Gasto</a>
 </div>
@@ -35,12 +45,14 @@
       <option [value]="y">{{ y }}</option>
     }
   </select>
-  <select class="form-select" [ngModel]="filterCategory()" (ngModelChange)="filterCategory.set($event); onFilterChange()" aria-label="Categoria">
-    <option value="">Todas as categorias</option>
-    @for (cat of categories(); track cat.id) {
-      <option [value]="cat.id">{{ cat.name }}</option>
-    }
-  </select>
+  @if (!uncategorizedMode) {
+    <select class="form-select" [ngModel]="filterCategory()" (ngModelChange)="filterCategory.set($event); onFilterChange()" aria-label="Categoria">
+      <option value="">Todas as categorias</option>
+      @for (cat of categories(); track cat.id) {
+        <option [value]="cat.id">{{ cat.name }}</option>
+      }
+    </select>
+  }
   <select class="form-select" [ngModel]="filterPayment()" (ngModelChange)="filterPayment.set($event); onFilterChange()" aria-label="Método">
     <option value="">Todos os métodos</option>
     <option value="dinheiro">💵 Dinheiro</option>
@@ -71,6 +83,31 @@
 </div>
 
 <!-- Conteúdo -->
+
+<!-- Mini-gráficos (somente na tela Gastos, não Histórico/Sem Categoria) -->
+@if (!historyMode && !uncategorizedMode) {
+  <div class="home-charts">
+    <div class="home-chart-card">
+      <h3 class="home-chart-card__title">🏷️ Por Categoria</h3>
+      <div class="home-chart-card__body">
+        <canvas #categoryChart></canvas>
+      </div>
+    </div>
+    <div class="home-chart-card">
+      <h3 class="home-chart-card__title">📅 Gasto Diário</h3>
+      <div class="home-chart-card__body">
+        <canvas #dailyChart></canvas>
+      </div>
+    </div>
+    <div class="home-chart-card">
+      <h3 class="home-chart-card__title">📆 Gasto por Semana</h3>
+      <div class="home-chart-card__body">
+        <canvas #weeklyChart></canvas>
+      </div>
+    </div>
+  </div>
+}
+
 @if (loading()) {
   <div class="loading-wrapper" aria-live="polite">
     <span class="spinner"></span> Carregando gastos...

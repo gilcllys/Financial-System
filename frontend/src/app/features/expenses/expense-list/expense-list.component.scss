@@ -104,3 +104,56 @@
     color: var(--color-muted);
   }
 }
+
+/* ── Eyebrow (mês atual) ── */
+.page-header__eyebrow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0052FF;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+/* ── Home charts grid ── */
+.home-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.home-chart-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+
+  &__title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0 0 12px;
+  }
+
+  &__body {
+    position: relative;
+    height: 200px;
+
+    canvas {
+      max-height: 200px;
+    }
+  }
+}
+
+@media (max-width: 767px) {
+  .home-charts {
+    grid-template-columns: 1fr;
+  }
+  .home-chart-card__body {
+    height: 180px;
+  }
+}

@@ -94,11 +94,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .page-content {
-  padding-top: calc(var(--navbar-h) + var(--space-lg));
+  // Mobile: offset from fixed mobile header + bottom nav
+  padding-top: calc(var(--mobile-header-h) + var(--space-sm));
   padding-bottom: calc(var(--bottom-nav-h) + var(--space-xl));
   min-height: 100vh;
 
-  @media (min-width: 1024px) {
+  // Desktop: sidebar takes left side, no header offset needed
+  @media (min-width: 768px) {
+    margin-left: var(--sidebar-w);
+    padding-top: var(--space-lg);
     padding-bottom: var(--space-xxl);
   }
 }
