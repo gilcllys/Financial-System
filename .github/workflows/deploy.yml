@@ -10,9 +10,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Validate required variables
         run: |
           missing=0
@@ -21,37 +18,45 @@ jobs:
             if [ -z "$1" ]; then
               echo "❌ Missing: $2"
               missing=1
+            else
+              echo "✅ $2"
             fi
           }
 
-          echo "🔍 Validating EC2 connection variables..."
+          echo "🔍 Validating EC2 connection..."
           check "${{ vars.EC2_HOST }}"         EC2_HOST
           check "${{ vars.EC2_USER }}"         EC2_USER
           check "${{ vars.EC2_PROJECT_PATH }}" EC2_PROJECT_PATH
           check "${{ secrets.EC2_SSH_KEY }}"   EC2_SSH_KEY
 
+          echo ""
           echo "🔍 Validating application variables..."
-          check "${{ vars.DEBUG }}"                    DEBUG
-          check "${{ vars.ALLOWED_HOSTS }}"            ALLOWED_HOSTS
-          check "${{ vars.CORS_ALLOWED_ORIGINS }}"     CORS_ALLOWED_ORIGINS
-          check "${{ vars.KEYCLOAK_SERVER_URL }}"      KEYCLOAK_SERVER_URL
-          check "${{ vars.KEYCLOAK_REALM }}"           KEYCLOAK_REALM
-          check "${{ vars.KEYCLOAK_CLIENT_ID }}"       KEYCLOAK_CLIENT_ID
-          check "${{ vars.KEYCLOAK_VERIFY_SSL }}"      KEYCLOAK_VERIFY_SSL
-          check "${{ vars.DB_NAME }}"                  DB_NAME
-          check "${{ vars.DB_USERNAME }}"              DB_USERNAME
-          check "${{ vars.DB_HOST }}"                  DB_HOST
-          check "${{ vars.DB_PORT }}"                  DB_PORT
-          check "${{ vars.GUNICORN_WORKERS }}"         GUNICORN_WORKERS
-          check "${{ secrets.SECRET_KEY }}"            SECRET_KEY
-          check "${{ secrets.DB_PASSWORD }}"           DB_PASSWORD
+          check "${{ vars.DEBUG }}"              DEBUG
+          check "${{ vars.ALLOWED_HOSTS }}"      ALLOWED_HOSTS
+          check "${{ vars.CORS_ALLOWED_ORIGINS }}" CORS_ALLOWED_ORIGINS
+          check "${{ vars.KEYCLOAK_SERVER_URL }}"  KEYCLOAK_SERVER_URL
+          check "${{ vars.KEYCLOAK_REALM }}"       KEYCLOAK_REALM
+          check "${{ vars.KEYCLOAK_CLIENT_ID }}"   KEYCLOAK_CLIENT_ID
+          check "${{ vars.KEYCLOAK_VERIFY_SSL }}"  KEYCLOAK_VERIFY_SSL
+          check "${{ vars.DB_NAME }}"              DB_NAME
+          check "${{ vars.DB_USERNAME }}"          DB_USERNAME
+          check "${{ vars.DB_HOST }}"              DB_HOST
+          check "${{ vars.DB_PORT }}"              DB_PORT
+          check "${{ vars.GUNICORN_WORKERS }}"     GUNICORN_WORKERS
+
+          echo ""
+          echo "🔍 Validating secrets..."
+          check "${{ secrets.SECRET_KEY }}"   SECRET_KEY
+          check "${{ secrets.DB_PASSWORD }}"  DB_PASSWORD
 
           if [ $missing -eq 1 ]; then
+            echo ""
             echo "🚨 Aborting deploy due to missing variables!"
             exit 1
           fi
 
-          echo "✅ All required variables are set"
+          echo ""
+          echo "✅ All variables and secrets are set"
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -68,51 +73,25 @@ jobs:
             echo "📦 Pulling latest code..."
             git pull origin main
 
-            echo "📝 Creating backend .env file..."
-            cat > ./backend/.env << 'ENVEOF'
-            DEBUG=${{ vars.DEBUG }}
-            SECRET_KEY=${{ secrets.SECRET_KEY }}
-            ALLOWED_HOSTS=${{ vars.ALLOWED_HOSTS }}
-            CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS }}
-            KEYCLOAK_SERVER_URL=${{ vars.KEYCLOAK_SERVER_URL }}
-            KEYCLOAK_REALM=${{ vars.KEYCLOAK_REALM }}
-            KEYCLOAK_CLIENT_ID=${{ vars.KEYCLOAK_CLIENT_ID }}
-            KEYCLOAK_VERIFY_SSL=${{ vars.KEYCLOAK_VERIFY_SSL }}
-            DB_NAME=${{ vars.DB_NAME }}
-            DB_USERNAME=${{ vars.DB_USERNAME }}
-            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            DB_HOST=${{ vars.DB_HOST }}
-            DB_PORT=${{ vars.DB_PORT }}
-            DB_SSL_MODE=disable
-            GUNICORN_WORKERS=${{ vars.GUNICORN_WORKERS }}
-            ENVEOF
+            echo "📝 Creating backend .env..."
+            printf 'DEBUG=%s\n'                '${{ vars.DEBUG }}'                  >  ./backend/.env
+            printf 'SECRET_KEY=%s\n'           '${{ secrets.SECRET_KEY }}'          >> ./backend/.env
+            printf 'ALLOWED_HOSTS=%s\n'        '${{ vars.ALLOWED_HOSTS }}'          >> ./backend/.env
+            printf 'CORS_ALLOWED_ORIGINS=%s\n' '${{ vars.CORS_ALLOWED_ORIGINS }}'   >> ./backend/.env
+            printf 'KEYCLOAK_SERVER_URL=%s\n'  '${{ vars.KEYCLOAK_SERVER_URL }}'    >> ./backend/.env
+            printf 'KEYCLOAK_REALM=%s\n'       '${{ vars.KEYCLOAK_REALM }}'         >> ./backend/.env
+            printf 'KEYCLOAK_CLIENT_ID=%s\n'   '${{ vars.KEYCLOAK_CLIENT_ID }}'     >> ./backend/.env
+            printf 'KEYCLOAK_VERIFY_SSL=%s\n'  '${{ vars.KEYCLOAK_VERIFY_SSL }}'    >> ./backend/.env
+            printf 'DB_NAME=%s\n'              '${{ vars.DB_NAME }}'                >> ./backend/.env
+            printf 'DB_USERNAME=%s\n'          '${{ vars.DB_USERNAME }}'            >> ./backend/.env
+            printf 'DB_PASSWORD=%s\n'          '${{ secrets.DB_PASSWORD }}'         >> ./backend/.env
+            printf 'DB_HOST=%s\n'              '${{ vars.DB_HOST }}'                >> ./backend/.env
+            printf 'DB_PORT=%s\n'              '${{ vars.DB_PORT }}'                >> ./backend/.env
+            printf 'DB_SSL_MODE=disable\n'                                          >> ./backend/.env
+            printf 'GUNICORN_WORKERS=%s\n'     '${{ vars.GUNICORN_WORKERS }}'       >> ./backend/.env
 
-            echo "🔍 DEBUG - DB_NAME: $(grep DB_NAME ./backend/.env | cut -d= -f2)"
-            echo "🔍 DEBUG - DB_PASSWORD first 3 chars: $(grep DB_PASSWORD ./backend/.env | cut -d= -f2 | cut -c1-3)"
-
-            echo "🐳 Rebuilding containers (preserving DB data)..."
-
-            # Para os containers SEM apagar volumes (--volumes ausente = dados preservados)
-            docker compose down || true
-
-            # Tenta subir — se o DB falhar por senha errada, remove SOMENTE o volume
-            if ! docker compose --env-file ./backend/.env up -d --build 2>&1; then
-              echo "⚠️ First attempt failed — checking if DB volume has wrong password..."
-              DB_EXIT=$(docker inspect financial-system-db-1 --format="{{.State.ExitCode}}" 2>/dev/null || echo "1")
-              if [ "$DB_EXIT" = "1" ]; then
-                echo "🗑️ Removing DB volume (password mismatch on fresh deploy)..."
-                docker volume rm financial-system_pgdata || true
-                echo "🔄 Retrying docker compose up..."
-                docker compose --env-file ./backend/.env up -d --build
-              else
-                echo "❌ Deploy failed for unknown reason"
-                exit 1
-              fi
-            fi
-
-            echo "⏳ Waiting for backend to be healthy..."
-            sleep 15
-            docker compose ps
+            echo "🐳 Starting containers..."
+            docker compose up -d --build
 
             echo "🔄 Reloading host nginx..."
             sudo nginx -t && sudo systemctl reload nginx
