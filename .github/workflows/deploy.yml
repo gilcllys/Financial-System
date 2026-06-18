@@ -90,16 +90,31 @@ jobs:
             echo "🔍 DEBUG - DB_NAME: $(grep DB_NAME ./backend/.env | cut -d= -f2)"
             echo "🔍 DEBUG - DB_PASSWORD first 3 chars: $(grep DB_PASSWORD ./backend/.env | cut -d= -f2 | cut -c1-3)"
 
-            echo "🐳 Rebuilding and restarting containers..."
+            echo "🐳 Rebuilding containers (preserving DB data)..."
+
+            # Para os containers SEM apagar volumes (--volumes ausente = dados preservados)
             docker compose down || true
 
-            echo "🗑️ Removing old DB volume to apply new password..."
-            docker volume rm financial-system_pgdata || true
-
-            docker compose --env-file ./backend/.env up -d --build
+            # Tenta subir — se o DB falhar por senha errada, remove SOMENTE o volume
+            if ! docker compose --env-file ./backend/.env up -d --build 2>&1; then
+              echo "⚠️ First attempt failed — checking if DB volume has wrong password..."
+              DB_EXIT=$(docker inspect financial-system-db-1 --format="{{.State.ExitCode}}" 2>/dev/null || echo "1")
+              if [ "$DB_EXIT" = "1" ]; then
+                echo "🗑️ Removing DB volume (password mismatch on fresh deploy)..."
+                docker volume rm financial-system_pgdata || true
+                echo "🔄 Retrying docker compose up..."
+                docker compose --env-file ./backend/.env up -d --build
+              else
+                echo "❌ Deploy failed for unknown reason"
+                exit 1
+              fi
+            fi
 
             echo "⏳ Waiting for backend to be healthy..."
             sleep 15
             docker compose ps
+
+            echo "🔄 Reloading host nginx..."
+            sudo nginx -t && sudo systemctl reload nginx
 
             echo "✅ Deploy finished successfully!"
