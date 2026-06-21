@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+
+  <!-- Sombra / profundidade do maço (parte de baixo) -->
+  <rect x="10" y="62" width="80" height="18" rx="8" fill="#3a7a3a"/>
+
+  <!-- Corpo principal das notas (verde) -->
+  <rect x="10" y="18" width="80" height="52" rx="8" fill="#5cb85c"/>
+
+  <!-- Borda interna das notas -->
+  <rect x="14" y="22" width="72" height="44" rx="6" fill="none" stroke="#4a9e4a" stroke-width="2"/>
+
+  <!-- Símbolo de $ (lado esquerdo) -->
+  <!-- Barra vertical do $ -->
+  <rect x="31" y="28" width="4" height="34" rx="2" fill="#3a7a3a"/>
+  <!-- Curva superior do S -->
+  <path d="M27 38 Q27 29 35 29 Q43 29 43 36 Q43 44 33 44" stroke="#3a7a3a" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <!-- Curva inferior do S -->
+  <path d="M37 44 Q47 44 47 52 Q47 59 39 59 Q31 59 29 52" stroke="#3a7a3a" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+  <!-- Círculo oval (lado direito — selo) -->
+  <circle cx="72" cy="44" r="13" fill="#4a9e4a"/>
+  <circle cx="72" cy="44" r="9" fill="#5cb85c"/>
+
+  <!-- Faixa do maço (creme/bege) -->
+  <rect x="38" y="18" width="24" height="62" fill="#f5e6a3"/>
+  <!-- Borda da faixa -->
+  <rect x="38" y="18" width="24" height="62" fill="none" stroke="#e8d080" stroke-width="1"/>
+
+  <!-- Parte laranja/dourada da faixa (base) -->
+  <rect x="38" y="62" width="24" height="18" rx="0" fill="#f0a020"/>
+  <!-- Cantos arredondados no canto inferior da faixa -->
+  <rect x="38" y="72" width="24" height="8" rx="4" fill="#f0a020"/>
+
+  <!-- Linha divisória da faixa (creme/laranja) -->
+  <rect x="38" y="61" width="24" height="3" fill="#e8d080"/>
+
+</svg>
