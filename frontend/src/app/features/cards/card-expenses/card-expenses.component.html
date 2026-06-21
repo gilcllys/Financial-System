@@ -184,6 +184,52 @@
         </tbody>
       </table>
     </div>
+
+    <!-- ── Pagination ─────────────────────────────────────────────────────── -->
+    @if (pagination() && pagination()!.total_pages > 1) {
+      <div class="pagination" role="navigation" aria-label="Paginação de gastos">
+        <button
+          class="btn btn--secondary btn--sm"
+          [disabled]="currentPage() === 1"
+          (click)="changePage(1)"
+          aria-label="Primeira página"
+        >«</button>
+        <button
+          class="btn btn--secondary btn--sm"
+          [disabled]="currentPage() === 1"
+          (click)="changePage(currentPage() - 1)"
+          aria-label="Página anterior"
+        >‹</button>
+
+        @for (p of pageRange(); track p) {
+          <button
+            class="btn btn--sm"
+            [class.btn--primary]="p === currentPage()"
+            [class.btn--secondary]="p !== currentPage()"
+            (click)="changePage(p)"
+            [attr.aria-current]="p === currentPage() ? 'page' : null"
+          >{{ p }}</button>
+        }
+
+        <button
+          class="btn btn--secondary btn--sm"
+          [disabled]="currentPage() === pagination()!.total_pages"
+          (click)="changePage(currentPage() + 1)"
+          aria-label="Próxima página"
+        >›</button>
+        <button
+          class="btn btn--secondary btn--sm"
+          [disabled]="currentPage() === pagination()!.total_pages"
+          (click)="changePage(pagination()!.total_pages)"
+          aria-label="Última página"
+        >»</button>
+
+        <span class="pagination__info text-muted">
+          Página {{ currentPage() }} de {{ pagination()!.total_pages }}
+          · {{ pagination()!.total_count }} gastos
+        </span>
+      </div>
+    }
   }
 
 } @else if (!loadingExpenses() && !loadingInvoices()) {

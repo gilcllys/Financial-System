@@ -152,11 +152,16 @@ class InvoiceExpensesBehavior:
       - Lista de despesas (filtrada por category_id se informado)
     """
 
-    def __init__(self, card, invoice_month: int, invoice_year: int, category_id: int | None = None):
+    PAGE_SIZE = 20
+
+    def __init__(self, card, invoice_month: int, invoice_year: int,
+                 category_id: int | None = None, page: int = 1, page_size: int = 20):
         self.card = card
         self.invoice_month = invoice_month
         self.invoice_year = invoice_year
         self.category_id = category_id
+        self.page = max(1, page)
+        self.page_size = max(1, min(page_size, 100))
 
     def run(self) -> Response:
         from expenses.models import Expense
@@ -212,6 +217,12 @@ class InvoiceExpensesBehavior:
             for row in cat_rows
         ]
 
+        # Pagination
+        total_count = qs.count()
+        total_pages = max(1, -(-total_count // self.page_size))  # ceil division
+        offset = (self.page - 1) * self.page_size
+        page_qs = qs[offset: offset + self.page_size]
+
         return Response(
             {
                 'invoice_month': self.invoice_month,
@@ -222,7 +233,13 @@ class InvoiceExpensesBehavior:
                 'due_date': due.isoformat(),
                 'summary': {'total': grand_total, 'count': agg['count'] or 0},
                 'by_category': by_category,
-                'expenses': ExpenseSerializer(qs, many=True).data,
+                'pagination': {
+                    'page': self.page,
+                    'page_size': self.page_size,
+                    'total_count': total_count,
+                    'total_pages': total_pages,
+                },
+                'expenses': ExpenseSerializer(page_qs, many=True).data,
             },
             status=status.HTTP_200_OK,
         )

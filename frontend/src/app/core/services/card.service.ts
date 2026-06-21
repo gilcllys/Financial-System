@@ -40,11 +40,15 @@ export class CardService {
     id: number,
     invoiceMonth: number,
     invoiceYear: number,
-    categoryId?: number
+    categoryId?: number,
+    page = 1,
+    pageSize = 20,
   ): Observable<InvoiceExpensesResponse> {
     let params = new HttpParams()
       .set('invoice_month', invoiceMonth)
-      .set('invoice_year', invoiceYear);
+      .set('invoice_year', invoiceYear)
+      .set('page', page)
+      .set('page_size', pageSize);
     if (categoryId !== undefined && categoryId !== null) {
       params = params.set('category_id', categoryId);
     }

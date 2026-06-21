@@ -69,7 +69,21 @@ class CreditCardViewSet(viewsets.ModelViewSet):
         if err:
             return err
 
-        return InvoiceExpensesBehavior(card, invoice_month, invoice_year, category_id).run()
+        page, err = self._parse_int_param(
+            request.query_params.get('page'), 'page', required=False, min_val=1,
+        )
+        if err:
+            return err
+        page_size, err = self._parse_int_param(
+            request.query_params.get('page_size'), 'page_size', required=False, min_val=1, max_val=100,
+        )
+        if err:
+            return err
+
+        return InvoiceExpensesBehavior(
+            card, invoice_month, invoice_year, category_id,
+            page=page or 1, page_size=page_size or 20,
+        ).run()
 
     # ------------------------------------------------------------------
     # Helpers
