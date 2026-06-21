@@ -141,6 +141,29 @@ export class ExpenseFormComponent implements OnInit {
       need_pay_vitoria: !!v.need_pay_vitoria,
     };
 
+    // Editar virando parcelado: deleta o original e cria N parcelas via create-expense
+    const isConvertingToInstallment =
+      this.isEdit() && !!v.is_installment && (v.installments ?? 1) > 1;
+
+    if (isConvertingToInstallment) {
+      this.expenseService.delete(this.editId()!).subscribe({
+        next: () => {
+          this.expenseService.create(payload).subscribe({
+            next: () => this.router.navigate(['/expenses']),
+            error: err => {
+              this.saving.set(false);
+              this.errorMessage.set(err?.error?.detail ?? 'Erro ao criar parcelas. Tente novamente.');
+            },
+          });
+        },
+        error: () => {
+          this.saving.set(false);
+          this.errorMessage.set('Erro ao remover gasto original. Tente novamente.');
+        },
+      });
+      return;
+    }
+
     const req$ = this.isEdit()
       ? this.expenseService.update(this.editId()!, payload)
       : this.expenseService.create(payload);

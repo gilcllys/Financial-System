@@ -164,12 +164,17 @@
               <td class="text-right">
                 <span class="value-down mono">{{ formatAmount(e.amount) }}</span>
               </td>
-              <td class="text-right">
+              <td class="text-right" style="display:flex;gap:6px;justify-content:flex-end">
                 <a
                   [routerLink]="['/expenses', e.id, 'edit']"
                   class="btn btn--secondary btn--sm"
                   aria-label="Editar {{ e.description }}"
                 >✏️ Editar</a>
+                <button
+                  class="btn btn--danger btn--sm"
+                  (click)="deleteExpense(e)"
+                  aria-label="Excluir {{ e.description }}"
+                >🗑️</button>
               </td>
             </tr>
           }

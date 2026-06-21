@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CardService } from '../../../core/services/card.service';
+import { ExpenseService } from '../../../core/services/expense.service';
 import { CreditCard, Expense, Invoice, InvoiceCategoryBreakdown, InvoiceExpensesResponse } from '../../../core/models';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -74,6 +75,8 @@ export class CardExpensesComponent implements OnInit {
     this.selectedCategoryId.set(categoryId);
   }
 
+  private expenseService = inject(ExpenseService);
+
   private loadInvoiceExpenses(invoice: Invoice): void {
     this.loadingExpenses.set(true);
     this.invoiceData.set(null);
@@ -87,6 +90,17 @@ export class CardExpensesComponent implements OnInit {
         this.loadingExpenses.set(false);
       },
       error: () => this.loadingExpenses.set(false),
+    });
+  }
+
+  deleteExpense(expense: Expense): void {
+    if (!confirm(`Excluir "${expense.description}"? Esta ação não pode ser desfeita.`)) return;
+    this.expenseService.delete(expense.id).subscribe({
+      next: () => {
+        const inv = this.selectedInvoice();
+        if (inv) this.loadInvoiceExpenses(inv);
+      },
+      error: () => alert('Erro ao excluir o gasto. Tente novamente.'),
     });
   }
 
