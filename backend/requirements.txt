@@ -1,7 +1,9 @@
 asgiref==3.10.0
 # [SEC-A08] Versão pinada com upper bound — evita breaking changes de major version
-cryptography>=41.0.0,<45.0.0
-Django==5.2.7
+# SEC-FIX: bumped para >=48.0.1 (CVE-2026-26007, PYSEC-2026-35, GHSA-537c-gmf6-5ccf)
+cryptography>=48.0.1,<49.0.0
+# SEC-FIX: 5.2.15 corrige PYSEC-2025-104/107/108/109, PYSEC-2026-42~55/197~201, CVE-2026-25673/25674
+Django==5.2.15
 django-cors-headers==4.9.0
 djangorestframework==3.16.1
 # [SEC-A08] 'dotenv==0.9.9' removido — pacote diferente de python-dotenv, obsoleto e
@@ -11,13 +13,17 @@ gunicorn==23.0.0
 inflection==0.5.1
 packaging==25.0
 psycopg2-binary==2.9.11
-PyJWT==2.10.1
+# SEC-FIX: 2.13.0 corrige PYSEC-2026-120/175/176/177/178/179, PYSEC-2025-183
+PyJWT==2.13.0
 python-dateutil==2.9.0
-python-dotenv==1.2.1
+# SEC-FIX: 1.2.2 corrige CVE-2026-28684
+python-dotenv==1.2.2
 pytz==2025.2
 PyYAML==6.0.3
-requests==2.32.3
-sqlparse==0.5.3
+# SEC-FIX: 2.33.0 corrige CVE-2024-47081 e CVE-2026-25645
+requests==2.33.0
+# SEC-FIX: 0.5.4 corrige GHSA-27jp-wm6q-gp25
+sqlparse==0.5.4
 typing_extensions==4.15.0
 uritemplate==4.2.0
 # [SEC-A08] Upper bound para evitar breaking changes

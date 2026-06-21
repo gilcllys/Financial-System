@@ -1,13 +1,13 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { SlicePipe, CurrencyPipe } from '@angular/common';
+import { CurrencyPipe } from '@angular/common';
 import { SupermarketService } from '../../../core/services/supermarket.service';
 import { SupermarketExpense } from '../../../core/models';
 
 @Component({
   selector: 'app-supermarket-list',
   standalone: true,
-  imports: [RouterLink, SlicePipe],
+  imports: [RouterLink],
   templateUrl: './supermarket-list.component.html',
   styleUrls: ['./supermarket-list.component.scss'],
 })

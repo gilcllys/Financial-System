@@ -1,14 +1,14 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { SlicePipe } from '@angular/common';
+
 import { SupermarketService } from '../../../core/services/supermarket.service';
 import { SupermarketExpense, SupermarketExpenseItem } from '../../../core/models';
 
 @Component({
   selector: 'app-supermarket-detail',
   standalone: true,
-  imports: [RouterLink, ReactiveFormsModule, SlicePipe],
+  imports: [RouterLink, ReactiveFormsModule],
   templateUrl: './supermarket-detail.component.html',
   styleUrls: ['./supermarket-detail.component.scss'],
 })
