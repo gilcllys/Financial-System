@@ -90,6 +90,10 @@ jobs:
             printf 'DB_SSL_MODE=disable\n'                                          >> ./backend/.env
             printf 'GUNICORN_WORKERS=%s\n'     '${{ vars.GUNICORN_WORKERS }}'       >> ./backend/.env
 
+            echo "🧹 Freeing disk space (old images & build cache)..."
+            docker system prune -af 2>/dev/null || true
+            df -h / | tail -1
+
             echo "🐳 Starting containers..."
             docker compose --env-file ./backend/.env up -d --build
 

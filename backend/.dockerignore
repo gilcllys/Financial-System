@@ -1,4 +1,13 @@
 fly.toml
 .git/
 *.sqlite3
-venv
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+.env
+*.log
