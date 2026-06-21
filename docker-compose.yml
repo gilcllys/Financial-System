@@ -61,30 +61,26 @@ services:
           memory: 200M
 
   # ─── Frontend (Angular + Nginx) ────────────────────────────────────────────
-  # DESATIVADO: Frontend migrado para Vercel/Netlify.
-  # Para reativar o modo antigo (tudo no EC2), descomente o bloco abaixo
-  # e remova o depends_on do backend se necessário.
-  #
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "127.0.0.1:3000:80"
-  #   depends_on:
-  #     - backend
-  #   healthcheck:
-  #     # [SEC-A05] Healthcheck do frontend — verifica se o Nginx está servindo
-  #     test: ["CMD-SHELL", "curl -f http://localhost/ -o /dev/null -s || exit 1"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 100M
-  #       reservations:
-  #         memory: 32M
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:3000:80"
+    depends_on:
+      - backend
+    healthcheck:
+      # [SEC-A05] Healthcheck do frontend — verifica se o Nginx está servindo
+      test: ["CMD-SHELL", "curl -f http://localhost/ -o /dev/null -s || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+        reservations:
+          memory: 32M
 
 volumes:
   pgdata:
