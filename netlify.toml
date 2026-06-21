@@ -3,6 +3,9 @@
   command = "ng build"
   publish = "dist/financial-frontend/browser"
 
+[functions]
+  directory = "netlify/functions"  # pasta inexistente — desativa functions
+
 [[redirects]]
   from   = "/*"
   to     = "/index.html"
