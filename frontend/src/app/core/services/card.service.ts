@@ -1,8 +1,9 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
-import { CreditCard, CreateCreditCardPayload } from '../models';
+import { CreditCard, CreateCreditCardPayload, Invoice, InvoiceExpensesResponse } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class CardService {
@@ -27,5 +28,33 @@ export class CardService {
 
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}/`);
+  }
+
+  getInvoices(id: number, count = 13): Observable<Invoice[]> {
+    return this.http.get<Invoice[]>(`${this.base}/${id}/invoices/`, {
+      params: { count: count.toString() }
+    });
+  }
+
+  getInvoiceExpenses(
+    id: number,
+    invoiceMonth: number,
+    invoiceYear: number,
+    categoryId?: number
+  ): Observable<InvoiceExpensesResponse> {
+    let params = new HttpParams()
+      .set('invoice_month', invoiceMonth)
+      .set('invoice_year', invoiceYear);
+    if (categoryId !== undefined && categoryId !== null) {
+      params = params.set('category_id', categoryId);
+    }
+    return this.http.get<InvoiceExpensesResponse>(
+      `${this.base}/${id}/invoice-expenses/`, { params }
+    ).pipe(
+      map(res => ({
+        ...res,
+        expenses: res.expenses.map(e => ({ ...e, amount: parseFloat(e.amount as any) }))
+      }))
+    );
   }
 }

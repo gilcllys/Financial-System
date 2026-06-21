@@ -115,3 +115,38 @@ export interface CreateSupermarketItemPayload {
   quantity: number;
   unit_price: number;
 }
+
+// ─── Invoice Models ────────────────────────────────────────────────────────────
+
+export interface Invoice {
+  invoice_month: number;
+  invoice_year: number;
+  invoice_name: string;   // e.g. "Julho 2026"
+  period_start: string;   // ISO date "YYYY-MM-DD"
+  period_end: string;     // ISO date "YYYY-MM-DD"
+  due_date: string;       // ISO date "YYYY-MM-DD"
+  is_current: boolean;
+}
+
+export interface InvoiceCategoryBreakdown {
+  category_id: number;
+  category_name: string;
+  total: number;
+  count: number;
+  percentage: number;
+}
+
+export interface InvoiceExpensesResponse {
+  invoice_month: number;
+  invoice_year: number;
+  invoice_name: string;
+  period_start: string;
+  period_end: string;
+  due_date: string;
+  summary: {
+    total: number;
+    count: number;
+  };
+  by_category: InvoiceCategoryBreakdown[];
+  expenses: Expense[];
+}
