@@ -1,36 +1,92 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CardService } from '../../../core/services/card.service';
-import { ExpenseService } from '../../../core/services/expense.service';
-import { CreditCard, Expense } from '../../../core/models';
-import { DatePipe } from '@angular/common';
+import { CreditCard, Expense, Invoice, InvoiceCategoryBreakdown, InvoiceExpensesResponse } from '../../../core/models';
+import { DatePipe, DecimalPipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-card-expenses',
   standalone: true,
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, DecimalPipe, FormsModule],
   templateUrl: './card-expenses.component.html',
   styleUrls: ['./card-expenses.component.scss'],
 })
 export class CardExpensesComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private cardService = inject(CardService);
-  private expenseService = inject(ExpenseService);
 
+  cardId = 0;
   card = signal<CreditCard | null>(null);
-  expenses = signal<Expense[]>([]);
-  loading = signal(true);
+  invoices = signal<Invoice[]>([]);
+  selectedInvoice = signal<Invoice | null>(null);
+  selectedCategoryId = signal<number | null>(null);
 
-  total = computed(() =>
-    this.expenses().reduce((sum, e) => sum + e.amount, 0)
+  invoiceData = signal<InvoiceExpensesResponse | null>(null);
+  loadingInvoices = signal(true);
+  loadingExpenses = signal(false);
+
+  /** Name of the currently active category filter, derived from breakdown data. */
+  selectedCategoryName = computed(() => {
+    const catId = this.selectedCategoryId();
+    const data = this.invoiceData();
+    if (!catId || !data) return null;
+    return data.by_category.find(c => c.category_id === catId)?.category_name ?? null;
+  });
+
+  /** Filtered expenses (client-side category filter). */
+  filteredExpenses = computed(() => {
+    const data = this.invoiceData();
+    const catId = this.selectedCategoryId();
+    if (!data) return [];
+    if (!catId) return data.expenses;
+    return data.expenses.filter(e => e.category_id === catId);
+  });
+
+  filteredTotal = computed(() =>
+    this.filteredExpenses().reduce((sum, e) => sum + Math.abs(e.amount), 0)
   );
 
   ngOnInit(): void {
-    const id = +this.route.snapshot.paramMap.get('id')!;
-    this.cardService.get(id).subscribe({ next: c => this.card.set(c) });
-    this.expenseService.listByCard(id).subscribe({
-      next: data => { this.expenses.set(data); this.loading.set(false); },
-      error: () => this.loading.set(false),
+    this.cardId = +this.route.snapshot.paramMap.get('id')!;
+    this.cardService.get(this.cardId).subscribe({ next: c => this.card.set(c) });
+    this.cardService.getInvoices(this.cardId).subscribe({
+      next: invoices => {
+        this.invoices.set(invoices);
+        this.loadingInvoices.set(false);
+        const current = invoices.find(i => i.is_current) ?? invoices[0];
+        if (current) {
+          this.selectedInvoice.set(current);
+          this.loadInvoiceExpenses(current);
+        }
+      },
+      error: () => this.loadingInvoices.set(false),
+    });
+  }
+
+  selectInvoice(invoice: Invoice): void {
+    this.selectedInvoice.set(invoice);
+    this.selectedCategoryId.set(null);
+    this.loadInvoiceExpenses(invoice);
+  }
+
+  selectCategory(categoryId: number | null): void {
+    this.selectedCategoryId.set(categoryId);
+  }
+
+  private loadInvoiceExpenses(invoice: Invoice): void {
+    this.loadingExpenses.set(true);
+    this.invoiceData.set(null);
+    this.cardService.getInvoiceExpenses(
+      this.cardId,
+      invoice.invoice_month,
+      invoice.invoice_year
+    ).subscribe({
+      next: data => {
+        this.invoiceData.set(data);
+        this.loadingExpenses.set(false);
+      },
+      error: () => this.loadingExpenses.set(false),
     });
   }
 
@@ -38,11 +94,12 @@ export class CardExpensesComponent implements OnInit {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(amount));
   }
 
-  amountClass(amount: number): string {
-    return amount >= 0 ? 'value-up' : 'value-down';
+  formatDate(dateStr: string): string {
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
   }
 
-  amountPrefix(amount: number): string {
-    return amount >= 0 ? '+' : '-';
+  roundPct(value: number): number {
+    return Math.round(value);
   }
 }
