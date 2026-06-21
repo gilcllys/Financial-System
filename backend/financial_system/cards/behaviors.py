@@ -92,20 +92,34 @@ class InvoicesBehavior:
     """
     Lista as faturas de um cartão de crédito.
 
-    Retorna a fatura corrente (is_current=True) mais as 12 anteriores,
-    ordenadas da mais recente para a mais antiga.
+    Retorna 2 faturas futuras + a corrente (is_current=True) + 12 anteriores
+    (15 no total), ordenadas da mais recente para a mais antiga.
     """
+
+    FUTURE_COUNT = 2
+    PAST_COUNT = 12
 
     def __init__(self, card):
         self.card = card
 
+    def _advance_month(self, month, year, steps=1):
+        for _ in range(steps):
+            if month == 12:
+                month, year = 1, year + 1
+            else:
+                month += 1
+        return month, year
+
     def run(self) -> Response:
         curr_month, curr_year = _current_invoice_month(self.card)
 
-        result = []
-        inv_month, inv_year = curr_month, curr_year
+        # Começa 2 meses à frente da fatura corrente
+        inv_month, inv_year = self._advance_month(curr_month, curr_year, self.FUTURE_COUNT)
 
-        for i in range(13):
+        result = []
+        total = self.FUTURE_COUNT + 1 + self.PAST_COUNT  # 15
+
+        for i in range(total):
             period_start, period_end, due = _compute_invoice_period(
                 self.card, inv_month, inv_year
             )
@@ -116,7 +130,8 @@ class InvoicesBehavior:
                 'period_start': period_start.isoformat(),
                 'period_end': period_end.isoformat(),
                 'due_date': due.isoformat(),
-                'is_current': i == 0,
+                'is_current': i == self.FUTURE_COUNT,
+                'is_future': i < self.FUTURE_COUNT,
             })
 
             if inv_month == 1:
