@@ -11,7 +11,10 @@
       </p>
     }
   </div>
-  <a routerLink="/cards" class="btn btn--secondary btn--sm">← Cartões</a>
+  <div style="display:flex;gap:8px;align-items:center">
+    <a routerLink="/cards" class="btn btn--secondary btn--sm">← Cartões</a>
+    <a [routerLink]="['/expenses/new']" [queryParams]="{card_id: cardId}" class="btn btn--primary btn--sm">＋ Novo Gasto</a>
+  </div>
 </div>
 
 <!-- ── Invoice Selector ──────────────────────────────────────────────────────── -->
