@@ -27,6 +27,9 @@ export class InstallmentsComponent implements OnInit {
 
   // Group installment expenses: "Parcela X/Y - Name"
   installmentGroups = computed((): InstallmentGroup[] => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const installmentExpenses = this.expenses().filter(e =>
       /parcela\s+\d+\/\d+/i.test(e.description)
     );
@@ -42,17 +45,22 @@ export class InstallmentsComponent implements OnInit {
       const totalParts = +match[3];
       const key = `${baseName}-${totalParts}`;
 
+      // Parcela já paga = data da despesa <= hoje
+      const expenseDate = new Date(expense.date + 'T00:00:00');
+      const isPaid = expenseDate <= today;
+
       const existing = groupMap.get(key);
       if (existing) {
         existing.expenses.push(expense);
-        if (currentPart > existing.paidInstallments) {
+        // Conta apenas parcelas já ocorridas (date <= today)
+        if (isPaid && currentPart > existing.paidInstallments) {
           existing.paidInstallments = currentPart;
         }
       } else {
         groupMap.set(key, {
           name: baseName,
           totalInstallments: totalParts,
-          paidInstallments: currentPart,
+          paidInstallments: isPaid ? currentPart : 0,
           amountPerInstallment: Math.abs(expense.amount),
           totalAmount: Math.abs(expense.amount) * totalParts,
           expenses: [expense],
