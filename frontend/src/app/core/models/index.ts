@@ -137,6 +137,13 @@ export interface InvoiceCategoryBreakdown {
   percentage: number;
 }
 
+export interface InvoicePagination {
+  page: number;
+  page_size: number;
+  total_count: number;
+  total_pages: number;
+}
+
 export interface InvoiceExpensesResponse {
   invoice_month: number;
   invoice_year: number;
@@ -150,4 +157,5 @@ export interface InvoiceExpensesResponse {
   };
   by_category: InvoiceCategoryBreakdown[];
   expenses: Expense[];
+  pagination: InvoicePagination;
 }

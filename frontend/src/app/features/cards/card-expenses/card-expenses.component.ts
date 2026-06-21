@@ -2,7 +2,7 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CardService } from '../../../core/services/card.service';
 import { ExpenseService } from '../../../core/services/expense.service';
-import { CreditCard, Expense, Invoice, InvoiceCategoryBreakdown, InvoiceExpensesResponse } from '../../../core/models';
+import { CreditCard, Expense, Invoice, InvoiceCategoryBreakdown, InvoiceExpensesResponse, InvoicePagination } from '../../../core/models';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -26,6 +26,24 @@ export class CardExpensesComponent implements OnInit {
   invoiceData = signal<InvoiceExpensesResponse | null>(null);
   loadingInvoices = signal(true);
   loadingExpenses = signal(false);
+  currentPage = signal(1);
+  readonly pageSize = 20;
+
+  pagination = computed((): InvoicePagination | null =>
+    this.invoiceData()?.pagination ?? null
+  );
+
+  /** Gera array de páginas visíveis: máx 5 páginas centradas na atual. */
+  pageRange = computed((): number[] => {
+    const p = this.pagination();
+    if (!p) return [];
+    const total = p.total_pages;
+    const current = this.currentPage();
+    const delta = 2;
+    const start = Math.max(1, current - delta);
+    const end = Math.min(total, current + delta);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  });
 
   /** Name of the currently active category filter, derived from breakdown data. */
   selectedCategoryName = computed(() => {
@@ -68,11 +86,21 @@ export class CardExpensesComponent implements OnInit {
   selectInvoice(invoice: Invoice): void {
     this.selectedInvoice.set(invoice);
     this.selectedCategoryId.set(null);
+    this.currentPage.set(1);
     this.loadInvoiceExpenses(invoice);
   }
 
   selectCategory(categoryId: number | null): void {
     this.selectedCategoryId.set(categoryId);
+    this.currentPage.set(1);
+    const inv = this.selectedInvoice();
+    if (inv) this.loadInvoiceExpenses(inv);
+  }
+
+  changePage(page: number): void {
+    this.currentPage.set(page);
+    const inv = this.selectedInvoice();
+    if (inv) this.loadInvoiceExpenses(inv);
   }
 
   private expenseService = inject(ExpenseService);
@@ -83,7 +111,10 @@ export class CardExpensesComponent implements OnInit {
     this.cardService.getInvoiceExpenses(
       this.cardId,
       invoice.invoice_month,
-      invoice.invoice_year
+      invoice.invoice_year,
+      this.selectedCategoryId() ?? undefined,
+      this.currentPage(),
+      this.pageSize,
     ).subscribe({
       next: data => {
         this.invoiceData.set(data);

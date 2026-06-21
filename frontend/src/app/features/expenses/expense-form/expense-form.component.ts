@@ -58,6 +58,15 @@ export class ExpenseFormComponent implements OnInit {
       this.editId.set(+id);
       this.loadExpense(+id);
     }
+
+    // Pré-preenche cartão quando vindo da tela de gastos do cartão (?card_id=X)
+    const cardId = this.route.snapshot.queryParamMap.get('card_id');
+    if (cardId && !id) {
+      // payment_method primeiro (dispara valueChanges que seta validators)
+      this.form.get('payment_method')!.setValue('cartao');
+      // depois credit_card_id, sem risco de ser limpo pelo subscriber
+      this.form.get('credit_card_id')!.setValue(+cardId);
+    }
   }
 
   toggleType(income: boolean): void {
