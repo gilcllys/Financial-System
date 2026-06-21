@@ -126,6 +126,7 @@ export interface Invoice {
   period_end: string;     // ISO date "YYYY-MM-DD"
   due_date: string;       // ISO date "YYYY-MM-DD"
   is_current: boolean;
+  is_future: boolean;
 }
 
 export interface InvoiceCategoryBreakdown {
