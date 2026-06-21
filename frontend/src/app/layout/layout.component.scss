@@ -139,8 +139,10 @@
   }
 
   &__logo-icon {
-    font-size: 22px;
-    line-height: 1;
+    width: 28px;
+    height: 28px;
+    display: block;
+    flex-shrink: 0;
   }
 
   &__logo-name {
