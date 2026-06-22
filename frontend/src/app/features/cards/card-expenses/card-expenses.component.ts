@@ -53,18 +53,14 @@ export class CardExpensesComponent implements OnInit {
     return data.by_category.find(c => c.category_id === catId)?.category_name ?? null;
   });
 
-  /** Filtered expenses (client-side category filter). */
-  filteredExpenses = computed(() => {
-    const data = this.invoiceData();
-    const catId = this.selectedCategoryId();
-    if (!data) return [];
-    if (!catId) return data.expenses;
-    return data.expenses.filter(e => e.category_id === catId);
-  });
+  /** Expenses da página atual (server já aplica filtro de categoria). */
+  filteredExpenses = computed(() => this.invoiceData()?.expenses ?? []);
 
-  filteredTotal = computed(() =>
-    this.filteredExpenses().reduce((sum, e) => sum + Math.abs(e.amount), 0)
-  );
+  /** Total real da fatura vem do summary da API (inclui todas as páginas). */
+  filteredTotal = computed(() => this.invoiceData()?.summary.total ?? 0);
+
+  /** Contagem total de transações (todas as páginas). */
+  totalTransactions = computed(() => this.invoiceData()?.summary.count ?? 0);
 
   ngOnInit(): void {
     this.cardId = +this.route.snapshot.paramMap.get('id')!;
