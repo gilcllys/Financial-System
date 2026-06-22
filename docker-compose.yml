@@ -48,7 +48,7 @@ services:
         condition: service_healthy
     healthcheck:
       # [SEC-A05] Healthcheck do backend — verifica se o Gunicorn está respondendo
-      test: ["CMD-SHELL", "curl -f -s -o /dev/null -H 'Host: localhost' http://localhost:8000/api/ || exit 1"]
+      test: ["CMD-SHELL", "python -c 'import socket; s=socket.socket(); s.settimeout(5); s.connect((\"localhost\",8000)); s.close()' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
