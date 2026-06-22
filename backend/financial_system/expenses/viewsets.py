@@ -1,6 +1,8 @@
 import calendar
+import re
 from datetime import date
 
+from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Abs, ExtractDay, ExtractMonth
 from rest_framework import status, viewsets
@@ -135,6 +137,60 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         payload = dict(s.validated_data)
         payload['tenant_id'] = request.user.tenant_id
         return CreateExpenseBehavior(data=payload).run()
+
+    @action(detail=False, methods=['post'], url_path='delete-installments')
+    def delete_installments(self, request):
+        """
+        POST /api/expenses/expenses/delete-installments/
+
+        Remove todas as parcelas de uma despesa parcelada de uma só vez.
+
+        O padrão de descrição esperado é o gerado por CreateExpenseBehavior:
+          "{description_prefix} - Parcela {X}/{total_installments}"
+
+        Request body:
+          - description_prefix   (str, obrigatório, max 255 chars)
+          - total_installments   (int, obrigatório, mínimo 2)
+
+        Responses:
+          200  {"deleted": N, "description_prefix": "...", "total_installments": N}
+          404  {"error": "Nenhuma parcela encontrada para os critérios informados."}
+          400  DRF validation errors
+        """
+        s = serializer.DeleteInstallmentsInputSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+
+        description_prefix = s.validated_data['description_prefix']
+        total_installments = s.validated_data['total_installments']
+
+        # Build a regex that matches exactly the installment format produced by
+        # CreateExpenseBehavior: "{BaseName} - Parcela {X}/{total}"
+        # re.escape ensures user-supplied characters (e.g. dots, parens) are safe.
+        pattern = rf'^{re.escape(description_prefix)} - Parcela \d+/{total_installments}$'
+
+        # [SEC-A01] Always scope to the authenticated tenant before any DML.
+        qs = models.Expense.objects.filter(
+            tenant_id=request.user.tenant_id,
+            description__iregex=pattern,
+        )
+
+        with transaction.atomic():
+            deleted_count, _ = qs.delete()
+
+        if deleted_count == 0:
+            return Response(
+                {'error': 'Nenhuma parcela encontrada para os critérios informados.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {
+                'deleted': deleted_count,
+                'description_prefix': description_prefix,
+                'total_installments': total_installments,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=False, methods=['get'], url_path='per-credit-card/(?P<card_id>[0-9]+)')
     def expenses_per_credit_card(self, request, card_id=None):
