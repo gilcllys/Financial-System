@@ -80,9 +80,12 @@ class CreditCardViewSet(viewsets.ModelViewSet):
         if err:
             return err
 
+        search = request.query_params.get('search', '').strip() or None
+
         return InvoiceExpensesBehavior(
             card, invoice_month, invoice_year, category_id,
             page=page or 1, page_size=page_size or 20,
+            search=search,
         ).run()
 
     # ------------------------------------------------------------------

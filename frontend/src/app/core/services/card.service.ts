@@ -43,6 +43,7 @@ export class CardService {
     categoryId?: number,
     page = 1,
     pageSize = 20,
+    search?: string,
   ): Observable<InvoiceExpensesResponse> {
     let params = new HttpParams()
       .set('invoice_month', invoiceMonth)
@@ -52,6 +53,7 @@ export class CardService {
     if (categoryId !== undefined && categoryId !== null) {
       params = params.set('category_id', categoryId);
     }
+    if (search) params = params.set('search', search);
     return this.http.get<InvoiceExpensesResponse>(
       `${this.base}/${id}/invoice-expenses/`, { params }
     ).pipe(
