@@ -7,7 +7,7 @@
 
 @if (loading()) {
   <div class="loading-wrapper" aria-live="polite"><span class="spinner"></span> Carregando...</div>
-} @else if (installmentGroups().length === 0) {
+} @else if (activeGroups().length === 0 && finalizadasGroups().length === 0) {
   <div class="empty-state">
     <div class="empty-state__icon">📅</div>
     <p class="empty-state__title">Nenhum parcelamento encontrado</p>
@@ -15,38 +15,112 @@
     <a routerLink="/expenses/new" class="btn btn--primary" style="margin-top: 16px">+ Novo Gasto Parcelado</a>
   </div>
 } @else {
-  <div class="installments-grid" role="list" aria-label="Parcelamentos">
-    @for (group of installmentGroups(); track group.name) {
-      <div class="installment-card" role="listitem">
-        <div class="installment-card__header">
-          <h3 class="installment-card__name">{{ group.name }}</h3>
-          <span class="badge" [class.badge--success]="group.paidInstallments === group.totalInstallments">
-            {{ group.paidInstallments }}/{{ group.totalInstallments }}
-          </span>
-        </div>
 
-        <!-- Progress bar -->
-        <div class="progress" role="progressbar"
-          [attr.aria-valuenow]="progressPct(group)"
-          aria-valuemin="0" aria-valuemax="100"
-          [attr.aria-label]="group.name + ': ' + progressPct(group) + '% concluído'">
-          <div class="progress__track">
-            <div class="progress__fill" [style.width.%]="progressPct(group)"></div>
+  <!-- ── Active groups ─────────────────────────────────────────────────────── -->
+  @if (activeGroups().length > 0) {
+    <div class="installments-grid" role="list" aria-label="Parcelamentos em andamento">
+      @for (group of activeGroups(); track group.name) {
+        <div class="installment-card" role="listitem">
+          <div class="installment-card__header">
+            <h3 class="installment-card__name">{{ group.name }}</h3>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span class="badge" [class.badge--success]="group.paidInstallments === group.totalInstallments">
+                {{ group.paidInstallments }}/{{ group.totalInstallments }}
+              </span>
+              <button
+                class="btn btn--danger btn--sm"
+                (click)="deleteGroup(group)"
+                [disabled]="deletingGroup() === group.name"
+                [attr.aria-label]="'Apagar todas as parcelas de ' + group.name"
+                type="button"
+              >
+                @if (deletingGroup() === group.name) { ⏳ } @else { 🗑️ }
+              </button>
+            </div>
           </div>
-          <span class="progress__label">{{ progressPct(group) }}%</span>
-        </div>
 
-        <div class="installment-card__values">
-          <div class="installment-card__value-item">
-            <span class="installment-card__value-label">Por parcela</span>
-            <span class="installment-card__value mono value-down">{{ formatAmount(group.amountPerInstallment) }}</span>
+          <!-- Progress bar -->
+          <div class="progress" role="progressbar"
+            [attr.aria-valuenow]="progressPct(group)"
+            aria-valuemin="0" aria-valuemax="100"
+            [attr.aria-label]="group.name + ': ' + progressPct(group) + '% concluído'">
+            <div class="progress__track">
+              <div class="progress__fill" [style.width.%]="progressPct(group)"></div>
+            </div>
+            <span class="progress__label">{{ progressPct(group) }}%</span>
           </div>
-          <div class="installment-card__value-item">
-            <span class="installment-card__value-label">Total</span>
-            <span class="installment-card__value mono">{{ formatAmount(group.totalAmount) }}</span>
+
+          <div class="installment-card__values">
+            <div class="installment-card__value-item">
+              <span class="installment-card__value-label">Por parcela</span>
+              <span class="installment-card__value mono value-down">{{ formatAmount(group.amountPerInstallment) }}</span>
+            </div>
+            <div class="installment-card__value-item">
+              <span class="installment-card__value-label">Total</span>
+              <span class="installment-card__value mono">{{ formatAmount(group.totalAmount) }}</span>
+            </div>
           </div>
         </div>
+      }
+    </div>
+  }
+
+  <!-- ── Finalizadas collapsible section ──────────────────────────────────── -->
+  @if (finalizadasGroups().length > 0) {
+    <button class="finalizadas-toggle" (click)="toggleFinalizadas()" type="button"
+      [attr.aria-expanded]="showFinalizadas()"
+      aria-controls="finalizadas-grid">
+      {{ showFinalizadas() ? '▲' : '▼' }} Finalizadas ({{ finalizadasGroups().length }})
+    </button>
+
+    @if (showFinalizadas()) {
+      <div id="finalizadas-grid" class="installments-grid" role="list" aria-label="Parcelamentos finalizados">
+        @for (group of finalizadasGroups(); track group.name) {
+          <div class="installment-card installment-card--done" role="listitem">
+            <div class="installment-card__header">
+              <h3 class="installment-card__name">{{ group.name }}</h3>
+              <div style="display:flex;gap:8px;align-items:center">
+                <span class="badge badge--success">
+                  {{ group.paidInstallments }}/{{ group.totalInstallments }}
+                </span>
+                <button
+                  class="btn btn--danger btn--sm"
+                  (click)="deleteGroup(group)"
+                  [disabled]="deletingGroup() === group.name"
+                  [attr.aria-label]="'Apagar todas as parcelas de ' + group.name"
+                  type="button"
+                >
+                  @if (deletingGroup() === group.name) { ⏳ } @else { 🗑️ }
+                </button>
+              </div>
+            </div>
+
+            <!-- Progress bar -->
+            <div class="progress" role="progressbar"
+              [attr.aria-valuenow]="progressPct(group)"
+              aria-valuemin="0" aria-valuemax="100"
+              [attr.aria-label]="group.name + ': ' + progressPct(group) + '% concluído'">
+              <div class="progress__track">
+                <div class="progress__fill" [style.width.%]="progressPct(group)"></div>
+              </div>
+              <span class="progress__label">{{ progressPct(group) }}%</span>
+            </div>
+
+            <div class="installment-card__values">
+              <div class="installment-card__value-item">
+                <span class="installment-card__value-label">Por parcela</span>
+                <span class="installment-card__value mono value-down">{{ formatAmount(group.amountPerInstallment) }}</span>
+              </div>
+              <div class="installment-card__value-item">
+                <span class="installment-card__value-label">Total</span>
+                <span class="installment-card__value mono">{{ formatAmount(group.totalAmount) }}</span>
+              </div>
+            </div>
+          </div>
+        }
       </div>
     }
-  </div>
+  }
+
 }
+
