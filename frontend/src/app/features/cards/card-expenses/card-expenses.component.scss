@@ -11,16 +11,11 @@
   overflow-x: auto;
   padding-bottom: var(--space-xs);
   margin-bottom: var(--space-base);
-  // hide scrollbar visually but keep scroll functionality
   scrollbar-width: thin;
   scrollbar-color: var(--color-hairline) transparent;
 
-  &::-webkit-scrollbar {
-    height: 4px;
-  }
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
+  &::-webkit-scrollbar { height: 4px; }
+  &::-webkit-scrollbar-track { background: transparent; }
   &::-webkit-scrollbar-thumb {
     background: var(--color-hairline);
     border-radius: var(--rounded-pill);
@@ -53,7 +48,6 @@
     border-color: var(--color-primary);
     background: var(--color-primary);
     color: #fff;
-
     .current-badge {
       background: rgba(255, 255, 255, 0.25);
       color: #fff;
@@ -91,176 +85,6 @@
   flex-wrap: wrap;
 }
 
-// ── Category Breakdown ────────────────────────────────────────────────────────
-.category-breakdown {
-  background: var(--color-canvas);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--rounded-xl);
-  padding: var(--space-base) var(--space-lg);
-  margin-bottom: var(--space-lg);
-
-  &__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: var(--space-base);
-  }
-
-  &__title {
-    font-size: 13px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--color-muted);
-  }
-}
-
-.category-item {
-  display: grid;
-  grid-template-columns: minmax(120px, 1fr) 1fr auto;
-  align-items: center;
-  gap: var(--space-sm);
-  width: 100%;
-  padding: var(--space-xs) var(--space-xs);
-  border-radius: var(--rounded-md);
-  border: 1.5px solid transparent;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.12s ease, border-color 0.12s ease;
-  font-family: var(--font-body);
-
-  & + & {
-    border-top: 1px solid var(--color-hairline-soft);
-    margin-top: 0;
-    border-radius: 0;
-
-    &:last-child {
-      border-radius: 0 0 var(--rounded-md) var(--rounded-md);
-    }
-  }
-
-  &:hover {
-    background: var(--color-surface-soft);
-  }
-
-  &--active {
-    background: rgba(0, 82, 255, 0.05);
-    border-color: rgba(0, 82, 255, 0.2);
-    border-radius: var(--rounded-md) !important;
-    border-top: 1.5px solid rgba(0, 82, 255, 0.2) !important;
-  }
-
-  &__info {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-  }
-
-  &__name {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--color-ink);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 140px;
-  }
-
-  &__count {
-    font-size: 12px;
-    white-space: nowrap;
-  }
-
-  &__right {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-    min-width: 90px;
-  }
-
-  &__amount {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--color-ink);
-    white-space: nowrap;
-  }
-
-  &__pct {
-    font-size: 11px;
-  }
-}
-
-.category-bar {
-  height: 6px;
-  border-radius: var(--rounded-pill);
-  background: var(--color-surface-strong);
-  overflow: hidden;
-  min-width: 40px;
-
-  &__fill {
-    height: 100%;
-    border-radius: var(--rounded-pill);
-    background: var(--color-primary);
-    opacity: 0.6;
-    transition: width 0.3s ease;
-  }
-}
-
-// ── Active Category Filter Pill ───────────────────────────────────────────────
-.category-filter-active {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px 4px 14px;
-  border-radius: var(--rounded-pill);
-  background: rgba(0, 82, 255, 0.1);
-  color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 500;
-  border: 1px solid rgba(0, 82, 255, 0.2);
-
-  &__clear {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: rgba(0, 82, 255, 0.15);
-    color: var(--color-primary);
-    font-size: 14px;
-    font-weight: 700;
-    line-height: 1;
-    border: none;
-    cursor: pointer;
-    transition: background 0.12s ease;
-    font-family: var(--font-body);
-    padding: 0;
-
-    &:hover {
-      background: rgba(0, 82, 255, 0.3);
-    }
-  }
-}
-
-
-.pagination {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: var(--space-base);
-  padding-top: var(--space-base);
-  border-top: 1px solid var(--color-hairline);
-
-  &__info {
-    margin-left: auto;
-    font-size: 13px;
-  }
-}
-
 // ── Charts grid ───────────────────────────────────────────────────────────────
 .charts-grid {
   display: grid;
@@ -269,22 +93,35 @@
   margin-bottom: var(--space-lg);
 
   @media (max-width: 768px) { grid-template-columns: 1fr; }
+
+  &--loading { pointer-events: none; }
 }
 
 .chart-card {
-  background: var(--color-surface);
+  background: var(--color-canvas);
   border: 1px solid var(--color-hairline);
-  border-radius: var(--rounded-card);
+  border-radius: var(--rounded-xl);
   padding: var(--space-base);
 
+  // Top-5 donut spans full width so the legend has room
   &--donut { grid-column: 1 / -1; }
 
+  // Skeleton placeholder while loading
+  &--placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+    background: var(--color-surface-soft);
+    border-color: transparent;
+  }
+
   &__title {
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--color-body);
+    letter-spacing: 0.06em;
+    color: var(--color-muted);
     margin: 0 0 var(--space-sm);
   }
 
@@ -292,38 +129,105 @@
     position: relative;
     height: 220px;
 
+    // Chart.js needs explicit 100% on the canvas to fill the container
     canvas { width: 100% !important; height: 100% !important; }
   }
 }
 
-// ── Improved category rows (Storytelling with Data) ───────────────────────────
+// ── Category Breakdown ────────────────────────────────────────────────────────
+.category-breakdown {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-xl);
+  padding: var(--space-base) var(--space-lg);
+  margin-bottom: var(--space-lg);
+  // leave room for the ::before accent bar on cat-rows
+  padding-left: 0;
+  overflow: hidden;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-sm);
+    padding: 0 var(--space-lg);
+  }
+
+  &__title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-muted);
+  }
+}
+
+// Clear-filter button replaces "Todos" — only renders when filter is active
+.cat-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--rounded-pill);
+  border: 1px solid rgba(0, 82, 255, 0.3);
+  background: rgba(0, 82, 255, 0.06);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: background 0.12s ease;
+
+  &:hover { background: rgba(0, 82, 255, 0.14); }
+}
+
+// ── Cat-row: Storytelling-with-Data category rows ─────────────────────────────
 .cat-row {
+  // Custom property set per-row via [style.--cat-color]
+  --cat-color: #0052ff;
+
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: 12px;
   width: 100%;
   background: none;
   border: none;
-  border-left: 3px solid transparent;
-  border-radius: 0 var(--rounded-sm) var(--rounded-sm) 0;
-  padding: 10px var(--space-sm) 10px 10px;
+  border-left: 2px solid var(--color-hairline);
+  padding: 10px var(--space-lg) 10px 14px;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background 0.12s ease, border-left-color 0.12s ease;
   text-align: left;
+  font-family: var(--font-body);
+
+  // Separator line between rows
+  & + & { border-top: 1px solid var(--color-hairline-soft); }
 
   &:hover { background: var(--color-surface-soft); }
 
+  // Active (clicked) state: tinted bg + accent border
   &--active {
-    background: color-mix(in srgb, var(--cat-color, #0052ff) 8%, transparent);
-    border-left-color: var(--cat-color, #0052ff);
+    background: color-mix(in srgb, var(--cat-color) 7%, transparent);
+    border-left-color: var(--cat-color) !important;
+  }
+
+  // #1 rank: thicker primary-colored left accent — preattentive: "most important"
+  &--rank-first {
+    border-left-width: 4px;
+    border-left-color: var(--color-primary);
+
+    .cat-row__rank { opacity: 1; color: var(--color-primary); font-size: 12px; }
+    .cat-row__bar  { opacity: 1; }
   }
 
   &__rank {
     font-size: 11px;
     font-weight: 700;
     color: var(--color-body);
-    min-width: 24px;
-    opacity: 0.4;
+    min-width: 22px;
+    opacity: 0.35;
+    flex-shrink: 0;
+    // smooth transition when rank-first overrides
+    transition: opacity 0.12s, color 0.12s;
   }
 
   &__main {
@@ -335,7 +239,7 @@
     display: flex;
     align-items: baseline;
     gap: 6px;
-    margin-bottom: 5px;
+    margin-bottom: 6px;
   }
 
   &__name {
@@ -345,51 +249,62 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-width: 200px;
   }
 
   &__count {
     font-size: 12px;
+    flex-shrink: 0;
   }
 
+  // Progress bar track
   &__bar-wrap {
     position: relative;
     height: 6px;
     background: var(--color-hairline);
     border-radius: 99px;
-    overflow: visible;
     display: flex;
     align-items: center;
+    overflow: visible;   // allow the % label to overflow
   }
 
+  // Bar fill: top category uses --color-primary; others get lighter neutral via catColor()
   &__bar {
     height: 100%;
     border-radius: 99px;
-    background: var(--cat-color, #0052ff);
-    opacity: 0.7;
+    background: var(--cat-color);
+    opacity: 0.55;
     transition: width 0.4s ease;
 
-    .cat-row--active & { opacity: 1; }
+    .cat-row--active & { opacity: 0.9; }
+    .cat-row--rank-first & { opacity: 0.85; }
   }
 
+  // Percentage overlay just past the bar end — "secondary" data
   &__bar-pct {
     position: absolute;
     right: 0;
     font-size: 10px;
-    color: var(--color-body);
-    transform: translateX(calc(100% + 6px));
+    font-weight: 500;
+    color: var(--color-muted);
+    transform: translateX(calc(100% + 8px));
     white-space: nowrap;
+    pointer-events: none;
   }
 
+  // Hero value column: amount is the big number, percentage is contextual
   &__values {
     min-width: 90px;
     text-align: right;
+    flex-shrink: 0;
   }
 
   &__amount {
     font-size: 14px;
     font-weight: 700;
-    color: var(--color-semantic-down);
+    color: var(--color-semantic-down, #ff3b30);
     display: block;
+    white-space: nowrap;
   }
 }
 
@@ -413,48 +328,85 @@
     left: 12px;
     font-size: 14px;
     pointer-events: none;
+    line-height: 1;
   }
 
   &__input {
     width: 100%;
     height: 40px;
-    padding: 0 36px 0 36px;
+    padding: 0 36px 0 38px;
     border: 1.5px solid var(--color-hairline);
     border-radius: var(--rounded-pill);
     font-size: 14px;
     font-family: var(--font-body);
-    background: var(--color-surface);
+    background: var(--color-canvas);
     color: var(--color-ink);
-    transition: border-color 0.15s;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
-    &:focus { outline: none; border-color: var(--color-primary); }
-    &::placeholder { color: var(--color-body); }
+    &:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(0, 82, 255, 0.12);
+    }
+
+    &::placeholder { color: var(--color-muted); }
+
+    // Hide browser's native clear button — we provide our own
+    &::-webkit-search-cancel-button { display: none; }
   }
 
+  // Custom clear button appears only when search has text
   &__clear {
     position: absolute;
-    right: 10px;
+    right: 12px;
     background: none;
     border: none;
-    font-size: 14px;
-    color: var(--color-body);
+    font-size: 13px;
+    color: var(--color-muted);
     cursor: pointer;
+    padding: 2px 4px;
     line-height: 1;
-    padding: 2px;
+    border-radius: 4px;
+    transition: color 0.12s, background 0.12s;
+
+    &:hover {
+      color: var(--color-ink);
+      background: var(--color-surface-soft);
+    }
   }
 
   &__category-select {
     height: 40px;
-    padding: 0 12px;
+    padding: 0 14px;
     border: 1.5px solid var(--color-hairline);
     border-radius: var(--rounded-pill);
     font-size: 14px;
     font-family: var(--font-body);
-    background: var(--color-surface);
+    background: var(--color-canvas);
     color: var(--color-ink);
     cursor: pointer;
     min-width: 180px;
+    transition: border-color 0.15s ease;
 
-    &:focus { outline: none; border-color: var(--color-primary); }
+    &:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+  }
+}
+
+// ── Pagination ────────────────────────────────────────────────────────────────
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: var(--space-base);
+  padding-top: var(--space-base);
+  border-top: 1px solid var(--color-hairline);
+
+  &__info {
+    margin-left: auto;
+    font-size: 13px;
   }
 }

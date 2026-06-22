@@ -63,4 +63,13 @@ export class CardService {
       }))
     );
   }
+
+  /** Fetches up to 200 expenses (no filters) for client-side chart aggregation. */
+  getInvoiceChart(
+    id: number,
+    invoiceMonth: number,
+    invoiceYear: number,
+  ): Observable<InvoiceExpensesResponse> {
+    return this.getInvoiceExpenses(id, invoiceMonth, invoiceYear, undefined, 1, 200);
+  }
 }
