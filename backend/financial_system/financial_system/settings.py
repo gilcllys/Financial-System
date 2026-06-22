@@ -25,8 +25,9 @@ _allowed = os.getenv("ALLOWED_HOSTS", "*")
 # Segurança: bloqueia DEBUG=True se ALLOWED_HOSTS não for wildcard (produção)
 DEBUG = _debug_env if ("*" in _allowed) else False
 
-# [SEC-A05] ALLOWED_HOSTS sem wildcard como padrão
-ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
+# [SEC-A05] ALLOWED_HOSTS sem wildcard como padrão; localhost sempre incluído para healthchecks
+_hosts_env = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
+ALLOWED_HOSTS = list({*_hosts_env, 'localhost', '127.0.0.1'})
 
 
 INSTALLED_APPS = [
