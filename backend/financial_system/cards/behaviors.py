@@ -155,13 +155,15 @@ class InvoiceExpensesBehavior:
     PAGE_SIZE = 20
 
     def __init__(self, card, invoice_month: int, invoice_year: int,
-                 category_id: int | None = None, page: int = 1, page_size: int = 20):
+                 category_id: int | None = None, page: int = 1, page_size: int = 20,
+                 search: str | None = None):
         self.card = card
         self.invoice_month = invoice_month
         self.invoice_year = invoice_year
         self.category_id = category_id
         self.page = max(1, page)
-        self.page_size = max(1, min(page_size, 100))
+        self.page_size = max(1, min(page_size, 200))
+        self.search = search.strip()[:200] if search else None
 
     def run(self) -> Response:
         from expenses.models import Expense
@@ -187,6 +189,8 @@ class InvoiceExpensesBehavior:
         )
         if self.category_id is not None:
             qs = qs.filter(category_id=self.category_id)
+        if self.search:
+            qs = qs.filter(description__icontains=self.search)
 
         agg = qs.aggregate(total=Sum(Abs('amount')), count=Count('id'))
         grand_total = round(float(agg['total'] or 0), 2)
