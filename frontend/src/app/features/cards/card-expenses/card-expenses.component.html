@@ -30,6 +30,7 @@
         [class.invoice-chip--active]="selectedInvoice()?.invoice_month === inv.invoice_month && selectedInvoice()?.invoice_year === inv.invoice_year"
         [class.invoice-chip--current]="inv.is_current"
         (click)="selectInvoice(inv)"
+        [attr.aria-pressed]="selectedInvoice()?.invoice_month === inv.invoice_month && selectedInvoice()?.invoice_year === inv.invoice_year"
       >
         {{ inv.invoice_name }}
         @if (inv.is_current) { <span class="current-badge">atual</span> }
@@ -52,7 +53,9 @@
   <div class="summary-card">
     <span class="summary-card__label">
       Total da Fatura
-      @if (selectedCategoryId()) { <span style="font-weight:400">(filtrado)</span> }
+      @if (selectedCategoryId() || searchControl.value) {
+        <span style="font-weight:400">(filtrado)</span>
+      }
     </span>
     <span class="summary-card__value value-down mono">{{ formatAmount(filteredTotal()) }}</span>
   </div>
@@ -62,39 +65,64 @@
   </div>
 </div>
 
-@if (invoiceData()) {
+<!-- ── Charts Section (independent from expense pagination) ──────────────────── -->
+@if (loadingChart()) {
+  <div class="charts-grid charts-grid--loading">
+    <div class="chart-card chart-card--placeholder">
+      <span class="spinner"></span>
+    </div>
+    <div class="chart-card chart-card--placeholder">
+      <span class="spinner"></span>
+    </div>
+    <div class="chart-card chart-card--placeholder chart-card--donut">
+      <span class="spinner"></span>
+    </div>
+  </div>
+} @else if (chartData()) {
+  <div class="charts-grid" aria-label="Gráficos de gastos da fatura">
+    <div class="chart-card">
+      <h2 class="chart-card__title">Gastos por Dia</h2>
+      <div class="chart-card__body">
+        <canvas #dailyChartCanvas aria-label="Gráfico de gastos diários" role="img"></canvas>
+      </div>
+    </div>
 
-  <!-- ── Charts Section ─────────────────────────────────────────────────────── -->
-  <div class="charts-grid">
     <div class="chart-card">
-      <h3 class="chart-card__title">Gastos por Dia</h3>
+      <h2 class="chart-card__title">Gastos por Semana</h2>
       <div class="chart-card__body">
-        <canvas #dailyChartCanvas></canvas>
+        <canvas #weeklyChartCanvas aria-label="Gráfico de gastos semanais" role="img"></canvas>
       </div>
     </div>
-    <div class="chart-card">
-      <h3 class="chart-card__title">Gastos por Semana</h3>
-      <div class="chart-card__body">
-        <canvas #weeklyChartCanvas></canvas>
-      </div>
-    </div>
+
     <div class="chart-card chart-card--donut">
-      <h3 class="chart-card__title">Por Categoria</h3>
+      <h2 class="chart-card__title">Top 5 Categorias</h2>
       <div class="chart-card__body">
-        <canvas #donutChartCanvas></canvas>
+        <canvas #donutChartCanvas aria-label="Gráfico de categorias por valor" role="img"></canvas>
       </div>
     </div>
   </div>
+}
 
-  <!-- ── Category Breakdown ─────────────────────────────────────────────────── -->
+<!-- ── Expense Detail Section ─────────────────────────────────────────────────── -->
+@if (loadingExpenses()) {
+  <div class="loading-wrapper">
+    <span class="spinner"></span> Carregando gastos da fatura...
+  </div>
+} @else if (invoiceData()) {
+
+  <!-- ── Category Breakdown ──────────────────────────────────────────────────── -->
   @if (invoiceData()!.by_category.length > 0) {
     <div class="category-breakdown" aria-label="Gastos por categoria">
       <div class="category-breakdown__header">
         <span class="category-breakdown__title">Por Categoria</span>
         @if (selectedCategoryId()) {
-          <button class="btn btn--ghost btn--sm" (click)="selectCategory(null)">
-            ✕ Limpar filtro
-          </button>
+          <!-- X clear: only appears when a filter is active — replaces "Todos" button -->
+          <button
+            class="cat-clear-btn"
+            (click)="selectCategory(null)"
+            aria-label="Remover filtro de categoria"
+            type="button"
+          >✕ Limpar</button>
         }
       </div>
 
@@ -102,21 +130,34 @@
         <button
           class="cat-row"
           [class.cat-row--active]="selectedCategoryId() === cat.category_id"
+          [class.cat-row--rank-first]="i === 0"
           [style.--cat-color]="catColor(i)"
           (click)="selectCategory(selectedCategoryId() === cat.category_id ? null : cat.category_id)"
           [attr.aria-pressed]="selectedCategoryId() === cat.category_id"
+          type="button"
         >
-          <span class="cat-row__rank">#{{ i + 1 }}</span>
+          <!-- Rank: preattentive cue showing relative position -->
+          <span class="cat-row__rank" aria-hidden="true">#{{ i + 1 }}</span>
+
+          <!-- Bar + label stacked in the middle column -->
           <div class="cat-row__main">
             <div class="cat-row__label-row">
               <span class="cat-row__name">{{ cat.category_name }}</span>
               <span class="cat-row__count text-muted">{{ cat.count }}x</span>
             </div>
-            <div class="cat-row__bar-wrap" role="progressbar" [attr.aria-valuenow]="cat.percentage">
+            <div
+              class="cat-row__bar-wrap"
+              role="progressbar"
+              [attr.aria-valuenow]="cat.percentage"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            >
               <div class="cat-row__bar" [style.width.%]="cat.percentage"></div>
-              <span class="cat-row__bar-pct">{{ roundPct(cat.percentage) }}%</span>
+              <span class="cat-row__bar-pct" aria-hidden="true">{{ roundPct(cat.percentage) }}%</span>
             </div>
           </div>
+
+          <!-- Hero number: amount is primary, percentage is secondary -->
           <div class="cat-row__values">
             <span class="cat-row__amount mono">{{ formatAmount(cat.total) }}</span>
           </div>
@@ -125,43 +166,55 @@
     </div>
   }
 
-  <!-- ── Search + Category filter ──────────────────────────────────────────── -->
+  <!-- ── Search + Category Filter Bar ──────────────────────────────────────── -->
   <div class="search-bar">
     <div class="search-bar__input-wrap">
-      <span class="search-bar__icon">🔍</span>
+      <span class="search-bar__icon" aria-hidden="true">🔍</span>
       <input
         class="search-bar__input"
         type="search"
         placeholder="Buscar por descrição..."
-        [formControl]="searchCtrl"
+        [formControl]="searchControl"
         aria-label="Buscar gasto por descrição"
+        autocomplete="off"
       />
-      @if (searchCtrl.value) {
-        <button class="search-bar__clear" (click)="clearSearch()" aria-label="Limpar busca">✕</button>
+      @if (searchControl.value) {
+        <button
+          class="search-bar__clear"
+          (click)="clearSearch()"
+          aria-label="Limpar busca"
+          type="button"
+        >✕</button>
       }
     </div>
 
     <select
       class="search-bar__category-select"
-      (change)="selectCategory($any($event.target).value ? +$any($event.target).value : null)"
-      [value]="selectedCategoryId() ?? ''"
+      (change)="onCategorySelectChange($event)"
       aria-label="Filtrar por categoria"
     >
       <option value="">Todas as categorias</option>
-      @for (cat of invoiceData()!.by_category; track cat.category_id) {
-        <option [value]="cat.category_id">{{ cat.category_name }}</option>
+      @for (cat of dropdownCategories(); track cat.category_id) {
+        <option
+          [value]="cat.category_id"
+          [selected]="selectedCategoryId() === cat.category_id"
+        >{{ cat.category_name }}</option>
       }
     </select>
   </div>
 
   <!-- ── Expense Table ───────────────────────────────────────────────────────── -->
-  @if (loadingExpenses()) {
-    <div class="loading-wrapper"><span class="spinner"></span> Carregando...</div>
-  } @else if (filteredExpenses().length === 0) {
+  @if (filteredExpenses().length === 0) {
     <div class="empty-state">
       <div class="empty-state__icon">🧾</div>
       <p class="empty-state__title">Nenhum gasto encontrado</p>
-      <p class="empty-state__text">Tente ajustar os filtros de busca ou categoria.</p>
+      <p class="empty-state__text">
+        @if (selectedCategoryId() || searchControl.value) {
+          Tente ajustar os filtros de busca ou categoria.
+        } @else {
+          Esta fatura não possui gastos registrados.
+        }
+      </p>
     </div>
   } @else {
     <div class="data-table-wrapper">
@@ -193,10 +246,17 @@
                 <span class="value-down mono">{{ formatAmount(e.amount) }}</span>
               </td>
               <td class="text-right" style="display:flex;gap:6px;justify-content:flex-end">
-                <a [routerLink]="['/expenses', e.id, 'edit']" class="btn btn--secondary btn--sm"
-                   aria-label="Editar {{ e.description }}">✏️ Editar</a>
-                <button class="btn btn--danger btn--sm" (click)="deleteExpense(e)"
-                   aria-label="Excluir {{ e.description }}">🗑️</button>
+                <a
+                  [routerLink]="['/expenses', e.id, 'edit']"
+                  class="btn btn--secondary btn--sm"
+                  aria-label="Editar {{ e.description }}"
+                >✏️ Editar</a>
+                <button
+                  class="btn btn--danger btn--sm"
+                  (click)="deleteExpense(e)"
+                  aria-label="Excluir {{ e.description }}"
+                  type="button"
+                >🗑️</button>
               </td>
             </tr>
           }
@@ -206,19 +266,26 @@
 
     <!-- ── Pagination ─────────────────────────────────────────────────────── -->
     @if (pagination() && pagination()!.total_pages > 1) {
-      <div class="pagination" role="navigation" aria-label="Paginação">
-        <button class="btn btn--secondary btn--sm" [disabled]="currentPage()===1" (click)="changePage(1)">«</button>
-        <button class="btn btn--secondary btn--sm" [disabled]="currentPage()===1" (click)="changePage(currentPage()-1)">‹</button>
+      <div class="pagination" role="navigation" aria-label="Paginação de gastos">
+        <button class="btn btn--secondary btn--sm" [disabled]="currentPage()===1" (click)="changePage(1)" aria-label="Primeira página">«</button>
+        <button class="btn btn--secondary btn--sm" [disabled]="currentPage()===1" (click)="changePage(currentPage()-1)" aria-label="Página anterior">‹</button>
+
         @for (p of pageRange(); track p) {
-          <button class="btn btn--sm"
-            [class.btn--primary]="p===currentPage()"
-            [class.btn--secondary]="p!==currentPage()"
-            (click)="changePage(p)">{{ p }}</button>
+          <button
+            class="btn btn--sm"
+            [class.btn--primary]="p === currentPage()"
+            [class.btn--secondary]="p !== currentPage()"
+            (click)="changePage(p)"
+            [attr.aria-current]="p === currentPage() ? 'page' : null"
+          >{{ p }}</button>
         }
-        <button class="btn btn--secondary btn--sm" [disabled]="currentPage()===pagination()!.total_pages" (click)="changePage(currentPage()+1)">›</button>
-        <button class="btn btn--secondary btn--sm" [disabled]="currentPage()===pagination()!.total_pages" (click)="changePage(pagination()!.total_pages)">»</button>
+
+        <button class="btn btn--secondary btn--sm" [disabled]="currentPage()===pagination()!.total_pages" (click)="changePage(currentPage()+1)" aria-label="Próxima página">›</button>
+        <button class="btn btn--secondary btn--sm" [disabled]="currentPage()===pagination()!.total_pages" (click)="changePage(pagination()!.total_pages)" aria-label="Última página">»</button>
+
         <span class="pagination__info text-muted">
-          Página {{ currentPage() }} de {{ pagination()!.total_pages }} · {{ pagination()!.total_count }} gastos
+          Página {{ currentPage() }} de {{ pagination()!.total_pages }}
+          · {{ pagination()!.total_count }} gastos
         </span>
       </div>
     }
@@ -230,6 +297,4 @@
     <p class="empty-state__title">Selecione uma fatura</p>
     <p class="empty-state__text">Escolha uma fatura acima para ver os gastos.</p>
   </div>
-} @else if (loadingExpenses()) {
-  <div class="loading-wrapper"><span class="spinner"></span> Carregando gastos da fatura...</div>
 }
