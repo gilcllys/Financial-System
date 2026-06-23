@@ -39,10 +39,6 @@ COPY . .
 
 RUN chmod +x /app/entrypoint.sh
 
-ARG SECRET_KEY=dummy-build-key
-ENV SECRET_KEY=${SECRET_KEY}
-RUN python financial_system/manage.py collectstatic --noinput
-
 EXPOSE 8000
 
 ENTRYPOINT ["/app/entrypoint.sh"]
