@@ -24,6 +24,8 @@ export class InstallmentsComponent implements OnInit {
 
   expenses = signal<Expense[]>([]);
   loading = signal(true);
+  showFinalizadas = signal(false);
+  deletingGroup = signal<string | null>(null);
 
   // Group installment expenses: "Parcela X/Y - Name"
   installmentGroups = computed((): InstallmentGroup[] => {
@@ -71,11 +73,45 @@ export class InstallmentsComponent implements OnInit {
     return Array.from(groupMap.values()).sort((a, b) => a.name.localeCompare(b.name));
   });
 
+  /** Groups with at least one remaining installment (not 100% paid). */
+  activeGroups = computed((): InstallmentGroup[] =>
+    this.installmentGroups().filter(g => g.paidInstallments < g.totalInstallments)
+  );
+
+  /** Groups where every installment has been paid. */
+  finalizadasGroups = computed((): InstallmentGroup[] =>
+    this.installmentGroups().filter(g => g.paidInstallments === g.totalInstallments)
+  );
+
   ngOnInit(): void {
+    this.fetchExpenses();
+  }
+
+  private fetchExpenses(): void {
+    this.loading.set(true);
     this.expenseService.list({ page_size: 500 }).subscribe({
-      next: res => { const data = res.results; this.expenses.set(data); this.loading.set(false); },
+      next: res => { this.expenses.set(res.results); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
+  }
+
+  deleteGroup(group: InstallmentGroup): void {
+    if (!confirm(
+      `Apagar todas as ${group.totalInstallments} parcelas de "${group.name}"? Esta ação não pode ser desfeita.`
+    )) return;
+
+    this.deletingGroup.set(group.name);
+    this.expenseService.deleteInstallments(group.name, group.totalInstallments).subscribe({
+      next: () => { this.deletingGroup.set(null); this.fetchExpenses(); },
+      error: () => {
+        alert('Erro ao apagar parcelas. Tente novamente.');
+        this.deletingGroup.set(null);
+      },
+    });
+  }
+
+  toggleFinalizadas(): void {
+    this.showFinalizadas.set(!this.showFinalizadas());
   }
 
   formatAmount(amount: number): string {

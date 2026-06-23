@@ -54,4 +54,11 @@ export class ExpenseService {
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}/`);
   }
+
+  deleteInstallments(descriptionPrefix: string, totalInstallments: number): Observable<{ deleted: number }> {
+    return this.http.post<{ deleted: number }>(`${this.base}/delete-installments/`, {
+      description_prefix: descriptionPrefix,
+      total_installments: totalInstallments,
+    });
+  }
 }

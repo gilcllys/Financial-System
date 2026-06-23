@@ -169,12 +169,12 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
         this.donutChart?.destroy();  this.donutChart  = undefined;
         return;
       }
-      // setTimeout(0): lets @if(chartData()) re-render the canvases before we paint
+      // setTimeout(50): lets @if(chartData()) re-render the canvases before we paint
       setTimeout(() => {
         if (daily)  this.renderDailyChart(daily);
         if (weekly) this.renderWeeklyChart(weekly);
         if (donut)  this.renderDonutChart(donut);
-      }, 0);
+      }, 50);
     });
   }
 

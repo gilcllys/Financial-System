@@ -30,3 +30,17 @@ class CreateExpenseInputSerializer(serializers.Serializer):
     is_installment = serializers.BooleanField(required=False, default=False)
     installments = serializers.IntegerField(required=False, default=1)
     need_pay_vitoria = serializers.BooleanField(required=False, default=False)
+
+
+class DeleteInstallmentsInputSerializer(serializers.Serializer):
+    description_prefix = serializers.CharField(
+        required=True,
+        allow_blank=False,
+        max_length=255,
+        help_text='Nome base da despesa parcelada (ex: "Celular novo").',
+    )
+    total_installments = serializers.IntegerField(
+        required=True,
+        min_value=2,
+        help_text='Total de parcelas do grupo (ex: 10 para "Parcela X/10").',
+    )

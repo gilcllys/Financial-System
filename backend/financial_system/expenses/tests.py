@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 from django.test import SimpleTestCase, RequestFactory
 from rest_framework.request import Request
 from expenses.viewsets import ExpensePagination, ExpenseViewSet
+from expenses.serializer import DeleteInstallmentsInputSerializer
 
 
 # ---------------------------------------------------------------------------
@@ -33,6 +34,10 @@ class _FakeQS:
 
     def filter(self, **kwargs):
         return _FakeQS(self._items, self._filters + [kwargs], self._order)
+
+    def select_related(self, *args):
+        # No-op in tests: relationships are not traversed in unit tests.
+        return self
 
     def order_by(self, *args):
         return _FakeQS(self._items, self._filters, args)
@@ -209,3 +214,280 @@ class ExpenseViewSetFilterTest(SimpleTestCase):
         self.assertTrue(qs.has_filter(category_id=3))
         self.assertTrue(qs.has_filter(payment_method='cartao'))
         self.assertTrue(qs.has_filter(description__icontains='uber'))
+
+
+# ---------------------------------------------------------------------------
+# DeleteInstallmentsInputSerializer — validation
+# ---------------------------------------------------------------------------
+
+class DeleteInstallmentsInputSerializerTest(SimpleTestCase):
+    """Unit tests for DeleteInstallmentsInputSerializer field validation."""
+
+    # --- happy path -------------------------------------------------------
+
+    def test_valid_input_passes(self):
+        s = DeleteInstallmentsInputSerializer(data={
+            'description_prefix': 'Celular novo',
+            'total_installments': 10,
+        })
+        self.assertTrue(s.is_valid(), s.errors)
+
+    def test_minimum_valid_total_installments(self):
+        s = DeleteInstallmentsInputSerializer(data={
+            'description_prefix': 'TV nova',
+            'total_installments': 2,
+        })
+        self.assertTrue(s.is_valid(), s.errors)
+
+    def test_description_prefix_max_length_exactly_255_passes(self):
+        s = DeleteInstallmentsInputSerializer(data={
+            'description_prefix': 'a' * 255,
+            'total_installments': 3,
+        })
+        self.assertTrue(s.is_valid(), s.errors)
+
+    # --- description_prefix errors ----------------------------------------
+
+    def test_missing_description_prefix_fails(self):
+        s = DeleteInstallmentsInputSerializer(data={'total_installments': 10})
+        self.assertFalse(s.is_valid())
+        self.assertIn('description_prefix', s.errors)
+
+    def test_empty_description_prefix_fails(self):
+        s = DeleteInstallmentsInputSerializer(data={
+            'description_prefix': '',
+            'total_installments': 10,
+        })
+        self.assertFalse(s.is_valid())
+        self.assertIn('description_prefix', s.errors)
+
+    def test_description_prefix_256_chars_fails(self):
+        s = DeleteInstallmentsInputSerializer(data={
+            'description_prefix': 'a' * 256,
+            'total_installments': 10,
+        })
+        self.assertFalse(s.is_valid())
+        self.assertIn('description_prefix', s.errors)
+
+    # --- total_installments errors ----------------------------------------
+
+    def test_missing_total_installments_fails(self):
+        s = DeleteInstallmentsInputSerializer(data={'description_prefix': 'Celular novo'})
+        self.assertFalse(s.is_valid())
+        self.assertIn('total_installments', s.errors)
+
+    def test_total_installments_one_fails(self):
+        s = DeleteInstallmentsInputSerializer(data={
+            'description_prefix': 'Celular novo',
+            'total_installments': 1,
+        })
+        self.assertFalse(s.is_valid())
+        self.assertIn('total_installments', s.errors)
+
+    def test_total_installments_zero_fails(self):
+        s = DeleteInstallmentsInputSerializer(data={
+            'description_prefix': 'Celular novo',
+            'total_installments': 0,
+        })
+        self.assertFalse(s.is_valid())
+        self.assertIn('total_installments', s.errors)
+
+    def test_total_installments_negative_fails(self):
+        s = DeleteInstallmentsInputSerializer(data={
+            'description_prefix': 'Celular novo',
+            'total_installments': -5,
+        })
+        self.assertFalse(s.is_valid())
+        self.assertIn('total_installments', s.errors)
+
+    def test_total_installments_non_integer_fails(self):
+        s = DeleteInstallmentsInputSerializer(data={
+            'description_prefix': 'Celular novo',
+            'total_installments': 'dez',
+        })
+        self.assertFalse(s.is_valid())
+        self.assertIn('total_installments', s.errors)
+
+
+# ---------------------------------------------------------------------------
+# ExpenseViewSet.delete_installments — action logic
+# ---------------------------------------------------------------------------
+
+def _make_action_request(data: dict, tenant_id: str = 'tenant-abc') -> MagicMock:
+    """Builds a minimal mock request suitable for the delete_installments action."""
+    request = MagicMock()
+    request.data = data
+    request.user.tenant_id = tenant_id
+    return request
+
+
+class DeleteInstallmentsActionTest(SimpleTestCase):
+    """
+    Unit tests for delete_installments action.
+
+    ORM calls are mocked so no database is required.
+    transaction.atomic is patched to a no-op context manager.
+    """
+
+    def _call_action(
+        self,
+        data: dict,
+        tenant_id: str = 'tenant-abc',
+        delete_return: tuple = (5, {'expenses.Expense': 5}),
+    ):
+        """
+        Runs delete_installments with mocked DB calls.
+
+        Returns (response, mock_objects, mock_qs).
+        """
+        vs = ExpenseViewSet()
+        vs.request = _make_action_request(data, tenant_id)
+        vs.format_kwarg = None
+        vs.kwargs = {}
+
+        mock_qs = MagicMock()
+        mock_qs.delete.return_value = delete_return
+
+        with patch('expenses.models.Expense.objects') as mock_objects, \
+             patch('django.db.transaction.atomic'):
+            mock_objects.filter.return_value = mock_qs
+            response = vs.delete_installments(vs.request)
+
+        return response, mock_objects, mock_qs
+
+    # --- success path -----------------------------------------------------
+
+    def test_returns_200_when_expenses_are_deleted(self):
+        response, _, _ = self._call_action(
+            data={'description_prefix': 'Celular novo', 'total_installments': 10},
+            delete_return=(10, {'expenses.Expense': 10}),
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_response_body_contains_deleted_count(self):
+        response, _, _ = self._call_action(
+            data={'description_prefix': 'Celular novo', 'total_installments': 10},
+            delete_return=(10, {'expenses.Expense': 10}),
+        )
+        self.assertEqual(response.data['deleted'], 10)
+
+    def test_response_body_echoes_description_prefix(self):
+        response, _, _ = self._call_action(
+            data={'description_prefix': 'Celular novo', 'total_installments': 10},
+            delete_return=(10, {'expenses.Expense': 10}),
+        )
+        self.assertEqual(response.data['description_prefix'], 'Celular novo')
+
+    def test_response_body_echoes_total_installments(self):
+        response, _, _ = self._call_action(
+            data={'description_prefix': 'Celular novo', 'total_installments': 10},
+            delete_return=(10, {'expenses.Expense': 10}),
+        )
+        self.assertEqual(response.data['total_installments'], 10)
+
+    # --- not found --------------------------------------------------------
+
+    def test_returns_404_when_no_expenses_found(self):
+        response, _, _ = self._call_action(
+            data={'description_prefix': 'Celular novo', 'total_installments': 10},
+            delete_return=(0, {}),
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_404_response_contains_error_key(self):
+        response, _, _ = self._call_action(
+            data={'description_prefix': 'Celular novo', 'total_installments': 10},
+            delete_return=(0, {}),
+        )
+        self.assertIn('error', response.data)
+
+    # --- validation errors ------------------------------------------------
+
+    def test_invalid_input_raises_validation_error(self):
+        from rest_framework.exceptions import ValidationError
+        vs = ExpenseViewSet()
+        vs.request = _make_action_request({
+            'description_prefix': '',
+            'total_installments': 1,
+        })
+        vs.format_kwarg = None
+        vs.kwargs = {}
+        with self.assertRaises(ValidationError):
+            vs.delete_installments(vs.request)
+
+    def test_missing_fields_raises_validation_error(self):
+        from rest_framework.exceptions import ValidationError
+        vs = ExpenseViewSet()
+        vs.request = _make_action_request({})
+        vs.format_kwarg = None
+        vs.kwargs = {}
+        with self.assertRaises(ValidationError):
+            vs.delete_installments(vs.request)
+
+    # --- tenant isolation -------------------------------------------------
+
+    def test_filter_always_includes_tenant_id(self):
+        TENANT = 'specific-tenant-xyz'
+        _, mock_objects, _ = self._call_action(
+            data={'description_prefix': 'Notebook', 'total_installments': 5},
+            tenant_id=TENANT,
+            delete_return=(5, {'expenses.Expense': 5}),
+        )
+        call_kwargs = mock_objects.filter.call_args.kwargs
+        self.assertEqual(call_kwargs['tenant_id'], TENANT)
+
+    def test_filter_does_not_see_other_tenant_data(self):
+        """Verify that tenant_id is the ONLY tenant scoping and is set correctly."""
+        _, mock_objects, _ = self._call_action(
+            data={'description_prefix': 'Viagem', 'total_installments': 4},
+            tenant_id='tenant-A',
+            delete_return=(4, {'expenses.Expense': 4}),
+        )
+        call_kwargs = mock_objects.filter.call_args.kwargs
+        # Must be scoped to tenant-A, not any other value
+        self.assertNotEqual(call_kwargs.get('tenant_id'), 'tenant-B')
+
+    # --- iregex pattern correctness ---------------------------------------
+
+    def test_filter_uses_iregex_with_correct_pattern(self):
+        import re
+        PREFIX = 'TV nova'
+        TOTAL = 6
+        _, mock_objects, _ = self._call_action(
+            data={'description_prefix': PREFIX, 'total_installments': TOTAL},
+            delete_return=(6, {'expenses.Expense': 6}),
+        )
+        call_kwargs = mock_objects.filter.call_args.kwargs
+        expected = rf'^{re.escape(PREFIX)} - Parcela \d+/{TOTAL}$'
+        self.assertEqual(call_kwargs['description__iregex'], expected)
+
+    def test_iregex_pattern_escapes_special_chars_in_prefix(self):
+        """Prefixes with regex-special chars must be escaped to prevent injection."""
+        import re
+        PREFIX = 'Curso (React) 2.0'   # contains ( ) .
+        TOTAL = 3
+        _, mock_objects, _ = self._call_action(
+            data={'description_prefix': PREFIX, 'total_installments': TOTAL},
+            delete_return=(3, {'expenses.Expense': 3}),
+        )
+        call_kwargs = mock_objects.filter.call_args.kwargs
+        expected = rf'^{re.escape(PREFIX)} - Parcela \d+/{TOTAL}$'
+        self.assertEqual(call_kwargs['description__iregex'], expected)
+        # Double-check the escaped prefix does NOT contain unescaped special chars
+        self.assertIn(r'\(', call_kwargs['description__iregex'])
+
+    # --- ORM call verification --------------------------------------------
+
+    def test_delete_is_called_once(self):
+        _, _, mock_qs = self._call_action(
+            data={'description_prefix': 'Celular', 'total_installments': 3},
+            delete_return=(3, {'expenses.Expense': 3}),
+        )
+        mock_qs.delete.assert_called_once()
+
+    def test_filter_is_called_once(self):
+        _, mock_objects, _ = self._call_action(
+            data={'description_prefix': 'Celular', 'total_installments': 3},
+            delete_return=(3, {'expenses.Expense': 3}),
+        )
+        mock_objects.filter.assert_called_once()
