@@ -18,22 +18,15 @@ export class AuthService {
   async init(): Promise<boolean> {
     try {
       const authenticated = await this.keycloak.init({
-        // check-sso: verifica silenciosamente se há sessão SSO ativa no Keycloak.
-        // Se houver → loga automaticamente sem redirect.
-        // Se não houver → retorna false sem forçar login (o guard redireciona).
-        onLoad: 'check-sso',
+        onLoad: 'login-required',
         pkceMethod: 'S256',
         checkLoginIframe: false,
-        silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
         redirectUri: window.location.origin,
       });
       this._initialized = true;
 
       if (authenticated) {
         this.scheduleTokenRefresh();
-      } else {
-        // Sessão não encontrada — redireciona para login
-        await this.keycloak.login({ redirectUri: window.location.origin });
       }
 
       return authenticated;
