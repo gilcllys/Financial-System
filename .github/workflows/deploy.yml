@@ -3,14 +3,29 @@ name: Deploy to AWS EC2
 on:
   push:
     branches:
-      - main
+      - dev
+
+# ─────────────────────────────────────────────────────────────
+# Required GitHub Variables  (Settings → Variables → Actions)
+#   DOCKER_HUB_USERNAME      = gilcllys506
+#   EC2_HOST, EC2_USER
+#   DEBUG, ALLOWED_HOSTS, CORS_ALLOWED_ORIGINS
+#   KEYCLOAK_SERVER_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID, KEYCLOAK_VERIFY_SSL
+#   DB_NAME, DB_USERNAME, GUNICORN_WORKERS
+#   NOTE: DB_HOST (postgres) and DB_PORT (5432) are hardcoded in this pipeline
+#
+# Required GitHub Secrets    (Settings → Secrets → Actions)
+#   DOCKER_HUB_TOKEN
+#   EC2_SSH_KEY
+#   SECRET_KEY, DB_PASSWORD
+# ─────────────────────────────────────────────────────────────
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Validate required variables
+      - name: Validate required variables and secrets
         run: |
           missing=0
 
@@ -23,26 +38,28 @@ jobs:
             fi
           }
 
+          echo "🔍 Validating Docker Hub credentials..."
+          check "${{ vars.DOCKER_HUB_USERNAME }}"  DOCKER_HUB_USERNAME
+          check "${{ secrets.DOCKER_HUB_TOKEN }}"  DOCKER_HUB_TOKEN
+
+          echo ""
           echo "🔍 Validating EC2 connection..."
-          check "${{ vars.EC2_HOST }}"         EC2_HOST
-          check "${{ vars.EC2_USER }}"         EC2_USER
-          check "${{ vars.EC2_PROJECT_PATH }}" EC2_PROJECT_PATH
-          check "${{ secrets.EC2_SSH_KEY }}"   EC2_SSH_KEY
+          check "${{ vars.EC2_HOST }}"        EC2_HOST
+          check "${{ vars.EC2_USER }}"        EC2_USER
+          check "${{ secrets.EC2_SSH_KEY }}"  EC2_SSH_KEY
 
           echo ""
           echo "🔍 Validating application variables..."
-          check "${{ vars.DEBUG }}"              DEBUG
-          check "${{ vars.ALLOWED_HOSTS }}"      ALLOWED_HOSTS
-          check "${{ vars.CORS_ALLOWED_ORIGINS }}" CORS_ALLOWED_ORIGINS
-          check "${{ vars.KEYCLOAK_SERVER_URL }}"  KEYCLOAK_SERVER_URL
-          check "${{ vars.KEYCLOAK_REALM }}"       KEYCLOAK_REALM
-          check "${{ vars.KEYCLOAK_CLIENT_ID }}"   KEYCLOAK_CLIENT_ID
-          check "${{ vars.KEYCLOAK_VERIFY_SSL }}"  KEYCLOAK_VERIFY_SSL
-          check "${{ vars.DB_NAME }}"              DB_NAME
-          check "${{ vars.DB_USERNAME }}"          DB_USERNAME
-          check "${{ vars.DB_HOST }}"              DB_HOST
-          check "${{ vars.DB_PORT }}"              DB_PORT
-          check "${{ vars.GUNICORN_WORKERS }}"     GUNICORN_WORKERS
+          check "${{ vars.DEBUG }}"                  DEBUG
+          check "${{ vars.ALLOWED_HOSTS }}"          ALLOWED_HOSTS
+          check "${{ vars.CORS_ALLOWED_ORIGINS }}"   CORS_ALLOWED_ORIGINS
+          check "${{ vars.KEYCLOAK_SERVER_URL }}"    KEYCLOAK_SERVER_URL
+          check "${{ vars.KEYCLOAK_REALM }}"         KEYCLOAK_REALM
+          check "${{ vars.KEYCLOAK_CLIENT_ID }}"     KEYCLOAK_CLIENT_ID
+          check "${{ vars.KEYCLOAK_VERIFY_SSL }}"    KEYCLOAK_VERIFY_SSL
+          check "${{ vars.DB_NAME }}"                DB_NAME
+          check "${{ vars.DB_USERNAME }}"            DB_USERNAME
+          check "${{ vars.GUNICORN_WORKERS }}"       GUNICORN_WORKERS
 
           echo ""
           echo "🔍 Validating secrets..."
@@ -58,6 +75,29 @@ jobs:
           echo ""
           echo "✅ All variables and secrets are set"
 
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ vars.DOCKER_HUB_USERNAME }}/financial-backend:latest
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ vars.DOCKER_HUB_USERNAME }}/financial-frontend:latest
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -67,35 +107,28 @@ jobs:
           script: |
             set -e
 
-            echo "📁 Going to project folder..."
-            cd ${{ vars.EC2_PROJECT_PATH }}
+            echo "📝 Writing ~/sistema-financeiro/.env..."
+            printf 'DEBUG=%s\n'                '${{ vars.DEBUG }}'                  >  ~/sistema-financeiro/.env
+            printf 'SECRET_KEY=%s\n'           '${{ secrets.SECRET_KEY }}'          >> ~/sistema-financeiro/.env
+            printf 'ALLOWED_HOSTS=%s\n'        '${{ vars.ALLOWED_HOSTS }}'          >> ~/sistema-financeiro/.env
+            printf 'CORS_ALLOWED_ORIGINS=%s\n' '${{ vars.CORS_ALLOWED_ORIGINS }}'   >> ~/sistema-financeiro/.env
+            printf 'KEYCLOAK_SERVER_URL=%s\n'  '${{ vars.KEYCLOAK_SERVER_URL }}'    >> ~/sistema-financeiro/.env
+            printf 'KEYCLOAK_REALM=%s\n'       '${{ vars.KEYCLOAK_REALM }}'         >> ~/sistema-financeiro/.env
+            printf 'KEYCLOAK_CLIENT_ID=%s\n'   '${{ vars.KEYCLOAK_CLIENT_ID }}'     >> ~/sistema-financeiro/.env
+            printf 'KEYCLOAK_VERIFY_SSL=%s\n'  '${{ vars.KEYCLOAK_VERIFY_SSL }}'    >> ~/sistema-financeiro/.env
+            printf 'DB_NAME=%s\n'              '${{ vars.DB_NAME }}'                >> ~/sistema-financeiro/.env
+            printf 'DB_USERNAME=%s\n'          '${{ vars.DB_USERNAME }}'            >> ~/sistema-financeiro/.env
+            printf 'DB_PASSWORD=%s\n'          '${{ secrets.DB_PASSWORD }}'         >> ~/sistema-financeiro/.env
+            printf 'DB_HOST=postgres\n'                                             >> ~/sistema-financeiro/.env
+            printf 'DB_PORT=5432\n'                                                 >> ~/sistema-financeiro/.env
+            printf 'DB_SSL_MODE=disable\n'                                          >> ~/sistema-financeiro/.env
+            printf 'GUNICORN_WORKERS=%s\n'     '${{ vars.GUNICORN_WORKERS }}'       >> ~/sistema-financeiro/.env
 
-            echo "📦 Pulling latest code..."
-            git pull origin main
+            echo "🐳 Pulling latest images from Docker Hub..."
+            docker compose -f ~/main/docker-compose.yml pull backend frontend
 
-            echo "📝 Creating backend .env..."
-            printf 'DEBUG=%s\n'                '${{ vars.DEBUG }}'                  >  ./backend/.env
-            printf 'SECRET_KEY=%s\n'           '${{ secrets.SECRET_KEY }}'          >> ./backend/.env
-            printf 'ALLOWED_HOSTS=%s\n'        '${{ vars.ALLOWED_HOSTS }}'          >> ./backend/.env
-            printf 'CORS_ALLOWED_ORIGINS=%s\n' '${{ vars.CORS_ALLOWED_ORIGINS }}'   >> ./backend/.env
-            printf 'KEYCLOAK_SERVER_URL=%s\n'  '${{ vars.KEYCLOAK_SERVER_URL }}'    >> ./backend/.env
-            printf 'KEYCLOAK_REALM=%s\n'       '${{ vars.KEYCLOAK_REALM }}'         >> ./backend/.env
-            printf 'KEYCLOAK_CLIENT_ID=%s\n'   '${{ vars.KEYCLOAK_CLIENT_ID }}'     >> ./backend/.env
-            printf 'KEYCLOAK_VERIFY_SSL=%s\n'  '${{ vars.KEYCLOAK_VERIFY_SSL }}'    >> ./backend/.env
-            printf 'DB_NAME=%s\n'              '${{ vars.DB_NAME }}'                >> ./backend/.env
-            printf 'DB_USERNAME=%s\n'          '${{ vars.DB_USERNAME }}'            >> ./backend/.env
-            printf 'DB_PASSWORD=%s\n'          '${{ secrets.DB_PASSWORD }}'         >> ./backend/.env
-            printf 'DB_HOST=%s\n'              '${{ vars.DB_HOST }}'                >> ./backend/.env
-            printf 'DB_PORT=%s\n'              '${{ vars.DB_PORT }}'                >> ./backend/.env
-            printf 'DB_SSL_MODE=disable\n'                                          >> ./backend/.env
-            printf 'GUNICORN_WORKERS=%s\n'     '${{ vars.GUNICORN_WORKERS }}'       >> ./backend/.env
-
-            echo "🧹 Freeing disk space (old images & build cache)..."
-            docker system prune -af 2>/dev/null || true
-            df -h / | tail -1
-
-            echo "🐳 Starting containers..."
-            docker compose --env-file ./backend/.env up -d --build
+            echo "🚀 Restarting backend and frontend containers..."
+            docker compose -f ~/main/docker-compose.yml up -d --no-deps backend frontend
 
             echo "🔄 Reloading host nginx..."
             sudo nginx -t && sudo systemctl reload nginx
