@@ -1,0 +1,98 @@
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 12px;
+}
+
+.consolidated {
+  margin-bottom: var(--space-lg);
+
+  &__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+
+    @media (max-width: 768px) { grid-template-columns: 1fr; }
+  }
+
+  &__block-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-ink);
+    margin: 0 0 12px;
+  }
+}
+
+.net-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  &__item {
+    font-size: 14px;
+    color: var(--color-ink);
+    padding: 8px 0;
+    border-bottom: 1px solid var(--color-hairline);
+
+    &:last-child { border-bottom: none; }
+  }
+}
+
+.personal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  &__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 14px;
+    color: var(--color-ink);
+    padding: 8px 0;
+    border-bottom: 1px solid var(--color-hairline);
+
+    &:last-child { border-bottom: none; }
+  }
+
+  &__label { display: flex; flex-direction: column; gap: 2px; }
+  &__count { font-size: 12px; color: var(--color-muted); }
+  &__value { font-weight: 600; font-size: 15px; flex-shrink: 0; }
+}
+
+.group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.group-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-lg);
+  text-decoration: none;
+  transition: border-color 0.2s, transform 0.1s;
+
+  &:hover { border-color: var(--color-accent, #0052ff); }
+  &:active { transform: scale(0.995); }
+
+  &__info { display: flex; flex-direction: column; gap: 4px; }
+  &__name { font-weight: 600; color: var(--color-ink); font-size: 15px; }
+  &__hint { font-size: 13px; color: var(--color-muted); }
+  &__arrow { font-size: 24px; color: var(--color-muted); flex-shrink: 0; }
+}

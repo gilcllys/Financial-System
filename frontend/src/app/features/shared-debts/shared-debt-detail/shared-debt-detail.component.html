@@ -1,0 +1,214 @@
+<div class="page-header">
+  <div class="page-header__left">
+    <h1 class="page-header__title">👥 {{ group()?.name ?? 'Grupo' }}</h1>
+    <p class="page-header__subtitle">Despesas compartilhadas do grupo</p>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <a routerLink="/shared-debts" class="btn btn--secondary btn--sm">← Grupos</a>
+    <button class="btn btn--secondary btn--sm" type="button" (click)="invite()" [disabled]="inviting()">
+      @if (inviting()) { <span class="spinner"></span> } 🔗 Convidar
+    </button>
+  </div>
+</div>
+
+@if (inviteUrl(); as url) {
+  <div class="invite-box" role="status">
+    <span class="invite-box__label">Link de convite:</span>
+    <input class="invite-box__input mono" type="text" [value]="url" readonly aria-label="Link de convite" />
+    <button class="btn btn--primary btn--sm" type="button" (click)="copyInvite()">
+      {{ copied() ? '✓ Copiado' : 'Copiar' }}
+    </button>
+  </div>
+}
+
+@if (loading()) {
+  <div class="loading-wrapper" aria-live="polite"><span class="spinner"></span> Carregando...</div>
+} @else {
+
+  <!-- ── Acerto de contas ─────────────────────────────────────────────────── -->
+  @if (balances(); as bal) {
+    <div class="card settle-card">
+      <h2 class="settle-card__title">Acerto de contas</h2>
+
+      @if (bal.settlement.length === 0) {
+        <p class="settle-card__ok">✓ Tudo quitado — ninguém deve nada.</p>
+      } @else {
+        <ul class="settle-list">
+          @for (s of bal.settlement; track s.from_member_id + '-' + s.to_member_id) {
+            <li class="settle-list__item">
+              <strong>{{ s.from_name }}</strong> paga
+              <strong class="value-down mono">{{ formatCurrency(s.amount) }}</strong>
+              para <strong>{{ s.to_name }}</strong>
+            </li>
+          }
+        </ul>
+      }
+
+      <div class="member-balances">
+        @for (m of bal.members; track m.member_id) {
+          <div class="member-balances__row">
+            <span class="member-balances__name">{{ m.display_name }}</span>
+            <span
+              class="member-balances__value mono"
+              [class.value-up]="m.balance > 0"
+              [class.value-down]="m.balance < 0"
+            >
+              @if (m.balance > 0) { +{{ formatCurrency(m.balance) }} }
+              @else if (m.balance < 0) { -{{ formatCurrency(m.balance) }} }
+              @else { {{ formatCurrency(0) }} }
+            </span>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ── Despesas ─────────────────────────────────────────────────────────── -->
+  <div class="page-header" style="margin-top: var(--space-lg)">
+    <h2 class="section-title" style="margin:0">Despesas</h2>
+    <button class="btn btn--primary btn--sm" type="button" (click)="toggleEntryForm()">
+      {{ showEntryForm() ? '✕ Fechar' : '＋ Nova despesa' }}
+    </button>
+  </div>
+
+  @if (showEntryForm()) {
+    <div class="card" style="margin-bottom: var(--space-lg)">
+      <form [formGroup]="form" (ngSubmit)="saveEntry()" novalidate aria-label="Nova despesa compartilhada">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="description">Descrição *</label>
+            <input id="description" class="form-input" [class.error]="hasError('description')"
+              type="text" formControlName="description" placeholder="Ex: Jantar" autocomplete="off" />
+            @if (hasError('description')) {
+              <span class="form-error" role="alert">Descrição é obrigatória.</span>
+            }
+          </div>
+        </div>
+
+        <div class="form-row form-row--2col">
+          <div class="form-group">
+            <label class="form-label" for="amount">Valor *</label>
+            <input id="amount" class="form-input mono" [class.error]="hasError('amount')"
+              type="number" step="0.01" min="0.01" formControlName="amount" placeholder="120.00" />
+            @if (hasError('amount')) {
+              <span class="form-error" role="alert">Valor é obrigatório.</span>
+            }
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="date">Data *</label>
+            <input id="date" class="form-input" type="date" formControlName="date" [class.error]="hasError('date')" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="paid_by">Pago por *</label>
+            <select id="paid_by" class="form-select" [class.error]="hasError('paid_by')" formControlName="paid_by">
+              <option [ngValue]="null" disabled>Selecione quem pagou</option>
+              @for (m of members(); track m.id) {
+                <option [ngValue]="m.id">{{ m.display_name }}</option>
+              }
+            </select>
+            @if (hasError('paid_by')) {
+              <span class="form-error" role="alert">Selecione quem pagou.</span>
+            }
+          </div>
+        </div>
+
+        <div class="form-row">
+          <fieldset class="form-group">
+            <legend class="form-label">Participantes (quem divide) *</legend>
+            <div class="participants">
+              @for (m of members(); track m.id) {
+                <label class="participant-chip" [class.participant-chip--on]="isParticipant(m.id)">
+                  <input type="checkbox" [checked]="isParticipant(m.id)" (change)="toggleParticipant(m.id)" />
+                  <span>{{ m.display_name }}</span>
+                </label>
+              }
+            </div>
+            <span class="form-hint">Todos marcados por padrão. Desmarque quem não participa.</span>
+          </fieldset>
+        </div>
+
+        <div class="form-row">
+          <fieldset class="form-group">
+            <legend class="form-label">Método de Pagamento *</legend>
+            <div class="radio-group" role="radiogroup">
+              <label class="radio-option">
+                <input type="radio" formControlName="payment_method" value="dinheiro" />
+                <span class="radio-btn">💵 Dinheiro</span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" formControlName="payment_method" value="cartao" />
+                <span class="radio-btn">💳 Cartão</span>
+              </label>
+            </div>
+          </fieldset>
+        </div>
+
+        @if (isCartao && payerIsMe && cards().length) {
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="credit_card_id">Cartão de Crédito (opcional)</label>
+              <select id="credit_card_id" class="form-select" formControlName="credit_card_id">
+                <option [ngValue]="null">Nenhum / não vincular</option>
+                @for (card of cards(); track card.id) {
+                  <option [ngValue]="card.id">{{ card.name }} •••• {{ card.last_four_digits }}</option>
+                }
+              </select>
+            </div>
+          </div>
+        }
+
+        @if (entryError()) {
+          <div class="form-error-box" role="alert">{{ entryError() }}</div>
+        }
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn--primary" [disabled]="savingEntry()">
+            @if (savingEntry()) { <span class="spinner"></span> } Salvar despesa
+          </button>
+        </div>
+      </form>
+    </div>
+  }
+
+  @if (entries().length === 0) {
+    <div class="empty-state">
+      <div class="empty-state__icon">🧾</div>
+      <p class="empty-state__title">Nenhuma despesa</p>
+      <p class="empty-state__text">Adicione a primeira despesa compartilhada do grupo.</p>
+    </div>
+  } @else {
+    <div class="data-table-wrapper">
+      <table class="data-table" role="table" aria-label="Despesas do grupo">
+        <thead>
+          <tr>
+            <th scope="col">Descrição</th>
+            <th scope="col">Pago por</th>
+            <th scope="col">Data</th>
+            <th scope="col" class="text-right">Valor</th>
+            <th scope="col" class="text-right">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (e of entries(); track e.id) {
+            <tr>
+              <td style="font-weight:500">
+                {{ e.description }}
+                <span class="badge--shared">{{ e.payment_method === 'cartao' ? '💳' : '💵' }} 👥</span>
+              </td>
+              <td>{{ e.paid_by_name }}</td>
+              <td class="mono text-muted" style="font-size:13px;white-space:nowrap">{{ formatDate(e.date) }}</td>
+              <td class="text-right"><span class="value-down mono">{{ formatCurrency(e.amount) }}</span></td>
+              <td class="text-right">
+                <button class="btn btn--danger btn--sm" type="button"
+                  (click)="deleteEntry(e)" aria-label="Excluir {{ e.description }}">🗑️</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}

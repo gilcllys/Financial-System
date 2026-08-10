@@ -1,31 +1,211 @@
+import uuid
+
 from django.db import models
+from django.db.models import Q
+
 from financial_system.base_model import BaseModel
 
 
-class VitoriaDebt(BaseModel):
+class SharedDebt(BaseModel):
+    """
+    Grupo de dívida compartilhada (estilo Tricount).
+
+    Reúne múltiplos membros (tenants distintos do Keycloak) que dividem
+    despesas em comum. O acesso é baseado em participação (membership),
+    não em posse — ver SharedDebtViewSet.get_queryset.
+    """
+
+    name = models.CharField(
+        max_length=120,
+        db_column='name',
+        null=False,
+    )
+    owner_tenant_id = models.CharField(
+        max_length=36,
+        db_column='owner_tenant_id',
+        db_index=True,
+        null=False,
+        help_text='tenant_id (sub do Keycloak) do criador do grupo.',
+    )
+
+    class Meta:
+        db_table = 'shared_debts'
+        verbose_name = 'Shared Debt'
+        verbose_name_plural = 'Shared Debts'
+
+
+class SharedDebtMember(BaseModel):
+    """
+    Membro de um grupo de dívida compartilhada.
+
+    tenant_id fica NULL enquanto o membro é apenas um "slot" adicionado por
+    nome (ainda não reivindicado via link de convite). Ao entrar pelo convite,
+    o usuário recebe um membro com tenant_id preenchido.
+    """
+
+    shared_debt = models.ForeignKey(
+        to=SharedDebt,
+        db_column='shared_debt_id',
+        on_delete=models.CASCADE,
+        related_name='members',
+    )
     tenant_id = models.CharField(
         max_length=36,
         db_column='tenant_id',
         db_index=True,
-        null=False,
-        help_text='Identificador único do tenant/usuário vindo do Keycloak (sub claim)',
+        null=True,
+        blank=True,
+        help_text='tenant_id do Keycloak; NULL até a pessoa entrar via link.',
     )
-    expense = models.ForeignKey(
-        to='expenses.Expense',
-        db_column='expense_id',
-        db_index=True,
+    display_name = models.CharField(
+        max_length=120,
+        db_column='display_name',
         null=False,
-        on_delete=models.CASCADE,
-        related_name='vitoria_debts',
     )
-    is_paid = models.BooleanField(
-        db_column='is_paid',
-        null=False,
-        default=False,
-        help_text='Indica se a dívida com a Vitória já foi paga',
+    email = models.EmailField(
+        db_column='email',
+        null=True,
+        blank=True,
     )
 
     class Meta:
-        db_table = 'vitoria_debts'
-        verbose_name = 'Vitoria Debt'
-        verbose_name_plural = 'Vitoria Debts'
+        db_table = 'shared_debt_members'
+        verbose_name = 'Shared Debt Member'
+        verbose_name_plural = 'Shared Debt Members'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['shared_debt', 'tenant_id'],
+                condition=Q(tenant_id__isnull=False),
+                name='uniq_member_per_tenant',
+            ),
+        ]
+
+
+class SharedEntry(BaseModel):
+    """Uma despesa compartilhada dentro de um grupo."""
+
+    PAYMENT_METHOD_CHOICES = [
+        ('dinheiro', 'Dinheiro'),
+        ('cartao', 'Cartao'),
+    ]
+
+    shared_debt = models.ForeignKey(
+        to=SharedDebt,
+        db_column='shared_debt_id',
+        on_delete=models.CASCADE,
+        related_name='entries',
+    )
+    paid_by = models.ForeignKey(
+        to=SharedDebtMember,
+        db_column='paid_by_id',
+        on_delete=models.PROTECT,
+        related_name='paid_entries',
+    )
+    description = models.CharField(
+        max_length=255,
+        db_column='description',
+        null=False,
+    )
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='amount',
+        null=False,
+        help_text='Valor positivo da despesa compartilhada.',
+    )
+    date = models.DateField(
+        db_column='date',
+        null=False,
+    )
+    payment_method = models.CharField(
+        max_length=10,
+        choices=PAYMENT_METHOD_CHOICES,
+        db_column='payment_method',
+        db_index=True,
+        default='dinheiro',
+        null=False,
+    )
+    credit_card = models.ForeignKey(
+        to='cards.CreditCard',
+        db_column='credit_card_id',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='shared_entries',
+        help_text='Preenchido apenas quando o usuário atual pagou no próprio cartão.',
+    )
+    created_by_tenant_id = models.CharField(
+        max_length=36,
+        db_column='created_by_tenant_id',
+        db_index=True,
+        null=False,
+    )
+
+    class Meta:
+        db_table = 'shared_entries'
+        verbose_name = 'Shared Entry'
+        verbose_name_plural = 'Shared Entries'
+
+
+class SharedEntryParticipant(BaseModel):
+    """
+    Participante de uma despesa compartilhada (rateio igualitário entre
+    todos os participantes de uma SharedEntry).
+    """
+
+    entry = models.ForeignKey(
+        to=SharedEntry,
+        db_column='entry_id',
+        on_delete=models.CASCADE,
+        related_name='participants',
+    )
+    member = models.ForeignKey(
+        to=SharedDebtMember,
+        db_column='member_id',
+        on_delete=models.CASCADE,
+        related_name='participations',
+    )
+
+    class Meta:
+        db_table = 'shared_entry_participants'
+        verbose_name = 'Shared Entry Participant'
+        verbose_name_plural = 'Shared Entry Participants'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['entry', 'member'],
+                name='uniq_participant_per_entry',
+            ),
+        ]
+
+
+class SharedDebtInvite(BaseModel):
+    """Convite por link para entrar em um grupo de dívida compartilhada."""
+
+    shared_debt = models.ForeignKey(
+        to=SharedDebt,
+        db_column='shared_debt_id',
+        on_delete=models.CASCADE,
+        related_name='invites',
+    )
+    token = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        db_index=True,
+        db_column='token',
+    )
+    expires_at = models.DateTimeField(
+        db_column='expires_at',
+        null=True,
+        blank=True,
+    )
+    created_by_tenant_id = models.CharField(
+        max_length=36,
+        db_column='created_by_tenant_id',
+        null=False,
+    )
+
+    class Meta:
+        db_table = 'shared_debt_invites'
+        verbose_name = 'Shared Debt Invite'
+        verbose_name_plural = 'Shared Debt Invites'

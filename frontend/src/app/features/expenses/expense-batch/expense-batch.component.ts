@@ -19,7 +19,6 @@ interface DraftExpense {
   credit_card_id: number | null;
   is_installment: boolean;
   installments: number;
-  need_pay_vitoria: boolean;
 }
 
 @Component({
@@ -59,7 +58,6 @@ export class ExpenseBatchComponent implements OnInit {
     is_installment: [false],
     installments: [{ value: 1, disabled: true }, [Validators.min(2), Validators.max(60)]],
     quantity: [1, [Validators.required, Validators.min(1)]],
-    need_pay_vitoria: [false],
   });
 
   get isCartao(): boolean { return this.form.value.payment_method === 'cartao'; }
@@ -112,12 +110,11 @@ export class ExpenseBatchComponent implements OnInit {
       credit_card_id: v.payment_method === 'cartao' ? v.credit_card_id : null,
       is_installment: !!v.is_installment,
       installments: v.installments ?? 1,
-      need_pay_vitoria: !!v.need_pay_vitoria,
     }]);
     // Reset, mantendo data e método por conveniência
     const keepDate = v.date!;
     const keepMethod = v.payment_method!;
-    this.form.reset({ date: keepDate, payment_method: keepMethod, quantity: 1, is_installment: false, installments: 1, need_pay_vitoria: false });
+    this.form.reset({ date: keepDate, payment_method: keepMethod, quantity: 1, is_installment: false, installments: 1 });
   }
 
   edit(d: DraftExpense): void {
@@ -132,7 +129,6 @@ export class ExpenseBatchComponent implements OnInit {
       credit_card_id: d.credit_card_id,
       is_installment: d.is_installment,
       installments: d.installments,
-      need_pay_vitoria: d.need_pay_vitoria,
     });
   }
 
@@ -153,7 +149,7 @@ export class ExpenseBatchComponent implements OnInit {
       const signed = d.isIncome ? Math.abs(d.amount) : -Math.abs(d.amount);
       return {
         category_id: d.category_id,
-        description: d.need_pay_vitoria ? `[CASAL] ${d.description}` : d.description,
+        description: d.description,
         amount: signed,
         date: d.date,
         quantity: 1,
@@ -161,7 +157,6 @@ export class ExpenseBatchComponent implements OnInit {
         credit_card_id: d.payment_method === 'cartao' ? d.credit_card_id : null,
         is_installment: d.is_installment,
         installments: d.installments,
-        need_pay_vitoria: d.need_pay_vitoria,
       };
     });
 

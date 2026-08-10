@@ -42,7 +42,6 @@ export class ExpenseFormComponent implements OnInit {
     is_installment: [false],
     installments: [{ value: 1, disabled: true }, [Validators.min(2), Validators.max(60)]],
     quantity: [1, [Validators.required, Validators.min(1)]],
-    need_pay_vitoria: [false],
   });
 
   get isCartao(): boolean { return this.form.value.payment_method === 'cartao'; }
@@ -110,7 +109,7 @@ export class ExpenseFormComponent implements OnInit {
         // Define o toggle baseado no sinal do amount
         this.isIncome.set(expense.amount >= 0);
         this.form.patchValue({
-          description: expense.description?.replace(/^\[CASAL\]\s*/, '') ?? '',
+          description: expense.description ?? '',
           amount: Math.abs(expense.amount),
           date: expense.date,
           category_id: expense.category_id,
@@ -139,7 +138,7 @@ export class ExpenseFormComponent implements OnInit {
 
     const payload = {
       category_id: v.category_id!,
-      description: v.need_pay_vitoria ? `[CASAL] ${v.description!}` : v.description!,
+      description: v.description!,
       amount: signedAmount,
       date: v.date!,
       quantity: v.quantity!,
@@ -147,7 +146,6 @@ export class ExpenseFormComponent implements OnInit {
       credit_card_id: v.payment_method === 'cartao' ? v.credit_card_id : null,
       is_installment: !!v.is_installment,
       installments: v.installments ?? 1,
-      need_pay_vitoria: !!v.need_pay_vitoria,
     };
 
     // Editar virando parcelado: deleta o original e cria N parcelas via create-expense

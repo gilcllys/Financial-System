@@ -356,3 +356,47 @@
     <p class="empty-state__text">Escolha uma fatura acima para ver os gastos.</p>
   </div>
 }
+
+<!-- ── Compartilhado (independent: shown whenever there are shared entries on this card) ── -->
+@if (sharedEntries().length) {
+  <div class="data-table-wrapper" style="margin-top: var(--space-lg)">
+    <table class="data-table" role="table" aria-label="Gastos compartilhados do cartão">
+      <thead>
+        <tr>
+          <th scope="col">Descrição</th>
+          <th scope="col">Categoria</th>
+          <th scope="col">Data</th>
+          <th scope="col" class="text-right">Valor</th>
+          <th scope="col" class="text-right">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td colspan="5" class="table-subheader">👥 Compartilhado · {{ sharedEntries().length }}</td></tr>
+        @for (s of sharedEntries(); track s.id) {
+          <tr>
+            <td style="font-weight: 500">
+              {{ s.description }}
+              <span class="badge--shared">👥 {{ s.paid_by_name }}</span>
+            </td>
+            <td>
+              <span class="text-muted" style="font-size:13px">Compartilhado</span>
+            </td>
+            <td class="mono text-muted" style="font-size: 13px; white-space: nowrap">
+              {{ formatDateFull(s.date) }}
+            </td>
+            <td class="text-right">
+              <span class="value-down mono">{{ formatAmount(s.amount) }}</span>
+            </td>
+            <td class="text-right">
+              <a
+                [routerLink]="['/shared-debts', s.shared_debt]"
+                class="btn btn--secondary btn--sm"
+                aria-label="Ver grupo da despesa {{ s.description }}"
+              >Ver grupo</a>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

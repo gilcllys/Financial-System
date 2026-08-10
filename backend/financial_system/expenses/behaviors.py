@@ -14,7 +14,6 @@ class CreateExpenseBehavior:
     Behavior para criar despesas com suporte a parcelamento.
 
     O tenant_id é extraído automaticamente do token autenticado.
-    Se need_pay_vitoria=True, cria um VitoriaDebt para cada despesa.
     """
 
     def __init__(self, data: dict):
@@ -28,15 +27,6 @@ class CreateExpenseBehavior:
         self.credit_card_id = data.get('credit_card_id')
         self.installments = data.get('installments', 1)
         self.is_installment = data.get('is_installment', False)
-        self.need_pay_vitoria = data.get('need_pay_vitoria', False)
-
-    def _create_vitoria_debt(self, expense: Expense):
-        from debts.models import VitoriaDebt
-        VitoriaDebt.objects.create(
-            tenant_id=self.tenant_id,
-            expense=expense,
-            is_paid=False,
-        )
 
     def _build_expense(self, description: str, amount: Decimal, expense_date) -> Expense:
         expense = Expense.objects.create(
@@ -49,8 +39,6 @@ class CreateExpenseBehavior:
             payment_method=self.payment_method,
             credit_card_id=self.credit_card_id,
         )
-        if self.need_pay_vitoria:
-            self._create_vitoria_debt(expense)
         return expense
 
     @transaction.atomic

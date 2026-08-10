@@ -21,6 +21,16 @@
   margin-left: 6px;
 }
 
+.badge--shared {
+  background: #f0f4ff;
+  color: #0052ff;
+  border: 1px solid rgba(0, 82, 255, 0.3);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  margin-left: 6px;
+}
+
 // ── Invoice Selector ──────────────────────────────────────────────────────────
 .invoice-selector {
   display: flex;

@@ -34,7 +34,6 @@ export interface CreateExpensePayload {
   credit_card_id: number | null;
   is_installment: boolean;
   installments: number;
-  need_pay_vitoria: boolean;
 }
 
 export interface CreditCard {
