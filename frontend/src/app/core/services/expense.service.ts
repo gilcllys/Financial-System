@@ -55,6 +55,20 @@ export class ExpenseService {
     return this.http.delete<void>(`${this.base}/${id}/`);
   }
 
+  bulkCreate(items: CreateExpensePayload[]): Observable<{ success: boolean; created: number; message: string }> {
+    return this.http.post<any>(`${this.base}/bulk-create/`, { items });
+  }
+
+  downloadTemplate(): Observable<Blob> {
+    return this.http.get(`${this.base}/import-template/`, { responseType: 'blob' });
+  }
+
+  importExcel(file: File): Observable<any> {
+    const fd = new FormData();
+    fd.append('file', file);
+    return this.http.post<any>(`${this.base}/import-excel/`, fd);
+  }
+
   deleteInstallments(descriptionPrefix: string, totalInstallments: number): Observable<{ deleted: number }> {
     return this.http.post<{ deleted: number }>(`${this.base}/delete-installments/`, {
       description_prefix: descriptionPrefix,

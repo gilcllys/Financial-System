@@ -12,6 +12,7 @@ from rest_framework.response import Response
 
 from expenses import models, serializer
 from expenses.behaviors import CreateExpenseBehavior
+from catalog.models import ExpenseCategory
 
 # Nomes dos meses em português (índice 0 não utilizado)
 _MONTH_NAMES = [
@@ -146,6 +147,385 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         payload = dict(s.validated_data)
         payload['tenant_id'] = request.user.tenant_id
         return CreateExpenseBehavior(data=payload).run()
+
+    def _create_from_item(self, item: dict, tenant_id):
+        """Cria despesa(s) a partir de um item validado, respeitando
+        quantidade/parcelamento. Retorna a lista de objetos criados."""
+        payload = dict(item)
+        payload['tenant_id'] = tenant_id
+        behavior = CreateExpenseBehavior(data=payload)
+        if behavior.is_installment and behavior.installments > 1:
+            return behavior._create_installments()
+        if behavior.quantity and behavior.quantity > 1:
+            return behavior._create_multiple()
+        return [behavior._create_single()]
+
+    @action(detail=False, methods=['post'], url_path='bulk-create')
+    def bulk_create(self, request):
+        """
+        POST /api/expenses/expenses/bulk-create/
+
+        Cria múltiplos gastos de forma atômica (tudo ou nada). Cada item segue
+        a mesma validação de create-expense (CreateExpenseInputSerializer).
+        """
+        s = serializer.BulkCreateExpenseInputSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        items = s.validated_data['items']
+        tenant = request.user.tenant_id
+
+        # [SEC] Valida propriedade das categorias ANTES de qualquer DML —
+        # impede referenciar categoria de outro tenant.
+        requested_ids = {item['category_id'] for item in items}
+        allowed_ids = set(
+            ExpenseCategory.objects.filter(
+                tenant_id__in=['system', tenant],
+                id__in=requested_ids,
+            ).values_list('id', flat=True)
+        )
+        invalid_ids = sorted(requested_ids - allowed_ids)
+        if invalid_ids:
+            return Response(
+                {
+                    'success': False,
+                    'message': f'Categoria(s) inválida(s): {invalid_ids}',
+                    'invalid_category_ids': invalid_ids,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        created = []
+        try:
+            with transaction.atomic():
+                for item in items:
+                    created.extend(self._create_from_item(item, tenant))
+        except Exception as e:
+            return Response(
+                {'success': False, 'message': f'Erro ao criar gastos em lote: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                'success': True,
+                'created': len(created),
+                'message': f'{len(created)} gasto(s) criado(s) com sucesso',
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=False, methods=['get'], url_path='import-template')
+    def import_template(self, request):
+        """
+        GET /api/expenses/expenses/import-template/
+
+        Retorna um arquivo .xlsx modelo para importação de gastos, com
+        dropdowns de categoria (válidas para o tenant), método de pagamento
+        e parcelado.
+        """
+        import io
+        from openpyxl import Workbook
+        from openpyxl.styles import Font
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.datavalidation import DataValidation
+
+        tenant = request.user.tenant_id
+        categories = list(
+            ExpenseCategory.objects
+            .filter(tenant_id__in=['system', tenant])
+            .order_by('name')
+            .values_list('name', flat=True)
+        )
+
+        headers = [
+            'descricao', 'tipo', 'valor', 'data', 'categoria',
+            'metodo_pagamento', 'quantidade', 'parcelado', 'parcelas',
+        ]
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Gastos'
+
+        bold = Font(bold=True)
+        for col_idx, header in enumerate(headers, start=1):
+            cell = ws.cell(row=1, column=col_idx, value=header)
+            cell.font = bold
+
+        # Linha de exemplo (valor POSITIVO — o sinal vem de `tipo`)
+        sample_category = categories[0] if categories else 'Alimentação'
+        ws.append([
+            'Mercado do mês', 'despesa', 150.00, '2026-08-01', sample_category,
+            'dinheiro', 1, 'nao', 1,
+        ])
+
+        # Larguras razoáveis (9 colunas)
+        widths = [28, 12, 12, 14, 22, 18, 12, 12, 10]
+        for col_idx, width in enumerate(widths, start=1):
+            ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+        ws.freeze_panes = 'A2'
+
+        # Sheet de categorias (fonte para o dropdown)
+        cat_ws = wb.create_sheet('Categorias')
+        cat_ws.cell(row=1, column=1, value='Categorias disponíveis').font = bold
+        for i, name in enumerate(categories, start=2):
+            cat_ws.cell(row=i, column=1, value=name)
+
+        # Colunas: A descricao, B tipo, C valor, D data, E categoria,
+        #          F metodo_pagamento, G quantidade, H parcelado, I parcelas.
+
+        # Dropdown tipo (coluna B)
+        tipo_dv = DataValidation(
+            type='list', formula1='"despesa,receita"', allow_blank=False,
+        )
+        ws.add_data_validation(tipo_dv)
+        tipo_dv.add('B2:B1000')
+
+        # Dropdown de categoria (coluna E). Se não houver categorias, pula.
+        if categories:
+            last = len(categories) + 1
+            cat_dv = DataValidation(
+                type='list',
+                formula1=f'=Categorias!$A$2:$A${last}',
+                allow_blank=True,
+            )
+            ws.add_data_validation(cat_dv)
+            cat_dv.add('E2:E1000')
+
+        # Dropdown método de pagamento (coluna F)
+        pm_dv = DataValidation(
+            type='list', formula1='"dinheiro,cartao"', allow_blank=True,
+        )
+        ws.add_data_validation(pm_dv)
+        pm_dv.add('F2:F1000')
+
+        # Dropdown parcelado (coluna H)
+        parc_dv = DataValidation(
+            type='list', formula1='"sim,nao"', allow_blank=True,
+        )
+        ws.add_data_validation(parc_dv)
+        parc_dv.add('H2:H1000')
+
+        from django.http import HttpResponse
+        bio = io.BytesIO()
+        wb.save(bio)
+        bio.seek(0)
+        resp = HttpResponse(
+            bio.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        resp['Content-Disposition'] = 'attachment; filename="template_gastos.xlsx"'
+        return resp
+
+    @action(detail=False, methods=['post'], url_path='import-excel')
+    def import_excel(self, request):
+        """
+        POST /api/expenses/expenses/import-excel/  (multipart/form-data)
+
+        Importa gastos a partir de um arquivo .xlsx (campo 'file').
+        Semântica tudo-ou-nada: se qualquer linha tiver erro, nada é criado.
+        """
+        from datetime import date as date_cls, datetime
+        from decimal import Decimal, InvalidOperation
+
+        MAX_ROWS = 1000
+
+        upload = request.FILES.get('file')
+        if upload is None:
+            return Response(
+                {'success': False, 'message': 'Arquivo não enviado'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            from openpyxl import load_workbook
+            wb = load_workbook(upload, data_only=True)
+        except Exception:
+            return Response(
+                {'success': False, 'message': 'Arquivo inválido ou corrompido'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ws = wb['Gastos'] if 'Gastos' in wb.sheetnames else wb.active
+
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows:
+            return Response(
+                {'success': False, 'message': 'Planilha vazia'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Mapa header -> índice (resiliente à ordem das colunas)
+        header_row = rows[0]
+        header_map = {}
+        for idx, val in enumerate(header_row):
+            if val is not None:
+                header_map[str(val).strip().lower()] = idx
+
+        required_headers = {'descricao', 'valor', 'data', 'categoria'}
+        missing = required_headers - set(header_map.keys())
+        if missing:
+            return Response(
+                {'success': False, 'message': f'Colunas obrigatórias ausentes: {sorted(missing)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        data_rows = rows[1:]
+        if len(data_rows) > MAX_ROWS:
+            return Response(
+                {'success': False, 'message': f'Número de linhas excede o máximo de {MAX_ROWS}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        tenant = request.user.tenant_id
+        category_map = {
+            c.name.strip(): c.id
+            for c in ExpenseCategory.objects.filter(tenant_id__in=['system', tenant])
+        }
+
+        def get_cell(row, name):
+            idx = header_map.get(name)
+            if idx is None or idx >= len(row):
+                return None
+            return row[idx]
+
+        def parse_date(value):
+            if isinstance(value, datetime):
+                return value.date()
+            if isinstance(value, date_cls):
+                return value
+            s = str(value).strip()
+            for fmt in ('%Y-%m-%d', '%d/%m/%Y'):
+                try:
+                    return datetime.strptime(s, fmt).date()
+                except ValueError:
+                    continue
+            return None
+
+        errors = []
+        parsed_items = []
+
+        for offset, row in enumerate(data_rows):
+            excel_row = offset + 2  # header é linha 1
+            # Ignora linhas totalmente vazias
+            if all(cell is None or str(cell).strip() == '' for cell in row):
+                continue
+
+            row_errors = []
+
+            descricao = get_cell(row, 'descricao')
+            descricao = str(descricao).strip() if descricao is not None else ''
+            if not descricao:
+                row_errors.append('descricao vazia')
+            elif len(descricao) > 255:
+                row_errors.append('descricao excede 255 caracteres')
+
+            valor_raw = get_cell(row, 'valor')
+            amount = None
+            try:
+                amount = Decimal(str(valor_raw).strip().replace(',', '.'))
+            except (InvalidOperation, AttributeError, TypeError):
+                row_errors.append('valor inválido')
+
+            tipo_raw = get_cell(row, 'tipo')
+            tipo = str(tipo_raw).strip().lower() if tipo_raw not in (None, '') else 'despesa'
+            if tipo not in ('despesa', 'receita'):
+                row_errors.append('tipo deve ser despesa/receita')
+
+            # Aplica o sinal a partir do tipo (magnitude absoluta), garantindo
+            # despesa negativa e receita positiva independente do que o usuário digitou.
+            if amount is not None and tipo in ('despesa', 'receita'):
+                amount = abs(amount) if tipo == 'receita' else -abs(amount)
+
+            data_val = parse_date(get_cell(row, 'data'))
+            if data_val is None:
+                row_errors.append('data inválida')
+
+            cat_name = get_cell(row, 'categoria')
+            cat_name = str(cat_name).strip() if cat_name is not None else ''
+            category_id = category_map.get(cat_name)
+            if category_id is None:
+                row_errors.append(f'categoria "{cat_name}" não encontrada')
+
+            pm_raw = get_cell(row, 'metodo_pagamento')
+            payment_method = str(pm_raw).strip().lower() if pm_raw not in (None, '') else 'dinheiro'
+            if payment_method not in ('dinheiro', 'cartao'):
+                row_errors.append('metodo_pagamento inválido')
+
+            qty_raw = get_cell(row, 'quantidade')
+            quantity = 1
+            if qty_raw not in (None, ''):
+                try:
+                    quantity = int(qty_raw)
+                except (ValueError, TypeError):
+                    row_errors.append('quantidade inválida')
+            if quantity < 1:
+                row_errors.append('quantidade deve ser >= 1')
+
+            parc_raw = get_cell(row, 'parcelado')
+            parcelado = str(parc_raw).strip().lower() if parc_raw not in (None, '') else 'nao'
+            if parcelado not in ('sim', 'nao'):
+                row_errors.append('parcelado deve ser sim/nao')
+
+            parcelas_raw = get_cell(row, 'parcelas')
+            parcelas = 1
+            if parcelas_raw not in (None, ''):
+                try:
+                    parcelas = int(parcelas_raw)
+                except (ValueError, TypeError):
+                    row_errors.append('parcelas inválida')
+            if parcelas < 1:
+                row_errors.append('parcelas deve ser >= 1')
+
+            if row_errors:
+                errors.append({'row': excel_row, 'error': '; '.join(row_errors)})
+                continue
+
+            parsed_items.append({
+                'category_id': category_id,
+                'description': descricao,
+                'amount': amount,
+                'date': data_val,
+                'quantity': quantity,
+                'payment_method': payment_method,
+                'is_installment': parcelado == 'sim',
+                'installments': parcelas,
+            })
+
+        if errors:
+            return Response(
+                {
+                    'success': False,
+                    'errors': errors,
+                    'message': f'{len(errors)} linha(s) com erro; nada foi importado',
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not parsed_items:
+            return Response(
+                {'success': False, 'message': 'Nenhuma linha de dados encontrada'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        created = []
+        try:
+            with transaction.atomic():
+                for item in parsed_items:
+                    created.extend(self._create_from_item(item, tenant))
+        except Exception as e:
+            return Response(
+                {'success': False, 'message': f'Erro ao importar gastos: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                'success': True,
+                'created': len(created),
+                'message': f'{len(created)} gasto(s) importado(s) com sucesso',
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=False, methods=['post'], url_path='delete-installments')
     def delete_installments(self, request):
