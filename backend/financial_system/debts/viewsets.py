@@ -1,116 +1,134 @@
-from django.db.models import Count, Q, Sum
-from django.db.models.functions import Abs
-from rest_framework import status, viewsets
+from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
-from debts import models, serializer
+from debts import custom_serializer, serializer
+from debts.behaviors import (
+    BalancesBehavior,
+    CreateSharedDebtBehavior,
+    CreateSharedEntryBehavior,
+    InviteBehavior,
+    JoinSharedDebtBehavior,
+)
+from debts.models import SharedDebt, SharedEntry
 
 
-class VitoriaDebtViewSet(viewsets.ModelViewSet):
-    serializer_class = serializer.VitoriaDebtSerializer
-    queryset = models.VitoriaDebt.objects.all()
+class SharedDebtViewSet(viewsets.ModelViewSet):
+    serializer_class = serializer.SharedDebtSerializer
+    queryset = SharedDebt.objects.all()
 
     def get_queryset(self):
+        # ACESSO por participação (membership), não por posse.
         return (
-            models.VitoriaDebt.objects
-            .filter(tenant_id=self.request.user.tenant_id)
-            # select_related evita N+1 ao acessar expense e category inline
-            .select_related('expense', 'expense__category')
+            SharedDebt.objects
+            .filter(members__tenant_id=self.request.user.tenant_id)
+            .distinct()
             .order_by('-id')
         )
 
-    def perform_create(self, serializer):
-        """
-        Injeta tenant_id e valida ownership da Expense vinculada.
+    def create(self, request, *args, **kwargs):
+        s = custom_serializer.CreateSharedDebtInputSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        return CreateSharedDebtBehavior(dict(s.validated_data), request.user).run()
 
-        [SEC-A01] IDOR: sem esta validação, um usuário poderia criar uma dívida
-        apontando para a Expense de outro tenant (o PrimaryKeyRelatedField aceita
-        qualquer ID válido do banco por padrão).
-        """
-        expense = serializer.validated_data.get('expense')
-        if expense and expense.tenant_id != self.request.user.tenant_id:
-            raise PermissionDenied(
-                "A despesa vinculada não pertence ao usuário autenticado."
+    @action(detail=True, methods=['post'], url_path='invite')
+    def invite(self, request, pk=None):
+        shared_debt = self.get_object()  # já filtra por membership
+        s = custom_serializer.InviteInputSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        return InviteBehavior(shared_debt, request.user, dict(s.validated_data)).run()
+
+    @action(detail=False, methods=['post'], url_path='join')
+    def join(self, request):
+        # NÃO restringe por get_queryset: o usuário ainda não é membro.
+        # O grupo é resolvido pelo token de convite dentro do behavior.
+        s = custom_serializer.JoinSharedDebtInputSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        return JoinSharedDebtBehavior(dict(s.validated_data), request.user).run()
+
+    @action(detail=True, methods=['get'], url_path='balances')
+    def balances(self, request, pk=None):
+        shared_debt = self.get_object()
+        return BalancesBehavior(shared_debt).run()
+
+    @action(detail=True, methods=['get'], url_path='members')
+    def members(self, request, pk=None):
+        shared_debt = self.get_object()
+        members_qs = shared_debt.members.all().order_by('id')
+        data = serializer.SharedDebtMemberSerializer(members_qs, many=True).data
+        return Response(data)
+
+
+class SharedEntryViewSet(viewsets.ModelViewSet):
+    serializer_class = serializer.SharedEntrySerializer
+    queryset = SharedEntry.objects.all()
+
+    def get_queryset(self):
+        qs = (
+            SharedEntry.objects
+            .filter(shared_debt__members__tenant_id=self.request.user.tenant_id)
+            .select_related('paid_by', 'shared_debt', 'credit_card')
+            .distinct()
+            .order_by('-date', '-id')
+        )
+
+        params = self.request.query_params
+
+        raw_shared_debt = params.get('shared_debt')
+        if raw_shared_debt is not None:
+            try:
+                qs = qs.filter(shared_debt_id=int(raw_shared_debt))
+            except (ValueError, TypeError):
+                pass
+
+        raw_credit_card = params.get('credit_card')
+        if raw_credit_card is not None:
+            try:
+                card_id = int(raw_credit_card)
+                # Subseção "shared" da fatura do cartão: apenas entries que o
+                # usuário atual pagou naquele cartão.
+                qs = qs.filter(
+                    credit_card_id=card_id,
+                    paid_by__tenant_id=self.request.user.tenant_id,
+                )
+            except (ValueError, TypeError):
+                pass
+
+        return qs
+
+    def _get_group_as_member(self, shared_debt_id):
+        """Carrega o grupo garantindo que o usuário é membro (else 403)."""
+        group = (
+            SharedDebt.objects
+            .filter(
+                id=shared_debt_id,
+                members__tenant_id=self.request.user.tenant_id,
             )
-        serializer.save(tenant_id=self.request.user.tenant_id)
-
-    def perform_update(self, serializer):
-        """[SEC-A01] Defense-in-depth: garante ownership também em updates."""
-        expense = serializer.validated_data.get('expense')
-        if expense and expense.tenant_id != self.request.user.tenant_id:
+            .distinct()
+            .first()
+        )
+        if group is None:
             raise PermissionDenied(
-                "A despesa vinculada não pertence ao usuário autenticado."
+                "Você não é membro deste grupo de dívida compartilhada."
             )
-        serializer.save(tenant_id=self.request.user.tenant_id)
+        return group
 
-    # ------------------------------------------------------------------
-    # Analytics / helpers
-    # ------------------------------------------------------------------
+    def create(self, request, *args, **kwargs):
+        shared_debt_id = request.data.get('shared_debt')
+        if not shared_debt_id:
+            raise PermissionDenied("O campo 'shared_debt' é obrigatório.")
+        group = self._get_group_as_member(shared_debt_id)
+        s = custom_serializer.CreateSharedEntryInputSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        return CreateSharedEntryBehavior(group, request.user, dict(s.validated_data)).run()
 
     def perform_destroy(self, instance):
-        if instance.tenant_id != self.request.user.tenant_id:
-            raise PermissionDenied("Você não tem permissão para excluir este recurso.")
+        is_member = instance.shared_debt.members.filter(
+            tenant_id=self.request.user.tenant_id,
+        ).exists()
+        if not is_member:
+            raise PermissionDenied(
+                "Você não tem permissão para excluir este recurso."
+            )
         instance.delete()
-
-    @action(detail=False, methods=['get'], url_path='summary')
-    def summary(self, request):
-        """
-        GET /api/debts/vitoria-debts/summary/
-
-        Retorna totais consolidados de dívidas pendentes e pagas do tenant.
-
-        Response:
-          {
-            "total_pending": 450.00,
-            "total_paid":    120.00,
-            "count_pending": 5,
-            "count_paid":    2
-          }
-        """
-        qs = models.VitoriaDebt.objects.filter(
-            tenant_id=request.user.tenant_id,
-        ).select_related('expense')
-
-        agg = qs.aggregate(
-            total_pending=Sum(
-                Abs('expense__amount'),
-                filter=Q(is_paid=False),
-            ),
-            total_paid=Sum(
-                Abs('expense__amount'),
-                filter=Q(is_paid=True),
-            ),
-            count_pending=Count('id', filter=Q(is_paid=False)),
-            count_paid=Count('id', filter=Q(is_paid=True)),
-        )
-
-        data = {
-            'total_pending': round(float(agg['total_pending'] or 0), 2),
-            'total_paid': round(float(agg['total_paid'] or 0), 2),
-            'count_pending': agg['count_pending'],
-            'count_paid': agg['count_paid'],
-        }
-
-        return Response(data, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=['post'], url_path='mark-paid')
-    def mark_paid(self, request, pk=None):
-        """
-        POST /api/debts/vitoria-debts/{id}/mark-paid/
-
-        Marca uma dívida específica do tenant como paga.
-        Não requer body na requisição.
-
-        Response:
-          { "success": true, "message": "Dívida marcada como paga" }
-        """
-        debt = self.get_object()  # já filtra por tenant via get_queryset
-        debt.is_paid = True
-        debt.save(update_fields=['is_paid'])
-
-        return Response(
-            {'success': True, 'message': 'Dívida marcada como paga'},
-            status=status.HTTP_200_OK,
-        )

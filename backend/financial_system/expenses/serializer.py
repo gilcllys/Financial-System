@@ -29,7 +29,6 @@ class CreateExpenseInputSerializer(serializers.Serializer):
     credit_card_id = serializers.IntegerField(required=False, allow_null=True, default=None)
     is_installment = serializers.BooleanField(required=False, default=False)
     installments = serializers.IntegerField(required=False, default=1)
-    need_pay_vitoria = serializers.BooleanField(required=False, default=False)
 
 
 class BulkCreateExpenseInputSerializer(serializers.Serializer):
