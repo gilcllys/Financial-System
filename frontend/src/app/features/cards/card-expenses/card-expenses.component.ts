@@ -31,6 +31,8 @@ const CAT_COLORS = [
   '#af52de', '#5ac8fa', '#ff6b35', '#30b0c7',
 ];
 
+const MONTH_ABBR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
 @Component({
   selector: 'app-card-expenses',
   standalone: true,
@@ -48,10 +50,13 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   @ViewChild('dailyChartCanvas')  dailyCanvas?:  ElementRef<HTMLCanvasElement>;
   @ViewChild('weeklyChartCanvas') weeklyCanvas?: ElementRef<HTMLCanvasElement>;
   @ViewChild('donutChartCanvas')  donutCanvas?:  ElementRef<HTMLCanvasElement>;
+  @ViewChild('monthlyChartCanvas') monthlyCanvas?: ElementRef<HTMLCanvasElement>;
 
   private dailyChart?:  Chart;
   private weeklyChart?: Chart;
   private donutChart?:  Chart;
+  private monthlyChart?: Chart;
+  private readonly installmentRe = /parcela\s+(\d+)\/(\d+)/i;
 
   // ── State signals ──────────────────────────────────────────────────────
   cardId = 0;
@@ -62,6 +67,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   invoiceData        = signal<InvoiceExpensesResponse | null>(null);
   /** Full invoice snapshot (page_size=200, no filters) — used for charts. */
   chartData          = signal<InvoiceExpensesResponse | null>(null);
+  allCardExpenses    = signal<Expense[]>([]);
   loadingInvoices    = signal(true);
   loadingExpenses    = signal(false);
   loadingChart       = signal(false);
@@ -93,6 +99,8 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   });
 
   filteredExpenses  = computed(() => this.invoiceData()?.expenses ?? []);
+  installmentExpenses = computed(() => this.filteredExpenses().filter(e => this.isInstallment(e)));
+  normalExpenses = computed(() => this.filteredExpenses().filter(e => !this.isInstallment(e)));
   filteredTotal     = computed(() => this.invoiceData()?.summary.total ?? 0);
   totalTransactions = computed(() => this.invoiceData()?.summary.count  ?? 0);
 
@@ -156,17 +164,34 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     };
   });
 
+  monthlyChartDataSig = computed(() => {
+    const year = this.selectedInvoice()?.invoice_year ?? new Date().getFullYear();
+    const totals = Array.from({ length: 12 }, () => 0);
+    for (const e of this.allCardExpenses()) {
+      const [expenseYear, expenseMonth] = e.date.split('-').map(Number);
+      if (expenseYear === year && expenseMonth >= 1 && expenseMonth <= 12) {
+        totals[expenseMonth - 1] += Math.abs(e.amount);
+      }
+    }
+    if (!totals.some(total => total > 0)) return null;
+    return {
+      labels: MONTH_ABBR,
+      values: totals.map(total => +total.toFixed(2)),
+    };
+  });
+
   // ── Constructor: effect redraws charts whenever chartData changes ──────
   constructor() {
     effect(() => {
       const daily  = this.dailyChartDataSig();
       const weekly = this.weeklyChartDataSig();
       const donut  = this.donutChartDataSig();
-      if (!daily && !weekly && !donut) {
-        // chartData cleared — destroy stale instances
-        this.dailyChart?.destroy();  this.dailyChart  = undefined;
-        this.weeklyChart?.destroy(); this.weeklyChart = undefined;
-        this.donutChart?.destroy();  this.donutChart  = undefined;
+      const monthly = this.monthlyChartDataSig();
+      if (!daily) { this.dailyChart?.destroy(); this.dailyChart = undefined; }
+      if (!weekly) { this.weeklyChart?.destroy(); this.weeklyChart = undefined; }
+      if (!donut) { this.donutChart?.destroy(); this.donutChart = undefined; }
+      if (!monthly) { this.monthlyChart?.destroy(); this.monthlyChart = undefined; }
+      if (!daily && !weekly && !donut && !monthly) {
         return;
       }
       // setTimeout(50): lets @if(chartData()) re-render the canvases before we paint
@@ -174,6 +199,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
         if (daily)  this.renderDailyChart(daily);
         if (weekly) this.renderWeeklyChart(weekly);
         if (donut)  this.renderDonutChart(donut);
+        if (monthly) this.renderMonthlyChart(monthly);
       }, 50);
     });
   }
@@ -182,6 +208,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.cardId = +this.route.snapshot.paramMap.get('id')!;
     this.cardSvc.get(this.cardId).subscribe({ next: c => this.card.set(c) });
+    this.cardSvc.getAllCardExpenses(this.cardId).subscribe({ next: e => this.allCardExpenses.set(e) });
     this.cardSvc.getInvoices(this.cardId).subscribe({
       next: invoices => {
         this.invoices.set(invoices);
@@ -213,6 +240,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     this.dailyChart?.destroy();
     this.weeklyChart?.destroy();
     this.donutChart?.destroy();
+    this.monthlyChart?.destroy();
   }
 
   // ── User actions ───────────────────────────────────────────────────────
@@ -408,6 +436,46 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     });
   }
 
+  private renderMonthlyChart(data: { labels: string[]; values: number[] }): void {
+    this.monthlyChart?.destroy();
+    const canvas = this.monthlyCanvas?.nativeElement;
+    if (!canvas) return;
+    this.monthlyChart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          label: 'Gastos (R$)',
+          data: data.values,
+          backgroundColor: 'rgba(0,82,255,0.70)',
+          borderRadius: 5,
+          borderSkipped: false,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` ${this.formatAmount(ctx.parsed.y ?? 0)}` } },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(0,0,0,0.05)' },
+            ticks: {
+              font: { size: 11 },
+              callback: v => new Intl.NumberFormat('pt-BR', {
+                style: 'currency', currency: 'BRL', maximumFractionDigits: 0,
+              }).format(+v),
+            },
+          },
+        },
+      },
+    });
+  }
+
   // ── Formatters ─────────────────────────────────────────────────────────
   formatAmount(amount: number): string {
     return new Intl.NumberFormat('pt-BR', {
@@ -428,6 +496,13 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   }
 
   roundPct(value: number): number { return Math.round(value); }
+
+  isInstallment(e: Expense): boolean { return this.installmentRe.test(e.description); }
+
+  installmentBadge(e: Expense): string | null {
+    const m = this.installmentRe.exec(e.description);
+    return m ? `${m[1]}/${m[2]}` : null;
+  }
 
   catColor(index: number): string { return CAT_COLORS[index % CAT_COLORS.length]; }
 }

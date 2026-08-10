@@ -75,6 +75,20 @@
         }
       </div>
     </div>
+
+    <div class="chart-card">
+      <div class="chart-card__header">
+        <h2 class="chart-card__title">💵 Gastos em Dinheiro — Por Categoria</h2>
+        <p class="chart-card__subtitle">Distribuição dos gastos em dinheiro</p>
+      </div>
+      <div class="chart-card__body chart-card__body--donut">
+        @if (cashCategoryData().length === 0) {
+          <div class="empty-chart">Sem gastos em dinheiro neste período</div>
+        } @else {
+          <canvas #cashCategoryChart></canvas>
+        }
+      </div>
+    </div>
   </div>
 
   <!-- Gráfico 4: Gasto Diário -->

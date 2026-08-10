@@ -29,16 +29,18 @@ export class AnalyticsService {
   private http = inject(HttpClient);
   private base = `${environment.apiBaseUrl}/api/expenses/expenses/analytics`;
 
-  monthly(year?: number): Observable<MonthlyAnalytics[]> {
+  monthly(year?: number, paymentMethod?: string): Observable<MonthlyAnalytics[]> {
     let params = new HttpParams();
     if (year) params = params.set('year', year);
+    if (paymentMethod) params = params.set('payment_method', paymentMethod);
     return this.http.get<MonthlyAnalytics[]>(`${this.base}/monthly/`, { params });
   }
 
-  byCategory(month?: number, year?: number): Observable<CategoryAnalytics[]> {
+  byCategory(month?: number, year?: number, paymentMethod?: string): Observable<CategoryAnalytics[]> {
     let params = new HttpParams();
     if (month) params = params.set('month', month);
     if (year) params = params.set('year', year);
+    if (paymentMethod) params = params.set('payment_method', paymentMethod);
     return this.http.get<CategoryAnalytics[]>(`${this.base}/by-category/`, { params });
   }
 
@@ -49,18 +51,20 @@ export class AnalyticsService {
     return this.http.get<CardAnalytics[]>(`${this.base}/by-card/`, { params });
   }
 
-  daily(month?: number, year?: number): Observable<DailyAnalytics[]> {
+  daily(month?: number, year?: number, paymentMethod?: string): Observable<DailyAnalytics[]> {
     let params = new HttpParams();
     if (month) params = params.set('month', month);
     if (year) params = params.set('year', year);
+    if (paymentMethod) params = params.set('payment_method', paymentMethod);
     return this.http.get<DailyAnalytics[]>(`${this.base}/daily/`, { params });
   }
 
   /** Endpoint otimizado — retorna todos os dados da tela Home em 1 request */
-  homeCharts(month?: number, year?: number): Observable<HomeCharts> {
+  homeCharts(month?: number, year?: number, paymentMethod?: string): Observable<HomeCharts> {
     let params = new HttpParams();
     if (month) params = params.set('month', month);
     if (year) params = params.set('year', year);
+    if (paymentMethod) params = params.set('payment_method', paymentMethod);
     return this.http.get<HomeCharts>(
       `${environment.apiBaseUrl}/api/expenses/expenses/home-charts/`, { params }
     );

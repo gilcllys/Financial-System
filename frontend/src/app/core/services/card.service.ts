@@ -3,7 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
-import { CreditCard, CreateCreditCardPayload, Invoice, InvoiceExpensesResponse } from '../models';
+import { CreditCard, CreateCreditCardPayload, Expense, Invoice, InvoiceExpensesResponse } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class CardService {
@@ -34,6 +34,14 @@ export class CardService {
     return this.http.get<Invoice[]>(`${this.base}/${id}/invoices/`, {
       params: { count: count.toString() }
     });
+  }
+
+  getAllCardExpenses(cardId: number): Observable<Expense[]> {
+    return this.http.get<Expense[]>(
+      `${environment.apiBaseUrl}/api/expenses/expenses/per-credit-card/${cardId}/`
+    ).pipe(
+      map(list => list.map(e => ({ ...e, amount: parseFloat(e.amount as any) })))
+    );
   }
 
   getInvoiceExpenses(

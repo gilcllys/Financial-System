@@ -21,6 +21,15 @@ _MONTH_NAMES = [
 ]
 
 
+def _apply_payment_method_filter(qs, params, model):
+    payment_method = params.get('payment_method')
+    if payment_method is not None:
+        valid_choices = {choice[0] for choice in model.PAYMENT_METHOD_CHOICES}
+        if payment_method in valid_choices:
+            qs = qs.filter(payment_method=payment_method)
+    return qs
+
+
 class ExpensePagination(PageNumberPagination):
     """
     Paginação padrão para o endpoint de expenses.
@@ -224,19 +233,26 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         saldo e quantidade de lançamentos.
 
         Query params:
-          - year (int, default=ano atual)
+          - year           (int, default=ano atual)
+          - payment_method (str, opcional) "dinheiro" | "cartao"
         """
         today = date.today()
+        params = request.query_params
         try:
-            year = int(request.query_params.get('year', today.year))
+            year = int(params.get('year', today.year))
             if year <= 0:
                 raise ValueError
         except (ValueError, TypeError):
             year = today.year
 
+        qs = models.Expense.objects.filter(
+            tenant_id=request.user.tenant_id,
+            date__year=year,
+        )
+        qs = _apply_payment_method_filter(qs, params, models.Expense)
+
         rows = (
-            models.Expense.objects
-            .filter(tenant_id=request.user.tenant_id, date__year=year)
+            qs
             .annotate(month_num=ExtractMonth('date'))
             .values('month_num')
             .annotate(
@@ -274,14 +290,16 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         amount < 0), ordenadas por total decrescente.
 
         Query params:
-          - month (int 1-12, opcional)
-          - year  (int, opcional)
+          - month          (int 1-12, opcional)
+          - year           (int, opcional)
+          - payment_method (str, opcional) "dinheiro" | "cartao"
         """
         params = request.query_params
         qs = models.Expense.objects.filter(
             tenant_id=request.user.tenant_id,
             amount__lt=0,
         )
+        qs = _apply_payment_method_filter(qs, params, models.Expense)
 
         raw_month = params.get('month')
         if raw_month is not None:
@@ -401,8 +419,9 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         dia (receitas e despesas somadas em valor absoluto).
 
         Query params:
-          - month (int 1-12, default=mês atual)
-          - year  (int, default=ano atual)
+          - month          (int 1-12, default=mês atual)
+          - year           (int, default=ano atual)
+          - payment_method (str, opcional) "dinheiro" | "cartao"
         """
         today = date.today()
         params = request.query_params
@@ -421,13 +440,15 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         except (ValueError, TypeError):
             year = today.year
 
+        qs = models.Expense.objects.filter(
+            tenant_id=request.user.tenant_id,
+            date__year=year,
+            date__month=month,
+        )
+        qs = _apply_payment_method_filter(qs, params, models.Expense)
+
         rows = (
-            models.Expense.objects
-            .filter(
-                tenant_id=request.user.tenant_id,
-                date__year=year,
-                date__month=month,
-            )
+            qs
             .values('date')
             .annotate(
                 total=Sum(Abs('amount')),
@@ -465,6 +486,11 @@ class ExpenseViewSet(viewsets.ModelViewSet):
           - daily: gasto por dia do mês (bar chart)
           - weekly: gasto agrupado por semana 1-4 (line chart)
 
+        Query params:
+          - month          (int 1-12, default=mês atual)
+          - year           (int, default=ano atual)
+          - payment_method (str, opcional) "dinheiro" | "cartao"
+
         Usa apenas 2 queries ao banco (category group + daily group).
         """
         import calendar as cal_module
@@ -492,6 +518,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             date__year=year,
             date__month=month,
         )
+        base_qs = _apply_payment_method_filter(base_qs, params, models.Expense)
 
         # ── Query 1: agrupamento por categoria (apenas despesas) ──────────
         cat_rows = (
