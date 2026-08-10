@@ -22,6 +22,16 @@ export const routes: Routes = [
           import('./features/expenses/expense-form/expense-form.component').then(m => m.ExpenseFormComponent),
       },
       {
+        path: 'expenses/batch',
+        loadComponent: () =>
+          import('./features/expenses/expense-batch/expense-batch.component').then(m => m.ExpenseBatchComponent),
+      },
+      {
+        path: 'expenses/import',
+        loadComponent: () =>
+          import('./features/expenses/expense-import/expense-import.component').then(m => m.ExpenseImportComponent),
+      },
+      {
         path: 'expenses/:id/edit',
         loadComponent: () =>
           import('./features/expenses/expense-form/expense-form.component').then(m => m.ExpenseFormComponent),

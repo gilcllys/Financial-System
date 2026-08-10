@@ -32,6 +32,10 @@ class CreateExpenseInputSerializer(serializers.Serializer):
     need_pay_vitoria = serializers.BooleanField(required=False, default=False)
 
 
+class BulkCreateExpenseInputSerializer(serializers.Serializer):
+    items = CreateExpenseInputSerializer(many=True, allow_empty=False)
+
+
 class DeleteInstallmentsInputSerializer(serializers.Serializer):
     description_prefix = serializers.CharField(
         required=True,

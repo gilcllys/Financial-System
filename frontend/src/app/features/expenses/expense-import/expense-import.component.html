@@ -1,0 +1,67 @@
+<div class="page-header">
+  <div class="page-header__left">
+    <h1 class="page-header__title">Importar Excel</h1>
+    <p class="page-header__subtitle">Importe vários gastos de uma planilha</p>
+  </div>
+  <a routerLink="/expenses" class="btn btn--secondary btn--sm">← Voltar</a>
+</div>
+
+<div class="card">
+  <ol class="import-instructions">
+    <li>Baixe o template abaixo e preencha as linhas com seus gastos.</li>
+    <li>Na coluna <strong>tipo</strong>, informe <strong>despesa</strong> ou <strong>receita</strong>.</li>
+    <li>Em <strong>valor</strong>, use sempre um número <strong>positivo</strong> — o sinal é aplicado automaticamente pelo sistema conforme o tipo (despesa → negativo, receita → positivo).</li>
+    <li>Use a lista suspensa de categorias da planilha para evitar erros de digitação.</li>
+    <li>É tudo ou nada: se qualquer linha tiver erro, nada é importado.</li>
+  </ol>
+
+  <div class="import-actions">
+    <button type="button" class="btn btn--secondary" (click)="downloadTemplate()">⬇️ Baixar template (.xlsx)</button>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label class="form-label" for="file">Planilha preenchida (.xlsx)</label>
+      <input id="file" class="form-input" type="file" accept=".xlsx" (change)="onFileSelected($event)"
+        aria-label="Selecionar planilha para importar" />
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button type="button" class="btn btn--primary" [disabled]="!file() || importing()" (click)="importFile()">
+      @if (importing()) { <span class="spinner"></span> } 📤 Importar
+    </button>
+  </div>
+</div>
+
+@if (successCount() !== null) {
+  <div class="card success-box" role="status" aria-live="polite">
+    <p>✅ {{ successCount() }} gasto(s) importado(s) com sucesso.</p>
+    <a routerLink="/expenses" class="btn btn--primary btn--sm">Ver gastos</a>
+  </div>
+}
+
+@if (errorMessage()) {
+  <div class="form-error-box" role="alert">{{ errorMessage() }}</div>
+}
+
+@if (rowErrors().length > 0) {
+  <div class="data-table-wrapper" aria-label="Erros por linha">
+    <table class="data-table" role="table">
+      <thead>
+        <tr>
+          <th scope="col">Linha</th>
+          <th scope="col">Erro</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (e of rowErrors(); track e.row) {
+          <tr>
+            <td class="mono">{{ e.row }}</td>
+            <td>{{ e.error }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
