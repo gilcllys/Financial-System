@@ -75,7 +75,7 @@ class CreditCardViewSet(viewsets.ModelViewSet):
         if err:
             return err
         page_size, err = self._parse_int_param(
-            request.query_params.get('page_size'), 'page_size', required=False, min_val=1, max_val=100,
+            request.query_params.get('page_size'), 'page_size', required=False, min_val=1, max_val=500,
         )
         if err:
             return err
