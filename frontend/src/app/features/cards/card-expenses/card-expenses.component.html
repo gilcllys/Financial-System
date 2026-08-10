@@ -77,6 +77,9 @@
     <div class="chart-card chart-card--placeholder chart-card--donut">
       <span class="spinner"></span>
     </div>
+    <div class="chart-card chart-card--placeholder">
+      <span class="spinner"></span>
+    </div>
   </div>
 } @else if (chartData()) {
   <div class="charts-grid" aria-label="Gráficos de gastos da fatura">
@@ -98,6 +101,19 @@
       <h2 class="chart-card__title">Top 5 Categorias</h2>
       <div class="chart-card__body">
         <canvas #donutChartCanvas aria-label="Gráfico de categorias por valor" role="img"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h2 class="chart-card__title">Gasto Mensal — {{ selectedInvoice()?.invoice_year }}</h2>
+      <div class="chart-card__body">
+        @if (monthlyChartDataSig()) {
+          <canvas #monthlyChartCanvas aria-label="Gráfico de gastos mensais" role="img"></canvas>
+        } @else {
+          <div class="empty-state" style="height:100%;display:flex;align-items:center;justify-content:center">
+            Sem dados mensais
+          </div>
+        }
       </div>
     </div>
   </div>
@@ -229,7 +245,49 @@
           </tr>
         </thead>
         <tbody>
-          @for (e of filteredExpenses(); track e.id) {
+          @if (installmentExpenses().length) {
+            <tr><td colspan="5" class="table-subheader">🔁 Parcelados · {{ installmentExpenses().length }}</td></tr>
+          }
+          @for (e of installmentExpenses(); track e.id) {
+            <tr>
+              <td style="font-weight: 500">
+                {{ e.description }}
+                @if (installmentBadge(e); as badge) {
+                  <span class="badge--installment">{{ badge }}</span>
+                }
+              </td>
+              <td>
+                @if (e.category) {
+                  <span class="badge badge--system">{{ e.category.name }}</span>
+                } @else {
+                  <span class="text-muted" style="font-size:13px">—</span>
+                }
+              </td>
+              <td class="mono text-muted" style="font-size: 13px; white-space: nowrap">
+                {{ formatDateFull(e.date) }}
+              </td>
+              <td class="text-right">
+                <span class="value-down mono">{{ formatAmount(e.amount) }}</span>
+              </td>
+              <td class="text-right" style="display:flex;gap:6px;justify-content:flex-end">
+                <a
+                  [routerLink]="['/expenses', e.id, 'edit']"
+                  class="btn btn--secondary btn--sm"
+                  aria-label="Editar {{ e.description }}"
+                >✏️ Editar</a>
+                <button
+                  class="btn btn--danger btn--sm"
+                  (click)="deleteExpense(e)"
+                  aria-label="Excluir {{ e.description }}"
+                  type="button"
+                >🗑️</button>
+              </td>
+            </tr>
+          }
+          @if (normalExpenses().length) {
+            <tr><td colspan="5" class="table-subheader">💳 Gastos normais · {{ normalExpenses().length }}</td></tr>
+          }
+          @for (e of normalExpenses(); track e.id) {
             <tr>
               <td style="font-weight: 500">{{ e.description }}</td>
               <td>

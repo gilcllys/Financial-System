@@ -18,6 +18,7 @@ export class AnalyticsComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('monthlyChart') monthlyChartRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('categoryChart') categoryChartRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('cardChart') cardChartRef!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('cashCategoryChart') cashCategoryChartRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('dailyChart') dailyChartRef!: ElementRef<HTMLCanvasElement>;
 
   private charts: Chart[] = [];
@@ -29,6 +30,8 @@ export class AnalyticsComponent implements OnInit, OnDestroy, AfterViewInit {
   monthlyData = signal<MonthlyAnalytics[]>([]);
   categoryData = signal<CategoryAnalytics[]>([]);
   cardData = signal<CardAnalytics[]>([]);
+  cashCategoryData = signal<CategoryAnalytics[]>([]);
+  cashDailyData = signal<DailyAnalytics[]>([]);
   dailyData = signal<DailyAnalytics[]>([]);
 
   years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
@@ -66,12 +69,14 @@ export class AnalyticsComponent implements OnInit, OnDestroy, AfterViewInit {
   loadAll(): void {
     this.loading.set(true);
     this.dataReady = false;
-    let pending = 4;
+    let pending = 6;
     const done = () => { if (--pending === 0) { this.dataReady = true; this.loading.set(false); if (this.viewReady) this.renderCharts(); } };
 
     this.analyticsService.monthly(this.selectedYear()).subscribe({ next: d => { this.monthlyData.set(d); done(); }, error: () => done() });
     this.analyticsService.byCategory(this.selectedMonth(), this.selectedYear()).subscribe({ next: d => { this.categoryData.set(d); done(); }, error: () => done() });
     this.analyticsService.byCard(this.selectedMonth(), this.selectedYear()).subscribe({ next: d => { this.cardData.set(d); done(); }, error: () => done() });
+    this.analyticsService.byCategory(this.selectedMonth(), this.selectedYear(), 'dinheiro').subscribe({ next: d => { this.cashCategoryData.set(d); done(); }, error: () => done() });
+    this.analyticsService.daily(this.selectedMonth(), this.selectedYear(), 'dinheiro').subscribe({ next: d => { this.cashDailyData.set(d); done(); }, error: () => done() });
     this.analyticsService.daily(this.selectedMonth(), this.selectedYear()).subscribe({ next: d => { this.dailyData.set(d); done(); }, error: () => done() });
   }
 
@@ -88,6 +93,7 @@ export class AnalyticsComponent implements OnInit, OnDestroy, AfterViewInit {
       this.renderMonthly();
       this.renderCategory();
       this.renderCard();
+      this.renderCashCategory();
       this.renderDaily();
     }, 50);
   }
@@ -150,6 +156,28 @@ export class AnalyticsComponent implements OnInit, OnDestroy, AfterViewInit {
         indexAxis: 'y', responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `R$ ${(ctx.parsed.x ?? 0).toFixed(2)}` } } },
         scales: { x: { ticks: { callback: v => `R$ ${v}` } } },
+      },
+    }));
+  }
+
+  private renderCashCategory(): void {
+    const ctx = this.cashCategoryChartRef?.nativeElement;
+    if (!ctx) return;
+    const data = this.cashCategoryData();
+    if (!data.length) return;
+    const colors = ['#05b169','#0052ff','#cf202f','#f4b000','#7c828a','#16181c','#a8acb3','#dee1e6','#eef0f3','#5b616e'];
+    this.charts.push(new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: data.map(d => d.category_name),
+        datasets: [{ data: data.map(d => d.total), backgroundColor: colors.slice(0, data.length), borderWidth: 2, borderColor: '#fff' }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right' },
+          tooltip: { callbacks: { label: ctx => `${ctx.label}: R$ ${(ctx.parsed as number).toFixed(2)} (${data[ctx.dataIndex].percentage.toFixed(1)}%)` } },
+        },
       },
     }));
   }

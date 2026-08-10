@@ -53,11 +53,6 @@
       }
     </select>
   }
-  <select class="form-select" [ngModel]="filterPayment()" (ngModelChange)="filterPayment.set($event); onFilterChange()" aria-label="Método">
-    <option value="">Todos os métodos</option>
-    <option value="dinheiro">💵 Dinheiro</option>
-    <option value="cartao">💳 Cartão</option>
-  </select>
 </div>
 
 <!-- Resumo -->
@@ -84,30 +79,6 @@
 
 <!-- Conteúdo -->
 
-<!-- Mini-gráficos (somente na tela Gastos, não Histórico/Sem Categoria) -->
-@if (!historyMode && !uncategorizedMode) {
-  <div class="home-charts">
-    <div class="home-chart-card">
-      <h3 class="home-chart-card__title">🏷️ Por Categoria</h3>
-      <div class="home-chart-card__body">
-        <canvas #categoryChart></canvas>
-      </div>
-    </div>
-    <div class="home-chart-card">
-      <h3 class="home-chart-card__title">📅 Gasto Diário</h3>
-      <div class="home-chart-card__body">
-        <canvas #dailyChart></canvas>
-      </div>
-    </div>
-    <div class="home-chart-card">
-      <h3 class="home-chart-card__title">📆 Gasto por Semana</h3>
-      <div class="home-chart-card__body">
-        <canvas #weeklyChart></canvas>
-      </div>
-    </div>
-  </div>
-}
-
 @if (loading()) {
   <div class="loading-wrapper" aria-live="polite">
     <span class="spinner"></span> Carregando gastos...
@@ -127,7 +98,6 @@
           <th scope="col">Descrição</th>
           <th scope="col">Categoria</th>
           <th scope="col">Data</th>
-          <th scope="col">Método</th>
           <th scope="col" class="text-right">Valor</th>
           <th scope="col">Ações</th>
         </tr>
@@ -142,11 +112,6 @@
               <span class="badge">{{ categoryName(e.category_id) }}</span>
             </td>
             <td class="mono text-muted">{{ e.date | slice:8:10 }}/{{ e.date | slice:5:7 }}/{{ e.date | slice:0:4 }}</td>
-            <td>
-              <span class="badge" [class.badge--primary]="e.payment_method === 'cartao'">
-                {{ e.payment_method === 'cartao' ? '💳 Cartão' : '💵 Dinheiro' }}
-              </span>
-            </td>
             <td class="text-right">
               <span [class]="amountClass(e.amount)" class="mono">
                 {{ amountPrefix(e.amount) }} {{ formatAmount(e.amount) }}

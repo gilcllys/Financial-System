@@ -1,19 +1,14 @@
 import {
-  Component, OnInit, OnDestroy, AfterViewInit,
-  inject, signal, computed, ViewChild, ElementRef
+  Component, OnInit, OnDestroy,
+  inject, signal, computed
 } from '@angular/core';
 import { RouterLink, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
 import { ExpenseService } from '../../../core/services/expense.service';
 import { CategoryService } from '../../../core/services/category.service';
-import { AnalyticsService, HomeCharts } from '../../../core/services/analytics.service';
 import { SlicePipe } from '@angular/common';
 import { Expense, ExpenseCategory, PaymentMethod } from '../../../core/models';
-import { Chart, registerables } from 'chart.js';
-
-Chart.register(...registerables);
-
 const MONTH_NAMES = [
   'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
@@ -26,25 +21,15 @@ const MONTH_NAMES = [
   templateUrl: './expense-list.component.html',
   styleUrls: ['./expense-list.component.scss'],
 })
-export class ExpenseListComponent implements OnInit, OnDestroy, AfterViewInit {
+export class ExpenseListComponent implements OnInit, OnDestroy {
   private expenseService = inject(ExpenseService);
   private categoryService = inject(CategoryService);
-  private analyticsService = inject(AnalyticsService);
   private route = inject(ActivatedRoute);
 
   historyMode = false;
   uncategorizedMode = false;
   private destroy$ = new Subject<void>();
   private searchSubject = new Subject<string>();
-  private chartsReady = false;
-  private dataReady = false;
-
-  // Chart refs
-  @ViewChild('categoryChart') categoryChartRef!: ElementRef<HTMLCanvasElement>;
-  @ViewChild('dailyChart')    dailyChartRef!: ElementRef<HTMLCanvasElement>;
-  @ViewChild('weeklyChart')   weeklyChartRef!: ElementRef<HTMLCanvasElement>;
-  private charts: Chart[] = [];
-
   expenses = signal<Expense[]>([]);
   categories = signal<ExpenseCategory[]>([]);
   loading = signal(true);
@@ -59,7 +44,7 @@ export class ExpenseListComponent implements OnInit, OnDestroy, AfterViewInit {
   filterMonth = signal(0);
   filterYear = signal(new Date().getFullYear());
   filterCategory = signal<number | ''>('');
-  filterPayment = signal<PaymentMethod | ''>('');
+  filterPayment = signal<PaymentMethod | ''>('dinheiro');
   searchTerm = signal('');
 
   // Mês atual para exibição
@@ -104,15 +89,7 @@ export class ExpenseListComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loadExpenses();
   }
 
-  ngAfterViewInit(): void {
-    this.chartsReady = true;
-    if (this.dataReady && !this.historyMode && !this.uncategorizedMode) {
-      this.renderCharts();
-    }
-  }
-
   ngOnDestroy(): void {
-    this.charts.forEach(c => c.destroy());
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -132,92 +109,8 @@ export class ExpenseListComponent implements OnInit, OnDestroy, AfterViewInit {
         this.expenses.set(res.results);
         this.totalCount.set(res.count);
         this.loading.set(false);
-        if (!this.historyMode && !this.uncategorizedMode) {
-          this.dataReady = true;
-          if (this.chartsReady) this.renderCharts();
-        }
       },
       error: () => this.loading.set(false),
-    });
-  }
-
-  private renderCharts(): void {
-    this.charts.forEach(c => c.destroy());
-    this.charts = [];
-
-    const month = this.filterMonth() || new Date().getMonth() + 1;
-    const year = this.filterYear();
-
-    // Uma única chamada ao backend — endpoint otimizado home-charts
-    this.analyticsService.homeCharts(month, year).subscribe(data => {
-      // 1) Por categoria (doughnut)
-      if (this.categoryChartRef && data.by_category.length) {
-        const ctx = this.categoryChartRef.nativeElement.getContext('2d')!;
-        this.charts.push(new Chart(ctx, {
-          type: 'doughnut',
-          data: {
-            labels: data.by_category.map(d => d.category_name),
-            datasets: [{
-              data: data.by_category.map(d => d.total),
-              backgroundColor: ['#0052FF','#1DB954','#FF6B35','#9B59B6','#E74C3C','#F39C12','#1ABC9C','#3498DB','#E67E22','#2ECC71','#E91E63','#607D8B'],
-            }]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } }
-          }
-        }));
-      }
-
-      // 2) Gasto diário (bar)
-      if (this.dailyChartRef) {
-        const activeDays = data.daily.filter(d => d.total > 0);
-        const ctx = this.dailyChartRef.nativeElement.getContext('2d')!;
-        this.charts.push(new Chart(ctx, {
-          type: 'bar',
-          data: {
-            labels: activeDays.map(d => `Dia ${d.day}`),
-            datasets: [{
-              label: 'Gasto (R$)',
-              data: activeDays.map(d => d.total),
-              backgroundColor: '#0052FF88',
-              borderColor: '#0052FF',
-              borderWidth: 1,
-            }]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { callback: (v: any) => `R$${v}` } } }
-          }
-        }));
-      }
-
-      // 3) Gasto por semana (line)
-      if (this.weeklyChartRef) {
-        const ctx = this.weeklyChartRef.nativeElement.getContext('2d')!;
-        this.charts.push(new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: data.weekly.map(w => w.label),
-            datasets: [{
-              label: 'Gasto (R$)',
-              data: data.weekly.map(w => w.total),
-              borderColor: '#0052FF',
-              backgroundColor: '#0052FF22',
-              fill: true,
-              tension: 0.4,
-              pointRadius: 5,
-              pointBackgroundColor: '#0052FF',
-            }]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { callback: (v: any) => `R$${v}` } } }
-          }
-        }));
-      }
     });
   }
 
