@@ -137,7 +137,8 @@
           <a class="group-card" [routerLink]="['/shared-debts', g.id]">
             <div class="group-card__info">
               <span class="group-card__name">{{ g.name }}</span>
-              @if (groupHint(g); as hint) {
+              @let hint = groupHint(g);
+              @if (hint !== null) {
                 <span class="group-card__hint" [class.value-up]="hint > 0" [class.value-down]="hint < 0">
                   @if (hint > 0) { A receber {{ formatCurrency(hint) }} }
                   @else if (hint < 0) { A pagar {{ formatCurrency(hint) }} }
