@@ -270,3 +270,71 @@ class BalancesBehaviorTests(TestCase):
         self.assertEqual(settlement[0]['from_member_id'], bob.id)
         self.assertEqual(settlement[0]['to_member_id'], alice.id)
         self.assertEqual(settlement[0]['amount'], 50.0)
+
+
+class PersonalSummaryBehaviorTests(TestCase):
+    def setUp(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from catalog.models import ExpenseCategory
+        from expenses.models import Expense
+
+        self.Expense = Expense
+        self.user = _make_user(tenant_id='pers-1')
+        self.today = timezone.localdate()
+        self.category = ExpenseCategory.objects.first() or ExpenseCategory.objects.create(
+            name='Geral'
+        )
+
+        def _mk(description, amount, date, payment_method='dinheiro'):
+            return Expense.objects.create(
+                tenant_id='pers-1',
+                category=self.category,
+                description=description,
+                quantity=1,
+                amount=amount,
+                date=date,
+                payment_method=payment_method,
+            )
+
+        # Future installment → counted in installments_remaining.
+        _mk('Celular - Parcela 3/10', -100, self.today + timedelta(days=5))
+        # Past installment → excluded from installments_remaining.
+        _mk('Notebook - Parcela 2/6', -200, self.today - timedelta(days=5))
+        # Current-month card expense → counted in card_current_month.
+        _mk('Mercado', -50, self.today, payment_method='cartao')
+        # Current-month dinheiro expense → excluded from card_current_month.
+        _mk('Padaria', -30, self.today, payment_method='dinheiro')
+        # Other tenant's data → never counted.
+        Expense.objects.create(
+            tenant_id='other-tenant',
+            category=self.category,
+            description='Outro - Parcela 1/2',
+            quantity=1,
+            amount=-999,
+            date=self.today + timedelta(days=1),
+            payment_method='cartao',
+        )
+
+    def test_personal_summary_aggregates(self):
+        from debts.behaviors import PersonalSummaryBehavior
+
+        resp = PersonalSummaryBehavior(self.user).run()
+        self.assertEqual(resp.status_code, 200)
+
+        data = resp.data
+        # Only the future installment (abs 100) counts.
+        self.assertEqual(data['installments_remaining']['count'], 1)
+        self.assertEqual(data['installments_remaining']['total'], 100.0)
+        # Only the current-month card expense (abs 50) counts.
+        self.assertEqual(data['card_current_month']['count'], 1)
+        self.assertEqual(data['card_current_month']['total'], 50.0)
+
+    def test_empty_tenant_returns_zeroes(self):
+        from debts.behaviors import PersonalSummaryBehavior
+
+        resp = PersonalSummaryBehavior(_make_user(tenant_id='no-data')).run()
+        self.assertEqual(resp.data, {
+            'installments_remaining': {'total': 0.0, 'count': 0},
+            'card_current_month': {'total': 0.0, 'count': 0},
+        })

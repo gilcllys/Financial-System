@@ -1,6 +1,8 @@
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import transaction
+from django.db.models import Count, Sum
+from django.db.models.functions import Abs
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
@@ -18,6 +20,7 @@ from debts.serializer import (
     SharedDebtSerializer,
     SharedEntrySerializer,
 )
+from expenses.models import Expense
 
 # Epsilon usado no algoritmo de acerto (settlement) — valores abaixo disso são
 # tratados como "quitados".
@@ -315,3 +318,59 @@ class BalancesBehavior:
                 debtors.pop(0)
 
         return settlement
+
+
+class PersonalSummaryBehavior:
+    """
+    Agrega as "Dívidas Pessoais" do usuário autenticado (sem tabelas novas):
+
+      - installments_remaining: parcelas futuras ainda devidas
+        (descrição casa 'parcela N/N' e date >= hoje).
+      - card_current_month: gastos no cartão dentro do mês/ano corrente
+        (proxy da fatura atual).
+
+    Ambos os agregados são escopados por tenant_id e usam Abs() para lidar
+    com a convenção de sinal das despesas.
+    """
+
+    # Padrão do formato gerado por CreateExpenseBehavior ("... Parcela X/Y").
+    _INSTALLMENT_REGEX = r'parcela\s+\d+/\d+'
+
+    def __init__(self, user):
+        self.user = user
+
+    def run(self) -> Response:
+        today = timezone.localdate()
+
+        installments = (
+            Expense.objects
+            .filter(
+                tenant_id=self.user.tenant_id,
+                description__iregex=self._INSTALLMENT_REGEX,
+                date__gte=today,
+            )
+            .aggregate(total=Sum(Abs('amount')), count=Count('id'))
+        )
+
+        card = (
+            Expense.objects
+            .filter(
+                tenant_id=self.user.tenant_id,
+                payment_method='cartao',
+                date__year=today.year,
+                date__month=today.month,
+            )
+            .aggregate(total=Sum(Abs('amount')), count=Count('id'))
+        )
+
+        data = {
+            'installments_remaining': {
+                'total': round(float(installments['total'] or 0), 2),
+                'count': installments['count'] or 0,
+            },
+            'card_current_month': {
+                'total': round(float(card['total'] or 0), 2),
+                'count': card['count'] or 0,
+            },
+        }
+        return Response(data, status=status.HTTP_200_OK)

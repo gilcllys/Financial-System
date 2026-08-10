@@ -2,6 +2,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from debts import custom_serializer, serializer
 from debts.behaviors import (
@@ -10,6 +11,7 @@ from debts.behaviors import (
     CreateSharedEntryBehavior,
     InviteBehavior,
     JoinSharedDebtBehavior,
+    PersonalSummaryBehavior,
 )
 from debts.models import SharedDebt, SharedEntry
 
@@ -132,3 +134,15 @@ class SharedEntryViewSet(viewsets.ModelViewSet):
                 "Você não tem permissão para excluir este recurso."
             )
         instance.delete()
+
+
+class PersonalSummaryView(APIView):
+    """
+    GET /api/debts/personal-summary/
+
+    Alimenta o bloco "Dívidas Pessoais" do frontend com os agregados
+    pessoais do usuário autenticado. Thin: delega ao behavior.
+    """
+
+    def get(self, request):
+        return PersonalSummaryBehavior(request.user).run()
