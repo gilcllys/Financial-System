@@ -107,3 +107,56 @@
   color: #0052ff;
   border: 1px solid rgba(0, 82, 255, 0.3);
 }
+
+/* <fieldset> was showing the native browser border + cramped legend.
+   Reset it so it behaves like the other .form-group blocks. */
+fieldset.form-group {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+fieldset.form-group > legend.form-label {
+  float: none;
+  width: auto;
+  padding: 0;
+  margin-bottom: 6px;
+  display: block;
+}
+
+/* Payment-method radios styled as pills, matching the participant chips. */
+.radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.radio-option {
+  display: inline-flex;
+  cursor: pointer;
+
+  input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .radio-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--rounded-md);
+    font-size: 14px;
+    user-select: none;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  input:checked + .radio-btn {
+    border-color: var(--color-accent, #0052ff);
+    background: rgba(0, 82, 255, 0.06);
+    font-weight: 600;
+  }
+  input:focus-visible + .radio-btn {
+    outline: 2px solid var(--color-accent, #0052ff);
+    outline-offset: 2px;
+  }
+}
