@@ -210,17 +210,6 @@
         </div>
       </div>
 
-      <!-- Need pay Vitoria toggle -->
-      <div class="form-row">
-        <label class="toggle-label" for="need_pay_vitoria">
-          <span class="toggle-text">Marcar para pagar para Vitória?</span>
-          <span class="toggle-switch" role="switch" [attr.aria-checked]="form.value.need_pay_vitoria">
-            <input type="checkbox" id="need_pay_vitoria" formControlName="need_pay_vitoria" />
-            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-          </span>
-        </label>
-      </div>
-
       <!-- Error message -->
       @if (errorMessage()) {
         <div class="form-error-box" role="alert">{{ errorMessage() }}</div>

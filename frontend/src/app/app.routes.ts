@@ -135,12 +135,23 @@ export const routes: Routes = [
           import('./features/analytics/analytics.component').then(m => m.AnalyticsComponent),
       },
 
-      // Vitória Debts
+      // Shared Debts (Dívida Compartilhada)
       {
-        path: 'vitoria',
+        path: 'shared-debts',
         loadComponent: () =>
-          import('./features/vitoria/vitoria.component').then(m => m.VitoriaComponent),
+          import('./features/shared-debts/shared-debts-list/shared-debts-list.component').then(m => m.SharedDebtsListComponent),
       },
+      {
+        path: 'shared-debts/join/:token',
+        loadComponent: () =>
+          import('./features/shared-debts/shared-debt-join/shared-debt-join.component').then(m => m.SharedDebtJoinComponent),
+      },
+      {
+        path: 'shared-debts/:id',
+        loadComponent: () =>
+          import('./features/shared-debts/shared-debt-detail/shared-debt-detail.component').then(m => m.SharedDebtDetailComponent),
+      },
+      { path: 'vitoria', redirectTo: 'shared-debts', pathMatch: 'full' },
 
     ],
   },

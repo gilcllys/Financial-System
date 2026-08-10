@@ -1,0 +1,37 @@
+<div class="page-header">
+  <div class="page-header__left">
+    <h1 class="page-header__title">👥 Entrar no grupo</h1>
+    <p class="page-header__subtitle">Você foi convidado para um grupo de despesas compartilhadas</p>
+  </div>
+</div>
+
+<div class="card join-card">
+  @if (errorMessage()) {
+    <div class="form-error-box" role="alert">{{ errorMessage() }}</div>
+    <div class="form-actions">
+      <a routerLink="/shared-debts" class="btn btn--secondary">Ver meus grupos</a>
+    </div>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="join()" novalidate aria-label="Entrar no grupo">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="displayName">Seu nome no grupo (opcional)</label>
+          <input
+            id="displayName"
+            class="form-input"
+            type="text"
+            formControlName="displayName"
+            placeholder="Ex: Ana"
+            autocomplete="name"
+          />
+          <span class="form-hint">Como você aparecerá para os outros membros.</span>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn--primary" [disabled]="joining()">
+          @if (joining()) { <span class="spinner"></span> } Entrar no grupo
+        </button>
+      </div>
+    </form>
+  }
+</div>

@@ -1,0 +1,127 @@
+<div class="page-header">
+  <div class="page-header__left">
+    <h1 class="page-header__title">👥 Dívida Compartilhada</h1>
+    <p class="page-header__subtitle">Seus grupos de despesas divididas</p>
+  </div>
+  <button class="btn btn--primary btn--sm" type="button" (click)="toggleForm()">
+    {{ showForm() ? '✕ Fechar' : '＋ Novo grupo' }}
+  </button>
+</div>
+
+@if (showForm()) {
+  <div class="card" style="margin-bottom: var(--space-lg)">
+    <form [formGroup]="form" (ngSubmit)="create()" novalidate aria-label="Novo grupo">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="name">Nome do grupo *</label>
+          <input
+            id="name"
+            class="form-input"
+            [class.error]="hasError('name')"
+            type="text"
+            formControlName="name"
+            placeholder="Ex: Casa, Viagem, Casal"
+            autocomplete="off"
+          />
+          @if (hasError('name')) {
+            <span class="form-error" role="alert">Nome é obrigatório (mín. 2 caracteres).</span>
+          }
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="memberNames">Membros (opcional)</label>
+          <input
+            id="memberNames"
+            class="form-input"
+            type="text"
+            formControlName="memberNames"
+            placeholder="Nomes separados por vírgula: Ana, João"
+            autocomplete="off"
+          />
+          <span class="form-hint">Membros extras além de você. Você pode convidar depois.</span>
+        </div>
+      </div>
+      @if (errorMessage()) {
+        <div class="form-error-box" role="alert">{{ errorMessage() }}</div>
+      }
+      <div class="form-actions">
+        <button type="submit" class="btn btn--primary" [disabled]="creating()">
+          @if (creating()) { <span class="spinner"></span> } Criar grupo
+        </button>
+      </div>
+    </form>
+  </div>
+}
+
+@if (loading()) {
+  <div class="loading-wrapper" aria-live="polite"><span class="spinner"></span> Carregando...</div>
+} @else {
+
+  <!-- ── Visão consolidada ────────────────────────────────────────────────── -->
+  <section class="consolidated" aria-label="Visão consolidada">
+    <h2 class="section-title">Visão consolidada</h2>
+    <div class="consolidated__grid">
+
+      <!-- Dívidas Pessoais (minimal) -->
+      <div class="card consolidated__block">
+        <h3 class="consolidated__block-title">💳 Dívidas Pessoais</h3>
+        <div class="empty-state" style="padding: var(--space-base)">
+          <p class="empty-state__text">Em breve — acompanhe aqui suas dívidas pessoais.</p>
+        </div>
+      </div>
+
+      <!-- Dívidas Compartilhadas -->
+      <div class="card consolidated__block">
+        <h3 class="consolidated__block-title">👥 Dívidas Compartilhadas</h3>
+        @if (consolidated().length === 0) {
+          <div class="empty-state" style="padding: var(--space-base)">
+            <p class="empty-state__text">Tudo quitado! Nenhuma pendência entre você e seus grupos.</p>
+          </div>
+        } @else {
+          <ul class="net-list">
+            @for (c of consolidated(); track c.name) {
+              <li class="net-list__item">
+                @if (c.net < 0) {
+                  <span>Você deve <strong class="value-down mono">{{ formatCurrency(c.net) }}</strong> para {{ c.name }}</span>
+                } @else {
+                  <span><strong>{{ c.name }}</strong> te deve <strong class="value-up mono">{{ formatCurrency(c.net) }}</strong></span>
+                }
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Grupos ───────────────────────────────────────────────────────────── -->
+  <section aria-label="Grupos">
+    <h2 class="section-title">Meus grupos</h2>
+    @if (groups().length === 0) {
+      <div class="empty-state">
+        <div class="empty-state__icon">👥</div>
+        <p class="empty-state__title">Nenhum grupo ainda</p>
+        <p class="empty-state__text">Crie um grupo para começar a dividir despesas.</p>
+      </div>
+    } @else {
+      <div class="group-list">
+        @for (g of groups(); track g.id) {
+          <a class="group-card" [routerLink]="['/shared-debts', g.id]">
+            <div class="group-card__info">
+              <span class="group-card__name">{{ g.name }}</span>
+              @if (groupHint(g); as hint) {
+                <span class="group-card__hint" [class.value-up]="hint > 0" [class.value-down]="hint < 0">
+                  @if (hint > 0) { A receber {{ formatCurrency(hint) }} }
+                  @else if (hint < 0) { A pagar {{ formatCurrency(hint) }} }
+                  @else { Quitado }
+                </span>
+              }
+            </div>
+            <span class="group-card__arrow" aria-hidden="true">›</span>
+          </a>
+        }
+      </div>
+    }
+  </section>
+}

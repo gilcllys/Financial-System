@@ -16,6 +16,7 @@ import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 import { Chart, registerables } from 'chart.js';
 import { CardService } from '../../../core/services/card.service';
 import { ExpenseService } from '../../../core/services/expense.service';
+import { SharedDebtService, SharedDebtEntry } from '../../../core/services/shared-debt.service';
 import {
   CreditCard,
   Expense,
@@ -44,6 +45,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   private route      = inject(ActivatedRoute);
   private cardSvc    = inject(CardService);
   private expenseSvc = inject(ExpenseService);
+  private sharedSvc  = inject(SharedDebtService);
   private destroy$   = new Subject<void>();
 
   // ── Canvas refs (static:false — canvases live inside @if blocks) ──────
@@ -68,6 +70,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   /** Full invoice snapshot (page_size=200, no filters) — used for charts. */
   chartData          = signal<InvoiceExpensesResponse | null>(null);
   allCardExpenses    = signal<Expense[]>([]);
+  sharedEntries      = signal<SharedDebtEntry[]>([]);
   loadingInvoices    = signal(true);
   loadingExpenses    = signal(false);
   loadingChart       = signal(false);
@@ -209,6 +212,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     this.cardId = +this.route.snapshot.paramMap.get('id')!;
     this.cardSvc.get(this.cardId).subscribe({ next: c => this.card.set(c) });
     this.cardSvc.getAllCardExpenses(this.cardId).subscribe({ next: e => this.allCardExpenses.set(e) });
+    this.sharedSvc.listEntries({ credit_card: this.cardId }).subscribe({ next: e => this.sharedEntries.set(e) });
     this.cardSvc.getInvoices(this.cardId).subscribe({
       next: invoices => {
         this.invoices.set(invoices);
