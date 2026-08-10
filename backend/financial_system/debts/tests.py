@@ -282,8 +282,9 @@ class PersonalSummaryBehaviorTests(TestCase):
         self.Expense = Expense
         self.user = _make_user(tenant_id='pers-1')
         self.today = timezone.localdate()
-        self.category = ExpenseCategory.objects.first() or ExpenseCategory.objects.create(
-            name='Geral'
+        self.category = ExpenseCategory.objects.create(
+            tenant_id='pers-1',
+            name='Geral',
         )
 
         def _mk(description, amount, date, payment_method='dinheiro'):
