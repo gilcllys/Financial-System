@@ -63,12 +63,39 @@
     <h2 class="section-title">Visão consolidada</h2>
     <div class="consolidated__grid">
 
-      <!-- Dívidas Pessoais (minimal) -->
+      <!-- Dívidas Pessoais -->
       <div class="card consolidated__block">
         <h3 class="consolidated__block-title">💳 Dívidas Pessoais</h3>
-        <div class="empty-state" style="padding: var(--space-base)">
-          <p class="empty-state__text">Em breve — acompanhe aqui suas dívidas pessoais.</p>
-        </div>
+        @if (personal(); as p) {
+          <ul class="personal-list">
+            <li class="personal-list__item">
+              <span class="personal-list__label">
+                Parcelamentos a vencer
+                <span class="personal-list__count">{{ p.installments_remaining.count }} item(s)</span>
+              </span>
+              <span class="personal-list__value value-down mono">
+                {{ formatCurrency(p.installments_remaining.total) }}
+              </span>
+            </li>
+            <li class="personal-list__item">
+              <span class="personal-list__label">
+                Cartão (mês atual)
+                <span class="personal-list__count">{{ p.card_current_month.count }} item(s)</span>
+              </span>
+              <span class="personal-list__value value-down mono">
+                {{ formatCurrency(p.card_current_month.total) }}
+              </span>
+            </li>
+          </ul>
+        } @else if (personalError()) {
+          <div class="empty-state" style="padding: var(--space-base)">
+            <p class="empty-state__text">— Não foi possível carregar suas dívidas pessoais.</p>
+          </div>
+        } @else {
+          <div class="loading-wrapper" style="padding: var(--space-base)" aria-live="polite">
+            <span class="spinner"></span> Carregando...
+          </div>
+        }
       </div>
 
       <!-- Dívidas Compartilhadas -->

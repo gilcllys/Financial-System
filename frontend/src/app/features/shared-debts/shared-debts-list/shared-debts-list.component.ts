@@ -8,6 +8,7 @@ import {
   SharedDebtService,
   SharedDebtGroup,
   BalancesResponse,
+  PersonalSummary,
 } from '../../../core/services/shared-debt.service';
 
 interface CounterpartSummary {
@@ -31,6 +32,8 @@ export class SharedDebtsListComponent implements OnInit {
 
   groups = signal<SharedDebtGroup[]>([]);
   balancesByGroup = signal<Map<number, BalancesResponse>>(new Map());
+  personal = signal<PersonalSummary | null>(null);
+  personalError = signal(false);
   loading = signal(true);
   showForm = signal(false);
   creating = signal(false);
@@ -87,6 +90,15 @@ export class SharedDebtsListComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.loadPersonal();
+  }
+
+  private loadPersonal(): void {
+    this.personalError.set(false);
+    this.svc.personalSummary().subscribe({
+      next: p => this.personal.set(p),
+      error: () => { this.personal.set(null); this.personalError.set(true); },
+    });
   }
 
   private load(): void {

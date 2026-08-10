@@ -77,6 +77,11 @@ export interface CreateEntryPayload {
   credit_card_id?: number | null;
 }
 
+export interface PersonalSummary {
+  installments_remaining: { total: number; count: number };
+  card_current_month: { total: number; count: number };
+}
+
 @Injectable({ providedIn: 'root' })
 export class SharedDebtService {
   private http = inject(HttpClient);
@@ -134,5 +139,10 @@ export class SharedDebtService {
 
   deleteEntry(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/shared-entries/${id}/`);
+  }
+
+  // ─── Personal debts summary ─────────────────────────────────────────────
+  personalSummary(): Observable<PersonalSummary> {
+    return this.http.get<PersonalSummary>(`${this.base}/personal-summary/`);
   }
 }
