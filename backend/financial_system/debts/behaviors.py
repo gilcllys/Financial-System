@@ -228,6 +228,132 @@ class CreateSharedEntryBehavior:
         )
 
 
+class UpdateSharedEntryBehavior:
+    """
+    Atualiza uma despesa compartilhada existente e ressincroniza participantes.
+
+    Regras idênticas ao create:
+    - paid_by precisa ser membro do grupo da entrada (shared_debt imutável).
+    - participant_ids (se fornecidos) precisam pertencer ao grupo.
+    - Para PUT (partial=False) sem participant_ids → usa todos os membros.
+    - Para PATCH (partial=True) sem participant_ids → mantém participantes atuais.
+    - credit_card_id (se informado e não-nulo) deve pertencer ao tenant autenticado.
+    - payment_method='dinheiro' força credit_card a null.
+    """
+
+    def __init__(self, entry: SharedEntry, user, data: dict, partial: bool = False):
+        self.entry = entry
+        self.user = user
+        self.data = data
+        self.partial = partial
+
+    def _member_ids(self):
+        return set(self.entry.shared_debt.members.values_list('id', flat=True))
+
+    def run(self) -> Response:
+        entry = self.entry
+        data = self.data
+        member_ids = self._member_ids()
+
+        # -- paid_by validation --
+        paid_by_id = data.get('paid_by', entry.paid_by_id if self.partial else None)
+        if paid_by_id is None:
+            return Response(
+                {'success': False, 'message': 'O campo paid_by é obrigatório.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if paid_by_id not in member_ids:
+            return Response(
+                {'success': False, 'message': 'paid_by não é membro deste grupo.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # -- participant_ids validation / resolution --
+        # An empty list is treated the same as "not provided":
+        # - PUT  → default to all members of the group.
+        # - PATCH → keep the existing participant set unchanged.
+        raw_participants = data.get('participant_ids') or None  # [] → None
+        if raw_participants is not None:
+            participant_ids = list(dict.fromkeys(raw_participants))
+            invalid = [pid for pid in participant_ids if pid not in member_ids]
+            if invalid:
+                return Response(
+                    {
+                        'success': False,
+                        'message': 'participant_ids contém membros de fora do grupo.',
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            replace_participants = True
+        elif self.partial:
+            # PATCH without participant_ids → keep existing participants unchanged.
+            participant_ids = None
+            replace_participants = False
+        else:
+            # Full PUT without participant_ids → default to all members.
+            participant_ids = list(member_ids)
+            replace_participants = True
+
+        if replace_participants and not participant_ids:
+            return Response(
+                {'success': False, 'message': 'Grupo sem participantes válidos.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # -- payment_method / credit_card --
+        payment_method = data.get(
+            'payment_method', entry.payment_method if self.partial else 'dinheiro'
+        )
+        credit_card_id = data.get('credit_card_id', entry.credit_card_id if self.partial else None)
+
+        # payment_method='dinheiro' clears credit_card.
+        if payment_method == 'dinheiro':
+            credit_card_id = None
+
+        # [SEC-A01] IDOR guard.
+        if credit_card_id is not None:
+            owns_card = CreditCard.objects.filter(
+                id=credit_card_id,
+                tenant_id=self.user.tenant_id,
+            ).exists()
+            if not owns_card:
+                return Response(
+                    {
+                        'success': False,
+                        'message': 'O cartão informado não pertence ao usuário autenticado.',
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        with transaction.atomic():
+            # Update scalar fields.
+            if 'description' in data or not self.partial:
+                entry.description = data.get('description', entry.description)
+            if 'amount' in data or not self.partial:
+                entry.amount = data.get('amount', entry.amount)
+            if 'date' in data or not self.partial:
+                entry.date = data.get('date', entry.date)
+            entry.paid_by_id = paid_by_id
+            entry.payment_method = payment_method
+            entry.credit_card_id = credit_card_id
+            entry.save()
+
+            # Re-sync participants only when requested.
+            if replace_participants:
+                entry.participants.all().delete()
+                SharedEntryParticipant.objects.bulk_create(
+                    [
+                        SharedEntryParticipant(entry=entry, member_id=mid)
+                        for mid in participant_ids
+                    ]
+                )
+
+        return Response(
+            SharedEntrySerializer(entry).data,
+            status=status.HTTP_200_OK,
+        )
+
+
 class BalancesBehavior:
     """Calcula saldos por membro e o plano de acerto (quem paga quem)."""
 

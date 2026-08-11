@@ -137,6 +137,10 @@ export class SharedDebtService {
     return this.http.post<SharedDebtEntry>(`${this.base}/shared-entries/`, payload);
   }
 
+  updateEntry(id: number, payload: Partial<CreateEntryPayload>): Observable<SharedDebtEntry> {
+    return this.http.patch<SharedDebtEntry>(`${this.base}/shared-entries/${id}/`, payload);
+  }
+
   deleteEntry(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/shared-entries/${id}/`);
   }

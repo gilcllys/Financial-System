@@ -9,6 +9,7 @@ from debts.behaviors import (
     CreateSharedEntryBehavior,
     InviteBehavior,
     JoinSharedDebtBehavior,
+    UpdateSharedEntryBehavior,
     _round2,
 )
 from debts.models import (
@@ -418,3 +419,191 @@ class SharedDebtDeleteEndpointTests(TestCase):
         resp = self.other_client.delete(f'/api/debts/shared-debts/{self.group_id}/')
         self.assertEqual(resp.status_code, 403)
         self.assertTrue(SharedDebt.objects.filter(id=self.group_id).exists())
+
+
+# ---------------------------------------------------------------------------
+# Regression tests: SharedEntry UPDATE endpoint (PUT / PATCH)
+# ---------------------------------------------------------------------------
+
+class SharedEntryUpdateEndpointTests(TestCase):
+    """
+    Tests for UpdateSharedEntryBehavior + SharedEntryViewSet.update().
+
+    Any member of the group can perform PUT or PATCH on an entry.
+    """
+
+    def _principal(self, sub, email='x@x.com', given_name='User', family_name='X'):
+        from financial_system.authentication import KeycloakPrincipal
+        return KeycloakPrincipal({
+            'sub': sub, 'email': email,
+            'given_name': given_name, 'family_name': family_name,
+        })
+
+    def _client(self, principal):
+        from rest_framework.test import APIClient
+        c = APIClient()
+        c.force_authenticate(user=principal)
+        return c
+
+    def setUp(self):
+        # Owner and non-owner member principals.
+        self.owner_p = self._principal('owner-u', email='owner@e.com', given_name='Owner')
+        self.member_p = self._principal('member-u', email='member@e.com', given_name='Member')
+        self.outsider_p = self._principal('outsider', email='out@e.com', given_name='Out')
+
+        self.owner_c = self._client(self.owner_p)
+        self.member_c = self._client(self.member_p)
+        self.outsider_c = self._client(self.outsider_p)
+
+        # Create group as owner.
+        resp = self.owner_c.post('/api/debts/shared-debts/', {'name': 'Trip', 'member_names': []}, format='json')
+        self.assertEqual(resp.status_code, 201)
+        self.group_id = resp.data['id']
+
+        # Invite + join the member.
+        inv = self.owner_c.post(f'/api/debts/shared-debts/{self.group_id}/invite/', {'expires_at': None}, format='json')
+        self.assertEqual(inv.status_code, 201)
+        join = self.member_c.post('/api/debts/shared-debts/join/', {'token': inv.data['invite_token'], 'display_name': ''}, format='json')
+        self.assertEqual(join.status_code, 200)
+
+        group = SharedDebt.objects.get(id=self.group_id)
+        self.owner_member = group.members.get(tenant_id='owner-u')
+        self.member_member = group.members.get(tenant_id='member-u')
+
+        # Create an initial entry (paid by owner, all members participate).
+        resp_e = self.owner_c.post('/api/debts/shared-entries/', {
+            'shared_debt': self.group_id,
+            'description': 'Dinner',
+            'amount': '100.00',
+            'date': '2026-01-01',
+            'paid_by': self.owner_member.id,
+            'participant_ids': [],
+            'payment_method': 'dinheiro',
+            'credit_card_id': None,
+        }, format='json')
+        self.assertEqual(resp_e.status_code, 201)
+        self.entry_id = resp_e.data['id']
+
+    def _put_payload(self, **overrides):
+        data = {
+            'shared_debt': self.group_id,
+            'description': 'Dinner Updated',
+            'amount': '120.00',
+            'date': '2026-01-02',
+            'paid_by': self.owner_member.id,
+            'participant_ids': [],
+            'payment_method': 'dinheiro',
+            'credit_card_id': None,
+        }
+        data.update(overrides)
+        return data
+
+    # --- Happy path: non-owner member can PUT ---
+    def test_non_owner_member_can_put_entry(self):
+        payload = self._put_payload(description='Updated by member', amount='150.00', paid_by=self.member_member.id)
+        resp = self.member_c.put(f'/api/debts/shared-entries/{self.entry_id}/', payload, format='json')
+        self.assertEqual(resp.status_code, 200, resp.data)
+        entry = SharedEntry.objects.get(id=self.entry_id)
+        self.assertEqual(entry.description, 'Updated by member')
+        self.assertEqual(entry.amount, Decimal('150.00'))
+        self.assertEqual(entry.paid_by_id, self.member_member.id)
+
+    # --- Happy path: owner can PUT ---
+    def test_owner_can_put_entry(self):
+        payload = self._put_payload(amount='200.00')
+        resp = self.owner_c.put(f'/api/debts/shared-entries/{self.entry_id}/', payload, format='json')
+        self.assertEqual(resp.status_code, 200, resp.data)
+        self.assertEqual(SharedEntry.objects.get(id=self.entry_id).amount, Decimal('200.00'))
+
+    # --- Happy path: PATCH a single field ---
+    def test_member_can_patch_description(self):
+        resp = self.member_c.patch(f'/api/debts/shared-entries/{self.entry_id}/', {'description': 'Patched!'}, format='json')
+        self.assertEqual(resp.status_code, 200, resp.data)
+        self.assertEqual(SharedEntry.objects.get(id=self.entry_id).description, 'Patched!')
+
+    def test_member_can_patch_amount(self):
+        resp = self.member_c.patch(f'/api/debts/shared-entries/{self.entry_id}/', {'amount': '77.00'}, format='json')
+        self.assertEqual(resp.status_code, 200, resp.data)
+        self.assertEqual(SharedEntry.objects.get(id=self.entry_id).amount, Decimal('77.00'))
+
+    # --- PATCH without participant_ids leaves participants unchanged ---
+    def test_patch_without_participant_ids_preserves_participants(self):
+        before = set(SharedEntryParticipant.objects.filter(entry_id=self.entry_id).values_list('member_id', flat=True))
+        resp = self.member_c.patch(f'/api/debts/shared-entries/{self.entry_id}/', {'amount': '88.00'}, format='json')
+        self.assertEqual(resp.status_code, 200)
+        after = set(SharedEntryParticipant.objects.filter(entry_id=self.entry_id).values_list('member_id', flat=True))
+        self.assertEqual(before, after)
+
+    # --- PUT with explicit participant_ids re-syncs participants ---
+    def test_put_resyncs_participants(self):
+        payload = self._put_payload(participant_ids=[self.owner_member.id])
+        resp = self.owner_c.put(f'/api/debts/shared-entries/{self.entry_id}/', payload, format='json')
+        self.assertEqual(resp.status_code, 200)
+        pids = set(SharedEntryParticipant.objects.filter(entry_id=self.entry_id).values_list('member_id', flat=True))
+        self.assertEqual(pids, {self.owner_member.id})
+
+    # --- Validation: paid_by non-member → 400 ---
+    def test_put_paid_by_non_member_returns_400(self):
+        payload = self._put_payload(paid_by=99999)
+        resp = self.owner_c.put(f'/api/debts/shared-entries/{self.entry_id}/', payload, format='json')
+        self.assertEqual(resp.status_code, 400)
+
+    # --- Validation: participant_ids with non-member → 400 ---
+    def test_put_participant_non_member_returns_400(self):
+        payload = self._put_payload(participant_ids=[99999])
+        resp = self.owner_c.put(f'/api/debts/shared-entries/{self.entry_id}/', payload, format='json')
+        self.assertEqual(resp.status_code, 400)
+
+    # --- Auth: non-member gets 403/404 ---
+    def test_non_member_update_returns_403_or_404(self):
+        payload = self._put_payload()
+        resp = self.outsider_c.put(f'/api/debts/shared-entries/{self.entry_id}/', payload, format='json')
+        self.assertIn(resp.status_code, [403, 404])
+
+    # --- IDOR: credit_card of another tenant → 400 ---
+    def test_credit_card_idor_on_update(self):
+        from cards.models import CreditCard
+        card = CreditCard.objects.create(
+            tenant_id='evil-tenant',
+            name='Evil Card',
+            due_date=5,
+            best_purchase_date=1,
+            last_four_digits='9999',
+        )
+        payload = self._put_payload(payment_method='cartao', credit_card_id=card.id)
+        resp = self.owner_c.put(f'/api/debts/shared-entries/{self.entry_id}/', payload, format='json')
+        self.assertEqual(resp.status_code, 400)
+        # Entry must remain unchanged.
+        self.assertEqual(SharedEntry.objects.get(id=self.entry_id).credit_card_id, None)
+
+    # --- Business rule: payment_method='dinheiro' clears credit_card ---
+    def test_switching_to_dinheiro_clears_credit_card(self):
+        from cards.models import CreditCard
+        card = CreditCard.objects.create(
+            tenant_id='owner-u',
+            name='My Card',
+            due_date=10,
+            best_purchase_date=1,
+            last_four_digits='1111',
+        )
+        # First set cartao.
+        payload = self._put_payload(payment_method='cartao', credit_card_id=card.id)
+        resp = self.owner_c.put(f'/api/debts/shared-entries/{self.entry_id}/', payload, format='json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(SharedEntry.objects.get(id=self.entry_id).credit_card_id, card.id)
+
+        # Then switch back to dinheiro.
+        payload2 = self._put_payload(payment_method='dinheiro', credit_card_id=card.id)
+        resp2 = self.owner_c.put(f'/api/debts/shared-entries/{self.entry_id}/', payload2, format='json')
+        self.assertEqual(resp2.status_code, 200)
+        self.assertIsNone(SharedEntry.objects.get(id=self.entry_id).credit_card_id)
+
+    # --- Entry amount/participants persist correctly (balance regression) ---
+    def test_entry_persists_after_update(self):
+        payload = self._put_payload(amount='300.00', participant_ids=[self.member_member.id])
+        resp = self.owner_c.put(f'/api/debts/shared-entries/{self.entry_id}/', payload, format='json')
+        self.assertEqual(resp.status_code, 200)
+        entry = SharedEntry.objects.get(id=self.entry_id)
+        self.assertEqual(entry.amount, Decimal('300.00'))
+        pids = set(SharedEntryParticipant.objects.filter(entry=entry).values_list('member_id', flat=True))
+        self.assertEqual(pids, {self.member_member.id})
