@@ -21,7 +21,7 @@ export class AuthService {
         onLoad: 'login-required',
         pkceMethod: 'S256',
         checkLoginIframe: false,
-        redirectUri: window.location.origin,
+        redirectUri: window.location.href, // preserva path+query no round-trip de login do Keycloak (deep-links como /shared-debts/join/:token)
       });
       this._initialized = true;
 
