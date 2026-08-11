@@ -12,6 +12,7 @@ from debts.behaviors import (
     InviteBehavior,
     JoinSharedDebtBehavior,
     PersonalSummaryBehavior,
+    UpdateSharedEntryBehavior,
 )
 from debts.models import SharedDebt, SharedEntry
 
@@ -150,6 +151,23 @@ class SharedEntryViewSet(viewsets.ModelViewSet):
                 "Você não tem permissão para excluir este recurso."
             )
         instance.delete()
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        entry = self.get_object()  # enforces membership via get_queryset() + 404
+        # Explicit membership re-check (any member may edit).
+        is_member = entry.shared_debt.members.filter(
+            tenant_id=request.user.tenant_id,
+        ).exists()
+        if not is_member:
+            raise PermissionDenied(
+                "Você não tem permissão para editar esta despesa."
+            )
+        s = custom_serializer.CreateSharedEntryInputSerializer(
+            data=request.data, partial=partial
+        )
+        s.is_valid(raise_exception=True)
+        return UpdateSharedEntryBehavior(entry, request.user, dict(s.validated_data), partial=partial).run()
 
 
 class PersonalSummaryView(APIView):
