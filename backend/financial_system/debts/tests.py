@@ -339,3 +339,82 @@ class PersonalSummaryBehaviorTests(TestCase):
             'installments_remaining': {'total': 0.0, 'count': 0},
             'card_current_month': {'total': 0.0, 'count': 0},
         })
+
+
+# ---------------------------------------------------------------------------
+# Regression tests: SharedDebt DELETE endpoint (bug: HTTP 500 ProtectedError)
+# ---------------------------------------------------------------------------
+
+class SharedDebtDeleteEndpointTests(TestCase):
+    """
+    Regression: deleting a SharedDebt group that has entries used to return
+    HTTP 500 because SharedEntry.paid_by has on_delete=PROTECT pointing to
+    SharedDebtMember. The fix (perform_destroy) deletes entries first.
+    """
+
+    def _principal(self, sub, email='x@x.com', given_name='User', family_name='X'):
+        from financial_system.authentication import KeycloakPrincipal
+        return KeycloakPrincipal({'sub': sub, 'email': email,
+                                  'given_name': given_name, 'family_name': family_name})
+
+    def _make_client(self, principal):
+        from rest_framework.test import APIClient
+        client = APIClient()
+        client.force_authenticate(user=principal)
+        return client
+
+    def setUp(self):
+        self.owner = self._principal('owner-1', email='owner@e.com', given_name='Owner')
+        self.other = self._principal('other-2', email='other@e.com', given_name='Other')
+        self.owner_client = self._make_client(self.owner)
+        self.other_client = self._make_client(self.other)
+
+        # Create a group as owner.
+        resp = self.owner_client.post('/api/debts/shared-debts/', {
+            'name': 'Viagem', 'member_names': []
+        }, format='json')
+        self.assertEqual(resp.status_code, 201, resp.data)
+        self.group_id = resp.data['id']
+
+        # Add an entry (this is what used to trigger ProtectedError on delete).
+        group = SharedDebt.objects.get(id=self.group_id)
+        owner_member = group.members.get(tenant_id='owner-1')
+        resp_entry = self.owner_client.post('/api/debts/shared-entries/', {
+            'shared_debt': self.group_id,
+            'description': 'Jantar',
+            'amount': '60.00',
+            'date': '2026-01-01',
+            'paid_by': owner_member.id,
+            'participant_ids': [],
+            'payment_method': 'dinheiro',
+            'credit_card_id': None,
+        }, format='json')
+        self.assertEqual(resp_entry.status_code, 201, resp_entry.data)
+
+    def test_owner_can_delete_group_with_entries_returns_204(self):
+        """Bug regression: must return 204, not 500 (ProtectedError)."""
+        resp = self.owner_client.delete(f'/api/debts/shared-debts/{self.group_id}/')
+        self.assertEqual(resp.status_code, 204)
+        self.assertFalse(SharedDebt.objects.filter(id=self.group_id).exists())
+        # Entries and members must also be gone.
+        self.assertEqual(SharedEntry.objects.filter(shared_debt_id=self.group_id).count(), 0)
+        self.assertEqual(SharedDebtMember.objects.filter(shared_debt_id=self.group_id).count(), 0)
+
+    def test_non_owner_member_delete_returns_403_group_intact(self):
+        """A member who is not the owner must receive 403 and the group must survive."""
+        # Let the other user join the group first.
+        invite_resp = self.owner_client.post(
+            f'/api/debts/shared-debts/{self.group_id}/invite/', {'expires_at': None}, format='json'
+        )
+        self.assertEqual(invite_resp.status_code, 201)
+        token = invite_resp.data['invite_token']
+
+        join_resp = self.other_client.post('/api/debts/shared-debts/join/', {
+            'token': token, 'display_name': ''
+        }, format='json')
+        self.assertEqual(join_resp.status_code, 200)
+
+        # Non-owner attempts to delete.
+        resp = self.other_client.delete(f'/api/debts/shared-debts/{self.group_id}/')
+        self.assertEqual(resp.status_code, 403)
+        self.assertTrue(SharedDebt.objects.filter(id=self.group_id).exists())
