@@ -8,6 +8,13 @@
     <button class="btn btn--secondary btn--sm" type="button" (click)="invite()" [disabled]="inviting()">
       @if (inviting()) { <span class="spinner"></span> } 🔗 Convidar
     </button>
+    @if (isOwner) {
+      <button class="btn btn--danger btn--sm" type="button"
+        (click)="deleteGroup()" [disabled]="deletingGroup()"
+        aria-label="Excluir grupo {{ group()?.name }}">
+        @if (deletingGroup()) { <span class="spinner"></span> } 🗑️ Excluir grupo
+      </button>
+    }
   </div>
 </div>
 
@@ -66,14 +73,16 @@
   <!-- ── Despesas ─────────────────────────────────────────────────────────── -->
   <div class="page-header" style="margin-top: var(--space-lg)">
     <h2 class="section-title" style="margin:0">Despesas</h2>
-    <button class="btn btn--primary btn--sm" type="button" (click)="toggleEntryForm()">
+    <button class="btn btn--primary btn--sm" type="button"
+      (click)="editingEntryId.set(null); toggleEntryForm()">
       {{ showEntryForm() ? '✕ Fechar' : '＋ Nova despesa' }}
     </button>
   </div>
 
   @if (showEntryForm()) {
     <div class="card" style="margin-bottom: var(--space-lg)">
-      <form [formGroup]="form" (ngSubmit)="saveEntry()" novalidate aria-label="Nova despesa compartilhada">
+      <form [formGroup]="form" (ngSubmit)="saveEntry()" novalidate
+        [attr.aria-label]="editingEntryId() ? 'Editar despesa compartilhada' : 'Nova despesa compartilhada'">
         <div class="form-row">
           <div class="form-group">
             <label class="form-label" for="description">Descrição *</label>
@@ -166,7 +175,8 @@
 
         <div class="form-actions">
           <button type="submit" class="btn btn--primary" [disabled]="savingEntry()">
-            @if (savingEntry()) { <span class="spinner"></span> } Salvar despesa
+            @if (savingEntry()) { <span class="spinner"></span> }
+            {{ editingEntryId() ? 'Salvar alterações' : 'Salvar despesa' }}
           </button>
         </div>
       </form>
@@ -202,6 +212,9 @@
               <td class="mono text-muted" style="font-size:13px;white-space:nowrap">{{ formatDate(e.date) }}</td>
               <td class="text-right"><span class="value-down mono">{{ formatCurrency(e.amount) }}</span></td>
               <td class="text-right">
+                <button class="btn btn--secondary btn--sm" type="button"
+                  (click)="editEntry(e)" aria-label="Editar {{ e.description }}"
+                  style="margin-right:4px">✏️</button>
                 <button class="btn btn--danger btn--sm" type="button"
                   (click)="deleteEntry(e)" aria-label="Excluir {{ e.description }}">🗑️</button>
               </td>

@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/auth/auth.service';
 import { CardService } from '../../../core/services/card.service';
@@ -21,6 +21,7 @@ import {
 })
 export class SharedDebtDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private svc = inject(SharedDebtService);
   private auth = inject(AuthService);
   private cardSvc = inject(CardService);
@@ -43,6 +44,9 @@ export class SharedDebtDetailComponent implements OnInit {
   showEntryForm = signal(false);
   savingEntry = signal(false);
   entryError = signal('');
+  editingEntryId = signal<number | null>(null);
+
+  deletingGroup = signal(false);
 
   // participants: track selected member ids (default = all)
   participantIds = signal<Set<number>>(new Set());
@@ -57,6 +61,11 @@ export class SharedDebtDetailComponent implements OnInit {
   });
 
   get isCartao(): boolean { return this.form.value.payment_method === 'cartao'; }
+
+  /** True when the authenticated user is the group owner. */
+  get isOwner(): boolean {
+    return !!this.group() && this.group()!.owner_tenant_id === this.myTenantId;
+  }
 
   /** True when the selected payer is me (only then show my credit cards). */
   get payerIsMe(): boolean {
@@ -116,7 +125,27 @@ export class SharedDebtDetailComponent implements OnInit {
   // ── Entry form ──────────────────────────────────────────────────────────
   toggleEntryForm(): void {
     this.showEntryForm.set(!this.showEntryForm());
+    this.editingEntryId.set(null);
     this.entryError.set('');
+  }
+
+  /** Open the form pre-filled for editing an existing entry.
+   *  NOTE: The list endpoint does not return participant_ids, so we default
+   *  to ALL members when editing. The user can uncheck before saving. */
+  editEntry(entry: SharedDebtEntry): void {
+    this.editingEntryId.set(entry.id);
+    this.entryError.set('');
+    this.form.reset({
+      description: entry.description,
+      amount: Math.abs(entry.amount),
+      date: entry.date,
+      paid_by: entry.paid_by,
+      payment_method: entry.payment_method,
+      credit_card_id: entry.credit_card ?? null,
+    });
+    // Default all members as participants — editing re-sends all unless user unchecks.
+    this.participantIds.set(new Set(this.members().map(m => m.id)));
+    this.showEntryForm.set(true);
   }
 
   isParticipant(memberId: number): boolean {
@@ -142,7 +171,7 @@ export class SharedDebtDetailComponent implements OnInit {
     this.entryError.set('');
     const v = this.form.getRawValue();
     const allSelected = participants.length === this.members().length;
-    this.svc.createEntry({
+    const payload = {
       shared_debt: this.groupId,
       description: v.description!,
       amount: Math.abs(v.amount!),
@@ -151,21 +180,31 @@ export class SharedDebtDetailComponent implements OnInit {
       participant_ids: allSelected ? undefined : participants,
       payment_method: v.payment_method!,
       credit_card_id: v.payment_method === 'cartao' && this.payerIsMe ? v.credit_card_id : null,
-    }).subscribe({
-      next: () => {
-        this.savingEntry.set(false);
-        this.showEntryForm.set(false);
-        this.form.reset({
-          description: '',
-          amount: null,
-          date: new Date().toISOString().split('T')[0],
-          paid_by: null,
-          payment_method: 'dinheiro',
-          credit_card_id: null,
-        });
-        this.participantIds.set(new Set(this.members().map(m => m.id)));
-        this.refreshEntriesAndBalances();
-      },
+    };
+
+    const editId = this.editingEntryId();
+    const request$ = editId != null
+      ? this.svc.updateEntry(editId, payload)
+      : this.svc.createEntry(payload);
+
+    const resetForm = () => {
+      this.savingEntry.set(false);
+      this.editingEntryId.set(null);
+      this.showEntryForm.set(false);
+      this.form.reset({
+        description: '',
+        amount: null,
+        date: new Date().toISOString().split('T')[0],
+        paid_by: null,
+        payment_method: 'dinheiro',
+        credit_card_id: null,
+      });
+      this.participantIds.set(new Set(this.members().map(m => m.id)));
+      this.refreshEntriesAndBalances();
+    };
+
+    request$.subscribe({
+      next: () => resetForm(),
       error: err => {
         this.savingEntry.set(false);
         this.entryError.set(err?.error?.detail ?? 'Erro ao salvar despesa. Tente novamente.');
@@ -178,6 +217,20 @@ export class SharedDebtDetailComponent implements OnInit {
     this.svc.deleteEntry(entry.id).subscribe({
       next: () => this.refreshEntriesAndBalances(),
       error: () => alert('Erro ao excluir despesa.'),
+    });
+  }
+
+  // ── Group deletion (owner only) ─────────────────────────────────────────
+  deleteGroup(): void {
+    const name = this.group()?.name ?? 'este grupo';
+    if (!confirm(`Excluir o grupo "${name}" e todas as despesas? Esta ação não pode ser desfeita.`)) return;
+    this.deletingGroup.set(true);
+    this.svc.deleteGroup(this.groupId).subscribe({
+      next: () => this.router.navigate(['/shared-debts']),
+      error: () => {
+        this.deletingGroup.set(false);
+        alert('Erro ao excluir grupo. Apenas o dono pode excluir.');
+      },
     });
   }
 
