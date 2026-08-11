@@ -109,6 +109,90 @@ sequenceDiagram
 
 ---
 
+## ☁️ Arquitetura em produção (EC2 + Nginx)
+
+Em produção o sistema roda em uma **AWS EC2** (`ec2-54-147-150-5.compute-1.amazonaws.com`) com **Nginx no host** como reverse proxy. Todos os serviços rodam em containers Docker expostos apenas em `127.0.0.1` — nenhuma porta de container é acessível diretamente da internet; tudo passa pelo Nginx.
+
+### Portas expostas pelo Nginx
+
+| Porta | Destino | Uso |
+|-------|---------|-----|
+| `:80` | redirect 301 → HTTPS | — |
+| `:443` | Keycloak `127.0.0.1:8080` | Login / OIDC |
+| `:4200` | Angular `:3000` + Django `:8000` | Financial System (SPA + API) |
+
+### Roteamento por header no `:4200`
+
+Para **não abrir portas extras**, o `:4200` decide o upstream conforme o caminho e um header opcional. Assim dá para acessar o backend Django direto (raiz do DRF, `/admin/`, `/static/`, testes de API) na mesma porta do frontend:
+
+| Requisição no `:4200` | Vai para |
+|-----------------------|----------|
+| `/api/...` | Django backend (sempre) |
+| `/` sem header | Angular SPA |
+| `/` com header `X-Backend-Route: backend` | Django backend direto |
+
+```nginx
+map $http_x_backend_route $fs_root_upstream {
+    default   "http://127.0.0.1:3000";   # Angular (SPA)
+    "backend" "http://127.0.0.1:8000";   # Django backend direto
+}
+# ...
+location /api/ { proxy_pass http://127.0.0.1:8000; }   # API sempre no backend
+location /     { proxy_pass $fs_root_upstream; }        # SPA ou backend via header
+```
+
+> 🔐 O header é **apenas roteamento**, não substitui autenticação. Toda chamada ao backend continua exigindo `Authorization: Bearer <JWT>` do Keycloak.
+
+### Diagrama (produção)
+
+```mermaid
+graph TB
+    USER["👤 Browser / Cliente API"]
+    subgraph EC2["☁️ AWS EC2 — Nginx (host)"]
+        NGINX["🔀 Nginx :80 / :443 / :4200"]
+        subgraph DOCKER["🐳 Docker (loopback only)"]
+            FE["🖥️ Angular :3000"]
+            BE["⚙️ Django :8000"]
+            KC["🔐 Keycloak :8080"]
+            PG["🗄️ PostgreSQL :5432 (interno)"]
+        end
+    end
+    USER -- ":443" --> NGINX
+    USER -- ":4200 (/, /api/)" --> NGINX
+    NGINX -- ":8080" --> KC
+    NGINX -- "/api/ + header → :8000" --> BE
+    NGINX -- "/ (default) → :3000" --> FE
+    BE -. "valida JWT (JWKS)" .-> KC
+    BE --> PG
+    KC --> PG
+```
+
+### Clientes Keycloak
+
+| Client | Tipo | Direct grant | Uso |
+|--------|------|--------------|-----|
+| `financial-frontend` | público | ❌ | SPA Angular (login no browser, PKCE) |
+| `financial-backend` | confidential | ✅ | validação de `aud` + token server-to-server |
+
+O client `financial-backend` possui o mapper de audiência `financial-backend-aud` para que o `aud` do token inclua `financial-backend` (exigido na validação via JWKS).
+
+### Obter token e chamar o backend direto
+
+```bash
+TOKEN=$(curl -sk -X POST \
+  "https://ec2-54-147-150-5.compute-1.amazonaws.com/realms/projetos-pessoais/protocol/openid-connect/token" \
+  -d "client_id=financial-backend" -d "client_secret=<CLIENT_SECRET>" \
+  -d "grant_type=password" -d "username=<email>" -d "password=<senha>" \
+  | jq -r .access_token)
+
+curl -sk -H "Authorization: Bearer $TOKEN" -H "X-Backend-Route: backend" \
+  "https://ec2-54-147-150-5.compute-1.amazonaws.com:4200/api/debts/shared-debts/"
+```
+
+> O `client_secret` vive apenas no Keycloak e **nunca** é versionado.
+
+---
+
 ## 🚀 Como subir o projeto
 
 ```bash
