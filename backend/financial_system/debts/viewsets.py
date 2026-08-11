@@ -54,6 +54,22 @@ class SharedDebtViewSet(viewsets.ModelViewSet):
         shared_debt = self.get_object()
         return BalancesBehavior(shared_debt).run()
 
+    def perform_destroy(self, instance):
+        # Only the group owner may delete the group.
+        if instance.owner_tenant_id != self.request.user.tenant_id:
+            raise PermissionDenied("Apenas o criador do grupo pode excluí-lo.")
+
+        # Entries must be deleted BEFORE the group's members are cascaded.
+        # SharedEntry.paid_by has on_delete=PROTECT pointing to SharedDebtMember.
+        # If we deleted the group directly, Django would collect members for CASCADE
+        # while simultaneously seeing that SharedEntry still references them via
+        # paid_by (PROTECT), raising ProtectedError (HTTP 500).
+        # Deleting entries first (which also cascades SharedEntryParticipant) removes
+        # that PROTECT reference, allowing the group — and then its members — to be
+        # deleted cleanly.
+        instance.entries.all().delete()
+        instance.delete()
+
     @action(detail=True, methods=['get'], url_path='members')
     def members(self, request, pk=None):
         shared_debt = self.get_object()
