@@ -73,11 +73,122 @@
   <!-- ── Despesas ─────────────────────────────────────────────────────────── -->
   <div class="page-header" style="margin-top: var(--space-lg)">
     <h2 class="section-title" style="margin:0">Despesas</h2>
-    <button class="btn btn--primary btn--sm" type="button"
-      (click)="editingEntryId.set(null); toggleEntryForm()">
-      {{ showEntryForm() ? '✕ Fechar' : '＋ Nova despesa' }}
-    </button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn--secondary btn--sm" type="button" (click)="toggleBatchSection()">
+        {{ showBatchSection() ? '✕ Fechar lote' : '📋 Vários de uma vez' }}
+      </button>
+      <button class="btn btn--primary btn--sm" type="button"
+        (click)="editingEntryId.set(null); toggleEntryForm()">
+        {{ showEntryForm() ? '✕ Fechar' : '＋ Nova despesa' }}
+      </button>
+    </div>
   </div>
+
+  @if (showBatchSection()) {
+    <div class="card batch-card" style="margin-bottom: var(--space-lg)">
+      <div class="card__header">
+        <span class="card__title">📋 Adicionar Vários Gastos</span>
+      </div>
+      <div class="card__body" style="padding: var(--space-lg) var(--space-xl)">
+        <form [formGroup]="batchForm" (ngSubmit)="addToBatch()" novalidate>
+          <div class="form-row form-row--2col">
+            <div class="form-group">
+              <label class="form-label" for="b-desc">Descrição *</label>
+              <input id="b-desc" class="form-input" type="text" formControlName="description" placeholder="Ex: Mercado" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="b-amount">Valor *</label>
+              <input id="b-amount" class="form-input mono" type="number" step="0.01" min="0.01" formControlName="amount" />
+            </div>
+          </div>
+          <div class="form-row form-row--2col">
+            <div class="form-group">
+              <label class="form-label" for="b-date">Data *</label>
+              <input id="b-date" class="form-input" type="date" formControlName="date" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="b-paid_by">Pago por *</label>
+              <select id="b-paid_by" class="form-select" formControlName="paid_by">
+                <option [ngValue]="null" disabled>Selecione</option>
+                @for (m of members(); track m.id) {
+                  <option [ngValue]="m.id">{{ m.display_name }}</option>
+                }
+              </select>
+            </div>
+          </div>
+          <div class="form-row form-row--2col">
+            <div class="form-group">
+              <label class="form-label" for="b-cat">Categoria</label>
+              <select id="b-cat" class="form-select" formControlName="category_id">
+                <option [ngValue]="null">Sem categoria</option>
+                @for (cat of categories(); track cat.id) {
+                  <option [ngValue]="cat.id">{{ cat.name }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Método</label>
+              <div class="radio-group">
+                <label class="radio-option">
+                  <input type="radio" formControlName="payment_method" value="dinheiro" />
+                  <span class="radio-btn">💵 Dinheiro</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" formControlName="payment_method" value="cartao" />
+                  <span class="radio-btn">💳 Cartão</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <fieldset class="form-group">
+              <legend class="form-label">Participantes</legend>
+              <div class="participants">
+                @for (m of members(); track m.id) {
+                  <label class="participant-chip" [class.participant-chip--on]="isBatchParticipant(m.id)">
+                    <input type="checkbox" [checked]="isBatchParticipant(m.id)" (change)="toggleBatchParticipant(m.id)" />
+                    <span>{{ m.display_name }}</span>
+                  </label>
+                }
+              </div>
+            </fieldset>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn--secondary">＋ Adicionar à lista</button>
+          </div>
+        </form>
+
+        @if (batchDrafts().length > 0) {
+          <div class="batch-list">
+            @for (d of batchDrafts(); track d.localId) {
+              <div class="batch-list__item">
+                <div class="batch-list__info">
+                  <span class="batch-list__desc">{{ d.description }}</span>
+                  <span class="batch-list__meta">{{ d.paid_by_name }} · {{ d.date | slice:8:10 }}/{{ d.date | slice:5:7 }}</span>
+                </div>
+                @if (d.category_name) {
+                  <span class="badge badge--primary" style="font-size:11px">{{ d.category_name }}</span>
+                }
+                <span class="batch-list__amount value-down mono">{{ formatCurrency(d.amount) }}</span>
+                <button class="btn btn--ghost btn--sm" type="button" (click)="removeBatchDraft(d.localId)">✕</button>
+              </div>
+            }
+            <div class="batch-list__footer">
+              <span>{{ batchDrafts().length }} gasto(s) · Total: <strong class="value-down mono">{{ formatCurrency(batchTotal) }}</strong></span>
+              <button class="btn btn--primary btn--sm" type="button"
+                (click)="saveAllBatch()" [disabled]="savingBatch()">
+                @if (savingBatch()) { <span class="spinner"></span> } 💾 Salvar todos ({{ batchDrafts().length }})
+              </button>
+            </div>
+          </div>
+        }
+
+        @if (batchError()) {
+          <div class="form-error-box" role="alert">{{ batchError() }}</div>
+        }
+      </div>
+    </div>
+  }
 
   @if (showEntryForm()) {
     <div class="card" style="margin-bottom: var(--space-lg)">

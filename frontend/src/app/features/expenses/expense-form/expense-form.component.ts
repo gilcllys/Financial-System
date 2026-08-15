@@ -1,7 +1,8 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { ExpenseService } from '../../../core/services/expense.service';
+import { SharedDebtService, SharedDebtGroup, SharedDebtMember } from '../../../core/services/shared-debt.service';
 import { CardService } from '../../../core/services/card.service';
 import { CategoryService } from '../../../core/services/category.service';
 import { CreditCard, ExpenseCategory } from '../../../core/models';
@@ -9,7 +10,7 @@ import { CreditCard, ExpenseCategory } from '../../../core/models';
 @Component({
   selector: 'app-expense-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, FormsModule, RouterLink],
   templateUrl: './expense-form.component.html',
   styleUrls: ['./expense-form.component.scss'],
 })
@@ -20,6 +21,26 @@ export class ExpenseFormComponent implements OnInit {
   private categoryService = inject(CategoryService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private sharedDebtSvc = inject(SharedDebtService);
+
+  // ── Modo Individual / Compartilhado ──────────────────────────────────────
+  mode = signal<'individual' | 'shared'>('individual');
+  sharedGroups = signal<SharedDebtGroup[]>([]);
+  sharedMembers = signal<SharedDebtMember[]>([]);
+  selectedGroupId = signal<number | null>(null);
+  participantIds = signal<Set<number>>(new Set());
+  savingShared = signal(false);
+
+  sharedForm = this.fb.group({
+    description: ['', [Validators.required, Validators.minLength(2)]],
+    amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
+    date: [this.todayStr(), Validators.required],
+    paid_by: [null as number | null, Validators.required],
+    payment_method: ['dinheiro' as 'dinheiro' | 'cartao'],
+    credit_card_id: [null as number | null],
+    category_id: [null as number | null],
+  });
+  get sharedIsCartao(): boolean { return this.sharedForm.value.payment_method === 'cartao'; }
 
   categories = signal<ExpenseCategory[]>([]);
   cards = signal<CreditCard[]>([]);
@@ -50,6 +71,7 @@ export class ExpenseFormComponent implements OnInit {
   ngOnInit(): void {
     this.loadSelects();
     this.setupConditionals();
+    this.sharedDebtSvc.listGroups().subscribe({ next: g => this.sharedGroups.set(g) });
 
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
@@ -122,6 +144,62 @@ export class ExpenseFormComponent implements OnInit {
       error: () => {
         this.errorMessage.set('Erro ao carregar gasto.');
         this.loading.set(false);
+      },
+    });
+  }
+
+
+  setMode(m: 'individual' | 'shared'): void {
+    this.mode.set(m);
+    this.selectedGroupId.set(null);
+    this.sharedMembers.set([]);
+    this.participantIds.set(new Set());
+  }
+
+  onGroupSelect(groupId: number): void {
+    this.selectedGroupId.set(groupId);
+    this.sharedDebtSvc.members(groupId).subscribe({
+      next: members => {
+        this.sharedMembers.set(members);
+        this.participantIds.set(new Set(members.map(m => m.id)));
+      },
+    });
+  }
+
+  isSharedParticipant(id: number): boolean { return this.participantIds().has(id); }
+
+  toggleSharedParticipant(id: number): void {
+    this.participantIds.update(s => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  }
+
+  submitShared(): void {
+    if (this.sharedForm.invalid) { this.sharedForm.markAllAsTouched(); return; }
+    if (!this.selectedGroupId()) { return; }
+    const parts = [...this.participantIds()];
+    if (parts.length === 0) { this.errorMessage.set('Selecione ao menos um participante.'); return; }
+    this.savingShared.set(true);
+    this.errorMessage.set('');
+    const v = this.sharedForm.getRawValue();
+    const allSelected = parts.length === this.sharedMembers().length;
+    this.sharedDebtSvc.createEntry({
+      shared_debt: this.selectedGroupId()!,
+      description: v.description!,
+      amount: Math.abs(v.amount!),
+      date: v.date!,
+      paid_by: v.paid_by!,
+      participant_ids: allSelected ? undefined : parts,
+      payment_method: v.payment_method as 'dinheiro' | 'cartao',
+      credit_card_id: v.payment_method === 'cartao' ? v.credit_card_id : null,
+      category_id: v.category_id,
+    }).subscribe({
+      next: () => this.router.navigate(['/home']),
+      error: err => {
+        this.savingShared.set(false);
+        this.errorMessage.set(err?.error?.detail ?? 'Erro ao salvar gasto compartilhado.');
       },
     });
   }

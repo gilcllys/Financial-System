@@ -3,9 +3,145 @@
     <h1 class="page-header__title">{{ isEdit() ? 'Editar Gasto' : 'Novo Gasto' }}</h1>
     <p class="page-header__subtitle">{{ isEdit() ? 'Atualize as informações do gasto' : 'Registre uma nova despesa ou receita' }}</p>
   </div>
-  <a routerLink="/expenses" class="btn btn--secondary btn--sm">← Voltar</a>
+  <a routerLink="/home" class="btn btn--secondary btn--sm">← Voltar</a>
 </div>
 
+@if (!isEdit()) {
+  <div class="mode-toggle" role="group" aria-label="Tipo de gasto">
+    <button type="button" class="mode-toggle__btn" [class.mode-toggle__btn--active]="mode() === 'individual'"
+      (click)="setMode('individual')">Individual</button>
+    <button type="button" class="mode-toggle__btn" [class.mode-toggle__btn--active]="mode() === 'shared'"
+      (click)="setMode('shared')">Compartilhado</button>
+  </div>
+}
+
+
+@if (mode() === 'shared') {
+  <div class="card">
+    <!-- Seleção de grupo -->
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="group_select">Grupo de Dívida *</label>
+        <select id="group_select" class="form-select"
+          [ngModel]="selectedGroupId()"
+          (ngModelChange)="onGroupSelect($event)">
+          <option [ngValue]="null" disabled>Selecione o grupo</option>
+          @for (g of sharedGroups(); track g.id) {
+            <option [ngValue]="g.id">{{ g.name }}</option>
+          }
+        </select>
+        @if (sharedGroups().length === 0) {
+          <span class="form-hint">Você não tem grupos compartilhados. <a routerLink="/shared-debts">Criar um grupo →</a></span>
+        }
+      </div>
+    </div>
+
+    @if (selectedGroupId() && sharedMembers().length > 0) {
+      <form [formGroup]="sharedForm" (ngSubmit)="submitShared()" novalidate>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="s-description">Descrição *</label>
+            <input id="s-description" class="form-input" type="text"
+              formControlName="description" placeholder="Ex: Jantar" autocomplete="off" />
+            @if (sharedForm.get('description')?.invalid && sharedForm.get('description')?.touched) {
+              <span class="form-error">Descrição é obrigatória.</span>
+            }
+          </div>
+        </div>
+
+        <div class="form-row form-row--2col">
+          <div class="form-group">
+            <label class="form-label" for="s-amount">Valor *</label>
+            <input id="s-amount" class="form-input mono" type="number" step="0.01" min="0.01"
+              formControlName="amount" placeholder="250.00" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="s-date">Data *</label>
+            <input id="s-date" class="form-input" type="date" formControlName="date" />
+          </div>
+        </div>
+
+        <div class="form-row form-row--2col">
+          <div class="form-group">
+            <label class="form-label" for="s-paid_by">Pago por *</label>
+            <select id="s-paid_by" class="form-select" formControlName="paid_by">
+              <option [ngValue]="null" disabled>Selecione quem pagou</option>
+              @for (m of sharedMembers(); track m.id) {
+                <option [ngValue]="m.id">{{ m.display_name }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="s-category">Categoria</label>
+            <select id="s-category" class="form-select" formControlName="category_id">
+              <option [ngValue]="null">Sem categoria</option>
+              @for (cat of categories(); track cat.id) {
+                <option [ngValue]="cat.id">{{ cat.name }}</option>
+              }
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <fieldset class="form-group">
+            <legend class="form-label">Participantes (quem divide) *</legend>
+            <div class="participants">
+              @for (m of sharedMembers(); track m.id) {
+                <label class="participant-chip" [class.participant-chip--on]="isSharedParticipant(m.id)">
+                  <input type="checkbox" [checked]="isSharedParticipant(m.id)" (change)="toggleSharedParticipant(m.id)" />
+                  <span>{{ m.display_name }}</span>
+                </label>
+              }
+            </div>
+          </fieldset>
+        </div>
+
+        <div class="form-row">
+          <fieldset class="form-group">
+            <legend class="form-label">Método de Pagamento</legend>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="radio" formControlName="payment_method" value="dinheiro" />
+                <span class="radio-btn">💵 Dinheiro</span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" formControlName="payment_method" value="cartao" />
+                <span class="radio-btn">💳 Cartão</span>
+              </label>
+            </div>
+          </fieldset>
+        </div>
+
+        @if (sharedIsCartao && cards().length) {
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="s-card">Cartão</label>
+              <select id="s-card" class="form-select" formControlName="credit_card_id">
+                <option [ngValue]="null">Nenhum</option>
+                @for (card of cards(); track card.id) {
+                  <option [ngValue]="card.id">{{ card.name }} •••• {{ card.last_four_digits }}</option>
+                }
+              </select>
+            </div>
+          </div>
+        }
+
+        @if (errorMessage()) {
+          <div class="form-error-box" role="alert">{{ errorMessage() }}</div>
+        }
+
+        <div class="form-actions">
+          <a routerLink="/home" class="btn btn--secondary">Cancelar</a>
+          <button type="submit" class="btn btn--primary" [disabled]="savingShared()">
+            @if (savingShared()) { <span class="spinner"></span> } Salvar compartilhado
+          </button>
+        </div>
+      </form>
+    }
+  </div>
+}
+
+@if (mode() === 'individual') {
 @if (loading()) {
   <div class="loading-wrapper" aria-live="polite">
     <span class="spinner"></span> Carregando...
@@ -225,4 +361,5 @@
 
     </form>
   </div>
+}
 }

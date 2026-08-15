@@ -148,3 +148,64 @@ legend {
 
 .input--income { border-color: var(--color-semantic-up) !important; }
 .input--expense { border-color: var(--color-semantic-down) !important; }
+
+// ── Mode Toggle (Individual / Compartilhado) ──────────────────────────────────
+.mode-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-lg);
+
+  &__btn {
+    padding: var(--space-base) var(--space-md);
+    border: 2px solid var(--color-hairline);
+    border-radius: var(--rounded-xl);
+    background: var(--color-canvas);
+    font-size: 16px;
+    font-weight: 600;
+    font-family: var(--font-body);
+    color: var(--color-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+
+    &:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+    &--active {
+      border-color: var(--color-primary);
+      background: rgba(0, 82, 255, 0.04);
+      color: var(--color-primary);
+    }
+  }
+}
+
+// ── Participant chips ─────────────────────────────────────────────────────────
+.participants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.participant-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xxs) var(--space-sm);
+  border: 1.5px solid var(--color-hairline);
+  border-radius: var(--rounded-pill);
+  font-size: 13px;
+  color: var(--color-body);
+  cursor: pointer;
+  transition: all 0.12s;
+  user-select: none;
+
+  input[type="checkbox"] { display: none; }
+
+  &--on {
+    border-color: var(--color-primary);
+    background: rgba(0, 82, 255, 0.08);
+    color: var(--color-primary);
+    font-weight: 600;
+  }
+}
