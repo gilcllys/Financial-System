@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from debts.models import SharedDebt, SharedDebtMember, SharedEntry
+from debts.models import SharedDebt, SharedDebtMember, SharedEntry, SharedRecurringTemplate
 
 
 class SharedDebtSerializer(serializers.ModelSerializer):
@@ -29,10 +29,14 @@ class SharedDebtMemberSerializer(serializers.ModelSerializer):
 
 
 class SharedEntrySerializer(serializers.ModelSerializer):
-    # Helper de leitura: nome do membro que pagou (evita lookup extra no cliente)
     paid_by_name = serializers.CharField(
         source='paid_by.display_name',
         read_only=True,
+    )
+    category_name = serializers.CharField(
+        source='category.name',
+        read_only=True,
+        default=None,
     )
 
     class Meta:
@@ -47,7 +51,24 @@ class SharedEntrySerializer(serializers.ModelSerializer):
             'date',
             'payment_method',
             'credit_card',
+            'category',
+            'category_name',
             'created_by_tenant_id',
             'created_at',
         ]
         read_only_fields = ['id', 'created_by_tenant_id', 'created_at']
+
+
+class SharedRecurringTemplateSerializer(serializers.ModelSerializer):
+    paid_by_name = serializers.CharField(source='paid_by.display_name', read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True, default=None)
+
+    class Meta:
+        model = SharedRecurringTemplate
+        fields = [
+            'id', 'shared_debt', 'description', 'amount',
+            'paid_by', 'paid_by_name', 'participant_ids',
+            'payment_method', 'category', 'category_name',
+            'day_of_month', 'is_active', 'created_at',
+        ]
+        read_only_fields = ['id', 'created_at']

@@ -13,7 +13,7 @@ import { ExpenseService } from '../../core/services/expense.service';
 import { CategoryService } from '../../core/services/category.service';
 import { AnalyticsService, MonthlyAnalytics, CategoryAnalytics, ConsolidatedSummary } from '../../core/services/analytics.service';
 import { OpenInvoice, Expense, ExpenseCategory } from '../../core/models';
-import { SharedDebtGroup } from '../../core/services/shared-debt.service';
+import { SharedDebtHomeSummary } from '../../core/services/shared-debt.service';
 
 Chart.register(...registerables);
 
@@ -51,7 +51,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   dashLoading        = signal(true);
   consolidated       = signal<ConsolidatedSummary>(EMPTY_CONSOLIDATED);
   openInvoices       = signal<OpenInvoice[]>([]);
-  sharedDebts        = signal<SharedDebtGroup[]>([]);
+  sharedDebts        = signal<SharedDebtHomeSummary[]>([]);
   byCategory         = signal<CategoryAnalytics[]>([]);
   evolution          = signal<MonthlyAnalytics[]>([]);
   installmentGroups  = signal<InstallmentGroup[]>([]);

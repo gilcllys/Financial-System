@@ -129,7 +129,7 @@
     <!-- Gastos Compartilhados -->
     <div class="card">
       <div class="card__header">
-        <span class="card__title">🤝 Gastos Compartilhados</span>
+        <span class="card__title">🤝 Gastos Compartilhados <span class="badge badge--system">{{ sharedDebts().length }} ativos</span></span>
         <a routerLink="/shared-debts" class="card__link">Ver todos →</a>
       </div>
       <div class="card__body">
@@ -138,12 +138,27 @@
         }
         @for (group of sharedDebts(); track group.id) {
           <a [routerLink]="['/shared-debts', group.id]" class="shared-item">
-            <div class="shared-item__avatar">{{ group.name.substring(0, 2).toUpperCase() }}</div>
+            <!-- Avatares dos membros (até 3) -->
+            <div class="shared-item__avatars">
+              @for (name of group.members.slice(0, 3); track name) {
+                <div class="shared-item__avatar" [title]="name">
+                  {{ name.substring(0, 2).toUpperCase() }}
+                </div>
+              }
+              @if (group.members.length > 3) {
+                <div class="shared-item__avatar shared-item__avatar--more">+{{ group.members.length - 3 }}</div>
+              }
+            </div>
+            <!-- Info -->
             <div class="shared-item__info">
               <p class="shared-item__name">{{ group.name }}</p>
-              <p class="shared-item__date">{{ group.created_at | date:'dd/MM/yyyy' }}</p>
+              <p class="shared-item__members">{{ group.members.join(' + ') }}</p>
             </div>
-            <span class="chevron">›</span>
+            <!-- Valores -->
+            <div class="shared-item__values">
+              <p class="shared-item__total">{{ formatCurrency(group.total_amount) }}</p>
+              <p class="shared-item__portion">Sua parte: {{ formatCurrency(group.my_portion) }}</p>
+            </div>
           </a>
         }
       </div>

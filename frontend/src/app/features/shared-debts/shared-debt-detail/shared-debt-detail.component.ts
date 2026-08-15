@@ -3,6 +3,8 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/auth/auth.service';
 import { CardService } from '../../../core/services/card.service';
+import { CategoryService } from '../../../core/services/category.service';
+import { ExpenseCategory } from '../../../core/models';
 import { CreditCard } from '../../../core/models';
 import {
   SharedDebtService,
@@ -10,6 +12,8 @@ import {
   SharedDebtMember,
   SharedDebtEntry,
   BalancesResponse,
+  MonthlyHistoryEntry,
+  RecurringTemplate,
 } from '../../../core/services/shared-debt.service';
 
 @Component({
@@ -25,6 +29,7 @@ export class SharedDebtDetailComponent implements OnInit {
   private svc = inject(SharedDebtService);
   private auth = inject(AuthService);
   private cardSvc = inject(CardService);
+  private categorySvc = inject(CategoryService);
   private fb = inject(FormBuilder);
 
   private myTenantId = this.auth.userProfile.sub ?? null;
@@ -36,6 +41,7 @@ export class SharedDebtDetailComponent implements OnInit {
   balances = signal<BalancesResponse | null>(null);
   cards = signal<CreditCard[]>([]);
   loading = signal(true);
+  categories = signal<ExpenseCategory[]>([]);
 
   inviteUrl = signal<string | null>(null);
   inviting = signal(false);
@@ -47,6 +53,22 @@ export class SharedDebtDetailComponent implements OnInit {
   editingEntryId = signal<number | null>(null);
 
   deletingGroup = signal(false);
+  monthlyHistory = signal<MonthlyHistoryEntry[]>([]);
+  recurringTemplates = signal<RecurringTemplate[]>([]);
+  showRecurringForm = signal(false);
+  savingRecurring = signal(false);
+  recurringError = signal('');
+  generatingMonth = signal(false);
+  generateResult = signal<{ created: string[]; skipped: string[] } | null>(null);
+
+  recurringForm = this.fb.group({
+    description: ['', [Validators.required, Validators.minLength(2)]],
+    amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
+    paid_by: [null as number | null, Validators.required],
+    day_of_month: [1, [Validators.required, Validators.min(1), Validators.max(28)]],
+    payment_method: ['dinheiro' as 'dinheiro' | 'cartao'],
+    category_id: [null as number | null],
+  });
 
   // participants: track selected member ids (default = all)
   participantIds = signal<Set<number>>(new Set());
@@ -58,6 +80,7 @@ export class SharedDebtDetailComponent implements OnInit {
     paid_by: [null as number | null, Validators.required],
     payment_method: ['dinheiro' as 'dinheiro' | 'cartao', Validators.required],
     credit_card_id: [null as number | null],
+    category_id: [null as number | null],
   });
 
   get isCartao(): boolean { return this.form.value.payment_method === 'cartao'; }
@@ -79,6 +102,7 @@ export class SharedDebtDetailComponent implements OnInit {
     this.groupId = +this.route.snapshot.paramMap.get('id')!;
     this.loadAll();
     this.cardSvc.list().subscribe({ next: c => this.cards.set(c) });
+    this.categorySvc.list().subscribe({ next: cats => this.categories.set(cats) });
   }
 
   private loadAll(): void {
@@ -93,6 +117,8 @@ export class SharedDebtDetailComponent implements OnInit {
       error: () => this.loading.set(false),
     });
     this.refreshEntriesAndBalances();
+    this.loadMonthlyHistory();
+    this.loadRecurringTemplates();
   }
 
   private refreshEntriesAndBalances(): void {
@@ -142,6 +168,7 @@ export class SharedDebtDetailComponent implements OnInit {
       paid_by: entry.paid_by,
       payment_method: entry.payment_method,
       credit_card_id: entry.credit_card ?? null,
+      category_id: entry.category ?? null,
     });
     // Default all members as participants — editing re-sends all unless user unchecks.
     this.participantIds.set(new Set(this.members().map(m => m.id)));
@@ -180,6 +207,7 @@ export class SharedDebtDetailComponent implements OnInit {
       participant_ids: allSelected ? undefined : participants,
       payment_method: v.payment_method!,
       credit_card_id: v.payment_method === 'cartao' && this.payerIsMe ? v.credit_card_id : null,
+      category_id: v.category_id ?? null,
     };
 
     const editId = this.editingEntryId();
@@ -198,9 +226,12 @@ export class SharedDebtDetailComponent implements OnInit {
         paid_by: null,
         payment_method: 'dinheiro',
         credit_card_id: null,
+        category_id: null,
       });
       this.participantIds.set(new Set(this.members().map(m => m.id)));
       this.refreshEntriesAndBalances();
+    this.loadMonthlyHistory();
+    this.loadRecurringTemplates();
     };
 
     request$.subscribe({
@@ -231,6 +262,77 @@ export class SharedDebtDetailComponent implements OnInit {
         this.deletingGroup.set(false);
         alert('Erro ao excluir grupo. Apenas o dono pode excluir.');
       },
+    });
+  }
+
+
+  private loadMonthlyHistory(): void {
+    this.svc.monthlyHistory(this.groupId).subscribe({
+      next: h => this.monthlyHistory.set(h),
+      error: () => {},
+    });
+  }
+
+  private loadRecurringTemplates(): void {
+    this.svc.listRecurringTemplates(this.groupId).subscribe({
+      next: t => this.recurringTemplates.set(t),
+      error: () => {},
+    });
+  }
+
+  toggleRecurringForm(): void {
+    this.showRecurringForm.set(!this.showRecurringForm());
+    this.recurringError.set('');
+  }
+
+  saveRecurring(): void {
+    if (this.recurringForm.invalid) { this.recurringForm.markAllAsTouched(); return; }
+    this.savingRecurring.set(true);
+    this.recurringError.set('');
+    const v = this.recurringForm.getRawValue();
+    const allMembers = this.members().map(m => m.id);
+    this.svc.createRecurringTemplate(this.groupId, {
+      description: v.description!,
+      amount: v.amount!,
+      paid_by: v.paid_by!,
+      day_of_month: v.day_of_month ?? 1,
+      payment_method: v.payment_method as 'dinheiro' | 'cartao',
+      category_id: v.category_id,
+      participant_ids: allMembers,
+    }).subscribe({
+      next: () => {
+        this.savingRecurring.set(false);
+        this.showRecurringForm.set(false);
+        this.recurringForm.reset({ description: '', amount: null, paid_by: null, day_of_month: 1, payment_method: 'dinheiro', category_id: null });
+        this.loadRecurringTemplates();
+      },
+      error: err => {
+        this.savingRecurring.set(false);
+        this.recurringError.set(err?.error?.detail ?? 'Erro ao salvar.');
+      },
+    });
+  }
+
+  deleteRecurring(tplId: number): void {
+    if (!confirm('Excluir este gasto recorrente?')) return;
+    this.svc.deleteRecurringTemplate(this.groupId, tplId).subscribe({
+      next: () => this.loadRecurringTemplates(),
+    });
+  }
+
+  toggleRecurring(tplId: number): void {
+    this.svc.toggleRecurringTemplate(this.groupId, tplId).subscribe({
+      next: () => this.loadRecurringTemplates(),
+    });
+  }
+
+  generateMonth(): void {
+    const now = new Date();
+    this.generatingMonth.set(true);
+    this.generateResult.set(null);
+    this.svc.generateMonth(this.groupId, now.getMonth() + 1, now.getFullYear()).subscribe({
+      next: r => { this.generatingMonth.set(false); this.generateResult.set(r); this.refreshEntriesAndBalances(); this.loadMonthlyHistory(); },
+      error: () => { this.generatingMonth.set(false); },
     });
   }
 

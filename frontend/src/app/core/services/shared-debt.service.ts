@@ -30,6 +30,8 @@ export interface SharedDebtEntry {
   date: string;
   payment_method: 'dinheiro' | 'cartao';
   credit_card: number | null;
+  category: number | null;
+  category_name: string | null;
   created_by_tenant_id: string;
   created_at: string;
 }
@@ -75,11 +77,57 @@ export interface CreateEntryPayload {
   participant_ids?: number[];
   payment_method?: 'dinheiro' | 'cartao';
   credit_card_id?: number | null;
+  category_id?: number | null;
 }
 
 export interface PersonalSummary {
   installments_remaining: { total: number; count: number };
   card_current_month: { total: number; count: number };
+}
+
+
+export interface SharedDebtHomeSummary {
+  id: number;
+  name: string;
+  members: string[];
+  total_amount: number;
+  my_portion: number;
+  entry_count: number;
+}
+
+export interface MonthlyHistoryEntry {
+  year: number;
+  month: number;
+  month_name: string;
+  total: number;
+  my_portion: number;
+  entry_count: number;
+}
+
+export interface RecurringTemplate {
+  id: number;
+  shared_debt: number;
+  description: string;
+  amount: number;
+  paid_by: number;
+  paid_by_name: string;
+  participant_ids: number[];
+  payment_method: 'dinheiro' | 'cartao';
+  category: number | null;
+  category_name: string | null;
+  day_of_month: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface CreateRecurringTemplatePayload {
+  description: string;
+  amount: number;
+  paid_by: number;
+  participant_ids?: number[];
+  payment_method?: 'dinheiro' | 'cartao';
+  category_id?: number | null;
+  day_of_month?: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -148,5 +196,35 @@ export class SharedDebtService {
   // ─── Personal debts summary ─────────────────────────────────────────────
   personalSummary(): Observable<PersonalSummary> {
     return this.http.get<PersonalSummary>(`${this.base}/personal-summary/`);
+  }
+
+  homeSummary(): Observable<SharedDebtHomeSummary[]> {
+    return this.http.get<SharedDebtHomeSummary[]>(`${this.base}/shared-debts/home-summary/`);
+  }
+
+  monthlyHistory(id: number): Observable<MonthlyHistoryEntry[]> {
+    return this.http.get<MonthlyHistoryEntry[]>(`${this.base}/shared-debts/${id}/monthly-history/`);
+  }
+
+  listRecurringTemplates(id: number): Observable<RecurringTemplate[]> {
+    return this.http.get<RecurringTemplate[]>(`${this.base}/shared-debts/${id}/recurring-templates/`);
+  }
+
+  createRecurringTemplate(id: number, payload: CreateRecurringTemplatePayload): Observable<RecurringTemplate> {
+    return this.http.post<RecurringTemplate>(`${this.base}/shared-debts/${id}/recurring-templates/`, payload);
+  }
+
+  deleteRecurringTemplate(groupId: number, tplId: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/shared-debts/${groupId}/recurring-templates/${tplId}/`);
+  }
+
+  toggleRecurringTemplate(groupId: number, tplId: number): Observable<RecurringTemplate> {
+    return this.http.patch<RecurringTemplate>(`${this.base}/shared-debts/${groupId}/recurring-templates/${tplId}/`, {});
+  }
+
+  generateMonth(groupId: number, month: number, year: number): Observable<{ created: string[]; skipped: string[] }> {
+    return this.http.post<{ created: string[]; skipped: string[] }>(
+      `${this.base}/shared-debts/${groupId}/generate-month/`, { month, year }
+    );
   }
 }

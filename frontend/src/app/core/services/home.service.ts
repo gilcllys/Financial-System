@@ -5,7 +5,7 @@ import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { OpenInvoice, Expense } from '../models';
 import { AnalyticsService, MonthlyAnalytics, CategoryAnalytics, ConsolidatedSummary } from './analytics.service';
-import { SharedDebtService, SharedDebtGroup } from './shared-debt.service';
+import { SharedDebtService, SharedDebtHomeSummary } from './shared-debt.service';
 import { ExpenseService } from './expense.service';
 
 export interface InstallmentGroup {
@@ -22,7 +22,7 @@ export interface HomeSummary {
   consolidated: ConsolidatedSummary;
   evolution: MonthlyAnalytics[];
   openInvoices: OpenInvoice[];
-  sharedDebts: SharedDebtGroup[];
+  sharedDebts: SharedDebtHomeSummary[];
   byCategory: CategoryAnalytics[];
   recentExpenses: Expense[];
   installmentGroups: InstallmentGroup[];
@@ -43,7 +43,7 @@ export class HomeService {
       homeCharts:          this.analytics.homeCharts(month, year),
       evolution:           this.analytics.monthly(year),
       openInvoices:        this.http.get<OpenInvoice[]>(`${this.cardsBase}/open-invoices/`),
-      sharedDebts:         this.sharedDebt.listGroups(),
+      sharedDebts:         this.sharedDebt.homeSummary(),
       recentExpenses:      this.expenseService.list({ month, year, page: 1, page_size: 5 }),
       allInstallmentExp:   this.expenseService.list({ page_size: 500 }),
     }).pipe(
