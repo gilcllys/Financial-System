@@ -1,49 +1,93 @@
 <!-- ── Page header ── -->
 <div class="page-header">
   <div>
-    <p class="page-header__label">🗓 Mês Atual</p>
+    <p class="page-header__label">📅 Mês Atual</p>
     <h1 class="page-header__title">{{ currentMonthName }} {{ currentYear }}</h1>
-    <p class="page-header__subtitle">Visão geral dos seus gastos</p>
+    <p class="page-header__subtitle">Seus gastos de {{ currentMonthName }}</p>
   </div>
   <div class="page-header__actions">
-    <a routerLink="/expenses/batch" class="btn btn--outline">+ Vários gastos</a>
+    <a routerLink="/expenses/batch"  class="btn btn--outline">➕ Vários gastos</a>
     <a routerLink="/expenses/import" class="btn btn--outline">📥 Importar Excel</a>
-    <a routerLink="/expenses/new" class="btn btn--primary">+ Novo Gasto</a>
+    <a routerLink="/expenses/new"    class="btn btn--primary">+ Novo Gasto</a>
   </div>
 </div>
 
-@if (loading()) {
-  <div class="loading-state">
-    <div class="spinner"></div>
-    <p>Carregando dashboard...</p>
-  </div>
-} @else {
+<!-- ── Search ── -->
+<div class="search-bar">
+  <span class="search-bar__icon">🔍</span>
+  <input
+    class="search-bar__input"
+    type="search"
+    placeholder="Buscar por descrição..."
+    [value]="searchTerm()"
+    (input)="onSearchInput($any($event.target).value)"
+    aria-label="Buscar gastos"
+  />
+  @if (searchTerm()) {
+    <button class="search-bar__clear" (click)="onSearchInput('')" aria-label="Limpar busca">✕</button>
+  }
+</div>
 
-  <!-- ── KPI Row ── -->
-  <div class="kpi-row">
-    <div class="kpi-card">
-      <p class="kpi-card__label">Receitas</p>
-      <p class="kpi-card__value kpi-card__value--green">{{ formatCurrency(summary().income) }}</p>
-      <p class="kpi-card__sub">no mês atual</p>
-    </div>
-    <div class="kpi-card">
-      <p class="kpi-card__label">Despesas</p>
-      <p class="kpi-card__value kpi-card__value--red">{{ formatCurrency(Math.abs(summary().expenses)) }}</p>
-      <p class="kpi-card__sub">no mês atual</p>
-    </div>
-    <div class="kpi-card">
-      <p class="kpi-card__label">Saldo</p>
-      <p class="kpi-card__value kpi-card__value--blue">{{ formatCurrency(summary().balance) }}</p>
-      <p class="kpi-card__sub">disponível</p>
-    </div>
-    <div class="kpi-card">
-      <p class="kpi-card__label">Total Registros</p>
-      <p class="kpi-card__value">{{ summary().count }}</p>
-      <p class="kpi-card__sub">lançamentos</p>
+<!-- ── Filters ── -->
+<div class="filter-bar">
+  <select class="form-select" [ngModel]="filterMonth()" (ngModelChange)="filterMonth.set(+$event); onFilterChange()" aria-label="Mês">
+    @for (m of months; track m.value) {
+      <option [value]="m.value">{{ m.label }}</option>
+    }
+  </select>
+  <select class="form-select" [ngModel]="filterYear()" (ngModelChange)="filterYear.set(+$event); onFilterChange()" aria-label="Ano">
+    @for (y of years; track y) {
+      <option [value]="y">{{ y }}</option>
+    }
+  </select>
+  <select class="form-select" [ngModel]="filterCategory()" (ngModelChange)="filterCategory.set($event); onFilterChange()" aria-label="Categoria">
+    <option value="">Todas as categorias</option>
+    @for (cat of categories(); track cat.id) {
+      <option [value]="cat.id">{{ cat.name }}</option>
+    }
+  </select>
+</div>
+
+<!-- ── KPI Row — consolidado por 3 fontes ── -->
+<div class="kpi-row">
+  <div class="kpi-card">
+    <p class="kpi-card__label">Receitas</p>
+    <p class="kpi-card__value kpi-card__value--green">{{ formatCurrency(consolidated().income) }}</p>
+    <p class="kpi-card__sub">{{ currentMonthName }} {{ currentYear }}</p>
+  </div>
+  <div class="kpi-card kpi-card--breakdown">
+    <p class="kpi-card__label">Despesas Totais</p>
+    <p class="kpi-card__value kpi-card__value--red">{{ formatCurrency(consolidated().total_expenses) }}</p>
+    <div class="kpi-breakdown">
+      <span class="kpi-breakdown__item" title="Gastos em dinheiro">
+        💵 {{ formatCurrency(consolidated().cash_expenses) }}
+      </span>
+      <span class="kpi-breakdown__sep">+</span>
+      <span class="kpi-breakdown__item" title="Faturas abertas de cartão">
+        💳 {{ formatCurrency(consolidated().card_invoices) }}
+      </span>
+      <span class="kpi-breakdown__sep">+</span>
+      <span class="kpi-breakdown__item" title="Minha parte em gastos compartilhados">
+        🤝 {{ formatCurrency(consolidated().shared_my_portion) }}
+      </span>
     </div>
   </div>
+  <div class="kpi-card">
+    <p class="kpi-card__label">Saldo</p>
+    <p class="kpi-card__value" [class]="consolidated().balance >= 0 ? 'kpi-card__value--blue' : 'kpi-card__value--red'">
+      {{ consolidated().balance >= 0 ? '+' : '-' }} {{ formatCurrency(consolidated().balance) }}
+    </p>
+    <p class="kpi-card__sub">disponível</p>
+  </div>
+  <div class="kpi-card">
+    <p class="kpi-card__label">Total Registros</p>
+    <p class="kpi-card__value">{{ totalCount() }}</p>
+    <p class="kpi-card__sub">lançamentos</p>
+  </div>
+</div>
 
-  <!-- ── Dashboard grid ── -->
+<!-- ── Dashboard cards grid ── -->
+@if (!dashLoading()) {
   <div class="dash-grid">
 
     <!-- Faturas Abertas -->
@@ -75,7 +119,7 @@
         }
         @if (openInvoices().length > 0) {
           <div class="invoice-total-row">
-            <span>Total em faturas abertas</span>
+            <span>Total em faturas</span>
             <strong>{{ formatCurrency(totalInvoices()) }}</strong>
           </div>
         }
@@ -94,9 +138,7 @@
         }
         @for (group of sharedDebts(); track group.id) {
           <a [routerLink]="['/shared-debts', group.id]" class="shared-item">
-            <div class="shared-item__avatar">
-              {{ group.name.substring(0, 2).toUpperCase() }}
-            </div>
+            <div class="shared-item__avatar">{{ group.name.substring(0, 2).toUpperCase() }}</div>
             <div class="shared-item__info">
               <p class="shared-item__name">{{ group.name }}</p>
               <p class="shared-item__date">{{ group.created_at | date:'dd/MM/yyyy' }}</p>
@@ -107,7 +149,49 @@
       </div>
     </div>
 
-    <!-- Gastos por Categoria -->
+    <!-- Parcelamentos ── NOVO ── -->
+    <div class="card">
+      <div class="card__header">
+        <span class="card__title">📋 Parcelamentos Ativos</span>
+        <a routerLink="/installments" class="card__link">Ver todos →</a>
+      </div>
+      <div class="card__body">
+        @if (activeInstallments().length === 0) {
+          <p class="empty-msg">Nenhum parcelamento ativo.</p>
+        }
+        @for (g of activeInstallments(); track g.name) {
+          <div class="installment-item">
+            <div class="installment-item__info">
+              <p class="installment-item__name">{{ g.name }}</p>
+              <div class="installment-item__progress-wrap">
+                <div class="installment-item__progress-bar">
+                  <div class="installment-item__progress-fill"
+                       [style.width]="progressPct(g) + '%'">
+                  </div>
+                </div>
+                <span class="installment-item__pct">
+                  {{ g.paidInstallments }}/{{ g.totalInstallments }}
+                </span>
+              </div>
+            </div>
+            <div class="installment-item__value">
+              <p class="installment-item__amount">{{ formatCurrency(g.amountPerInstallment) }}/mês</p>
+              <p class="installment-item__remaining">
+                Restam {{ formatCurrency(g.remainingAmount) }}
+              </p>
+            </div>
+          </div>
+        }
+        @if (activeInstallments().length > 0) {
+          <div class="invoice-total-row">
+            <span>Total restante em parcelas</span>
+            <strong>{{ formatCurrency(totalRemainingInstallments()) }}</strong>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Categorias -->
     <div class="card">
       <div class="card__header">
         <span class="card__title">📊 Gastos por Categoria</span>
@@ -133,26 +217,24 @@
     <div class="card">
       <div class="card__header">
         <span class="card__title">🕒 Últimos Lançamentos</span>
-        <a routerLink="/expenses" class="card__link">Ver todos →</a>
+        <a routerLink="/home" class="card__link">Ver tabela ↓</a>
       </div>
       <div class="card__body">
-        @if (recentExpenses().length === 0) {
+        @if (expenses().length === 0 && !tableLoading()) {
           <p class="empty-msg">Nenhum lançamento neste mês.</p>
         }
-        @for (exp of recentExpenses(); track exp.id) {
+        @for (exp of expenses().slice(0, 5); track exp.id) {
           <div class="expense-item">
-            <div class="expense-item__icon">
-              {{ exp.amount >= 0 ? '💰' : '💸' }}
-            </div>
+            <div class="expense-item__icon">{{ exp.amount >= 0 ? '💰' : '💸' }}</div>
             <div class="expense-item__info">
               <p class="expense-item__desc">{{ exp.description }}</p>
               <p class="expense-item__meta">
                 {{ exp.payment_method === 'cartao' ? '💳' : '💵' }}
-                {{ exp.date | date:'dd/MM' }}
+                {{ exp.date | slice:8:10 }}/{{ exp.date | slice:5:7 }}
               </p>
             </div>
             <p class="expense-item__amount" [class]="amountClass(exp.amount)">
-              {{ amountPrefix(exp.amount) }} {{ formatCurrency(Math.abs(exp.amount)) }}
+              {{ amountPrefix(exp.amount) }} {{ formatCurrency(exp.amount) }}
             </p>
           </div>
         }
@@ -175,5 +257,70 @@
     </div>
 
   </div><!-- /dash-grid -->
-
 }
+
+<!-- ── Tabela completa de gastos ── -->
+<div class="card card--full table-section">
+  <div class="card__header">
+    <span class="card__title">📋 Todos os Gastos</span>
+    <a routerLink="/history" class="card__link">Ver histórico completo →</a>
+  </div>
+
+  @if (tableLoading()) {
+    <div class="loading-state"><div class="spinner"></div><p>Carregando...</p></div>
+  } @else if (expenses().length === 0) {
+    <div class="empty-state">
+      <div class="empty-state__icon">💸</div>
+      <p class="empty-state__title">Nenhum gasto encontrado</p>
+      <p class="empty-state__text">Tente ajustar os filtros ou adicione um novo gasto.</p>
+      <a routerLink="/expenses/new" class="btn btn--primary" style="margin-top:16px">+ Novo Gasto</a>
+    </div>
+  } @else {
+    <div class="data-table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Descrição</th>
+            <th>Categoria</th>
+            <th>Data</th>
+            <th class="text-right">Valor</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (e of expenses(); track e.id) {
+            <tr>
+              <td><span class="expense-desc__text">{{ e.description }}</span></td>
+              <td><span class="badge badge--neutral">{{ categoryName(e.category_id) }}</span></td>
+              <td class="mono text-muted">{{ e.date | slice:8:10 }}/{{ e.date | slice:5:7 }}/{{ e.date | slice:0:4 }}</td>
+              <td class="text-right">
+                <span [class]="'mono ' + amountClass(e.amount)">
+                  {{ amountPrefix(e.amount) }} {{ formatCurrency(e.amount) }}
+                </span>
+              </td>
+              <td>
+                <div class="action-buttons">
+                  <a [routerLink]="['/expenses', e.id, 'edit']" class="btn btn--ghost btn--sm">✏️</a>
+                  <button class="btn btn--ghost btn--sm" (click)="delete(e.id)" [disabled]="deletingId() === e.id">
+                    @if (deletingId() === e.id) { <span class="spinner spinner--sm"></span> } @else { 🗑️ }
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (totalPages() > 1) {
+      <nav class="pagination">
+        <button class="pagination__btn" (click)="goToPage(currentPage() - 1)" [disabled]="currentPage() === 1">‹</button>
+        @for (p of pageNumbers(); track p) {
+          <button class="pagination__btn" [class.pagination__btn--active]="p === currentPage()" (click)="goToPage(p)">{{ p }}</button>
+        }
+        <button class="pagination__btn" (click)="goToPage(currentPage() + 1)" [disabled]="currentPage() === totalPages()">›</button>
+        <span class="pagination__info">{{ currentPage() }} de {{ totalPages() }} ({{ totalCount() }} registros)</span>
+      </nav>
+    }
+  }
+</div>

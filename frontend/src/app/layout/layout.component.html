@@ -62,15 +62,7 @@
       <span class="sidebar__link-label">Início</span>
     </a>
 
-        <a
-      routerLink="/expenses"
-      routerLinkActive="sidebar__link--active"
-      class="sidebar__link"
-      (click)="closeDrawer()"
-    >
-      <span class="sidebar__link-icon" aria-hidden="true">💰</span>
-      <span class="sidebar__link-label">Gastos</span>
-    </a>
+    
 
     <a
       routerLink="/history"
@@ -195,9 +187,9 @@
 
 <!-- ── Bottom navigation (mobile only) ── -->
 <nav class="bottom-nav" aria-label="Navegação rápida" role="navigation">
-  <a routerLink="/expenses" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
+  <a routerLink="/home" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
     <span class="bottom-nav__icon" aria-hidden="true">💰</span>
-    <span class="bottom-nav__label">Gastos</span>
+    <span class="bottom-nav__label">Início</span>
   </a>
   <a routerLink="/cards" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
     <span class="bottom-nav__icon" aria-hidden="true">💳</span>
