@@ -109,6 +109,20 @@
           </div>
         </div>
 
+        <!-- Categoria -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="category_id">Categoria</label>
+            <select id="category_id" class="form-select" formControlName="category_id">
+              <option [ngValue]="null">Sem categoria</option>
+              @for (cat of categories(); track cat.id) {
+                <option [ngValue]="cat.id">{{ cat.name }}</option>
+              }
+            </select>
+            <span class="form-hint">Opcional. Ajuda a analisar onde o grupo mais gasta.</span>
+          </div>
+        </div>
+
         <div class="form-row">
           <div class="form-group">
             <label class="form-label" for="paid_by">Pago por *</label>
@@ -195,6 +209,7 @@
         <thead>
           <tr>
             <th scope="col">Descrição</th>
+            <th scope="col">Categoria</th>
             <th scope="col">Pago por</th>
             <th scope="col">Data</th>
             <th scope="col" class="text-right">Valor</th>
@@ -207,6 +222,13 @@
               <td style="font-weight:500">
                 {{ e.description }}
                 <span class="badge--shared">{{ e.payment_method === 'cartao' ? '💳' : '💵' }} 👥</span>
+              </td>
+              <td>
+                @if (e.category_name) {
+                  <span class="badge badge--primary">{{ e.category_name }}</span>
+                } @else {
+                  <span class="text-muted" style="font-size:12px">—</span>
+                }
               </td>
               <td>{{ e.paid_by_name }}</td>
               <td class="mono text-muted" style="font-size:13px;white-space:nowrap">{{ formatDate(e.date) }}</td>

@@ -152,6 +152,7 @@ class CreateSharedEntryBehavior:
         self.participant_ids = data.get('participant_ids') or []
         self.payment_method = data.get('payment_method', 'dinheiro')
         self.credit_card_id = data.get('credit_card_id')
+        self.category_id = data.get('category_id')
 
     def _member_ids(self):
         return set(
@@ -213,6 +214,7 @@ class CreateSharedEntryBehavior:
                 date=self.date,
                 payment_method=self.payment_method,
                 credit_card_id=self.credit_card_id,
+                category_id=self.category_id,
                 created_by_tenant_id=self.user.tenant_id,
             )
             SharedEntryParticipant.objects.bulk_create(
@@ -336,6 +338,8 @@ class UpdateSharedEntryBehavior:
             entry.paid_by_id = paid_by_id
             entry.payment_method = payment_method
             entry.credit_card_id = credit_card_id
+            if 'category_id' in data or not self.partial:
+                entry.category_id = data.get('category_id', entry.category_id if self.partial else None)
             entry.save()
 
             # Re-sync participants only when requested.

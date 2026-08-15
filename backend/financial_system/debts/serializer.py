@@ -29,10 +29,14 @@ class SharedDebtMemberSerializer(serializers.ModelSerializer):
 
 
 class SharedEntrySerializer(serializers.ModelSerializer):
-    # Helper de leitura: nome do membro que pagou (evita lookup extra no cliente)
     paid_by_name = serializers.CharField(
         source='paid_by.display_name',
         read_only=True,
+    )
+    category_name = serializers.CharField(
+        source='category.name',
+        read_only=True,
+        default=None,
     )
 
     class Meta:
@@ -47,6 +51,8 @@ class SharedEntrySerializer(serializers.ModelSerializer):
             'date',
             'payment_method',
             'credit_card',
+            'category',
+            'category_name',
             'created_by_tenant_id',
             'created_at',
         ]

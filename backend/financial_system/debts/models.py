@@ -134,6 +134,15 @@ class SharedEntry(BaseModel):
         related_name='shared_entries',
         help_text='Preenchido apenas quando o usuário atual pagou no próprio cartão.',
     )
+    category = models.ForeignKey(
+        to='catalog.ExpenseCategory',
+        db_column='category_id',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='shared_entries',
+        help_text='Categoria opcional da despesa compartilhada.',
+    )
     created_by_tenant_id = models.CharField(
         max_length=36,
         db_column='created_by_tenant_id',

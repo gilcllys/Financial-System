@@ -39,6 +39,12 @@ class CreateSharedEntryInputSerializer(serializers.Serializer):
         allow_null=True,
         default=None,
     )
+    category_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        default=None,
+        help_text='ID da categoria (ExpenseCategory). Opcional.',
+    )
 
 
 class JoinSharedDebtInputSerializer(serializers.Serializer):
