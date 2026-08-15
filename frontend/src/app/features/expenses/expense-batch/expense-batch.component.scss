@@ -172,3 +172,33 @@ legend {
     font-weight: 600;
   }
 }
+
+// ── Mode Toggle ────────────────────────────────────────────────────────────────
+.mode-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-lg);
+
+  &__btn {
+    padding: var(--space-base) var(--space-md);
+    border: 2px solid var(--color-hairline);
+    border-radius: var(--rounded-xl);
+    background: var(--color-canvas);
+    font-size: 16px;
+    font-weight: 600;
+    font-family: var(--font-body);
+    color: var(--color-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+
+    &:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+    &--active {
+      border-color: var(--color-primary);
+      background: rgba(0, 82, 255, 0.04);
+      color: var(--color-primary);
+    }
+  }
+}

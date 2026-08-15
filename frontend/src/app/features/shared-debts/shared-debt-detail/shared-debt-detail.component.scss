@@ -172,3 +172,53 @@ fieldset.form-group > legend.form-label {
   &__ok   { font-size: 13px; color: var(--color-semantic-up); margin: 0; }
   &__skip { font-size: 13px; color: var(--color-muted); margin: 2px 0 0; }
 }
+
+// ── Batch list ────────────────────────────────────────────────────────────────
+.batch-list {
+  border-top: 1px solid var(--color-hairline);
+  margin-top: var(--space-base);
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--color-hairline-soft);
+
+    &:last-of-type { border-bottom: none; }
+  }
+
+  &__info { flex: 1; min-width: 0; }
+
+  &__desc {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-ink);
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__meta {
+    font-size: 12px;
+    color: var(--color-muted);
+  }
+
+  &__amount {
+    font-size: 14px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-sm) 0;
+    font-size: 13px;
+    color: var(--color-body);
+    border-top: 1px solid var(--color-hairline);
+    margin-top: var(--space-xs);
+  }
+}

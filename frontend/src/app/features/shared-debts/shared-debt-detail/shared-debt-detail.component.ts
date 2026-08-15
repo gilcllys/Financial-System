@@ -1,5 +1,7 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { SlicePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { forkJoin } from 'rxjs';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/auth/auth.service';
 import { CardService } from '../../../core/services/card.service';
@@ -16,10 +18,24 @@ import {
   RecurringTemplate,
 } from '../../../core/services/shared-debt.service';
 
+
+interface DraftSharedEntry {
+  localId: number;
+  description: string;
+  amount: number;
+  date: string;
+  paid_by: number;
+  paid_by_name: string;
+  participant_ids: number[];
+  payment_method: 'dinheiro' | 'cartao';
+  category_id: number | null;
+  category_name: string | null;
+}
+
 @Component({
   selector: 'app-shared-debt-detail',
   standalone: true,
-  imports: [RouterLink, ReactiveFormsModule],
+  imports: [RouterLink, ReactiveFormsModule, SlicePipe],
   templateUrl: './shared-debt-detail.component.html',
   styleUrls: ['./shared-debt-detail.component.scss'],
 })
@@ -59,6 +75,25 @@ export class SharedDebtDetailComponent implements OnInit {
   savingRecurring = signal(false);
   recurringError = signal('');
   generatingMonth = signal(false);
+
+  // ── Batch de gastos compartilhados ───────────────────────────────────────
+  showBatchSection = signal(false);
+  batchDrafts = signal<DraftSharedEntry[]>([]);
+  savingBatch = signal(false);
+  batchError = signal('');
+  batchSaveProgress = signal(0);
+  private batchNextId = 1;
+
+  batchForm = this.fb.group({
+    description: ['', [Validators.required, Validators.minLength(2)]],
+    amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
+    date: [new Date().toISOString().split('T')[0], Validators.required],
+    paid_by: [null as number | null, Validators.required],
+    category_id: [null as number | null],
+    payment_method: ['dinheiro' as 'dinheiro' | 'cartao'],
+  });
+  batchParticipantIds = signal<Set<number>>(new Set());
+  get batchTotal(): number { return this.batchDrafts().reduce((s, d) => s + d.amount, 0); }
   generateResult = signal<{ created: string[]; skipped: string[] } | null>(null);
 
   recurringForm = this.fb.group({
@@ -112,6 +147,7 @@ export class SharedDebtDetailComponent implements OnInit {
       next: m => {
         this.members.set(m);
         this.participantIds.set(new Set(m.map(x => x.id)));
+        this.batchParticipantIds.set(new Set(m.map(x => x.id)));
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
@@ -333,6 +369,88 @@ export class SharedDebtDetailComponent implements OnInit {
     this.svc.generateMonth(this.groupId, now.getMonth() + 1, now.getFullYear()).subscribe({
       next: r => { this.generatingMonth.set(false); this.generateResult.set(r); this.refreshEntriesAndBalances(); this.loadMonthlyHistory(); },
       error: () => { this.generatingMonth.set(false); },
+    });
+  }
+
+
+  // ── Batch methods ─────────────────────────────────────────────────────────
+  toggleBatchSection(): void { this.showBatchSection.set(!this.showBatchSection()); }
+
+  isBatchParticipant(id: number): boolean { return this.batchParticipantIds().has(id); }
+
+  toggleBatchParticipant(id: number): void {
+    this.batchParticipantIds.update(s => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  }
+
+  addToBatch(): void {
+    if (this.batchForm.invalid) { this.batchForm.markAllAsTouched(); return; }
+    const parts = [...this.batchParticipantIds()];
+    if (parts.length === 0) { this.batchError.set('Selecione ao menos um participante.'); return; }
+    const v = this.batchForm.getRawValue();
+    const paidByMember = this.members().find(m => m.id === v.paid_by);
+    const cat = this.categories().find(c => c.id === v.category_id);
+    this.batchDrafts.update(list => [...list, {
+      localId: this.batchNextId++,
+      description: v.description!,
+      amount: Math.abs(v.amount!),
+      date: v.date!,
+      paid_by: v.paid_by!,
+      paid_by_name: paidByMember?.display_name ?? '',
+      participant_ids: parts,
+      payment_method: v.payment_method as 'dinheiro' | 'cartao',
+      category_id: v.category_id,
+      category_name: cat?.name ?? null,
+    }]);
+    this.batchError.set('');
+    this.batchForm.reset({
+      description: '', amount: null, date: v.date!, paid_by: v.paid_by,
+      category_id: null, payment_method: 'dinheiro',
+    });
+    this.batchParticipantIds.set(new Set(this.members().map(m => m.id)));
+  }
+
+  removeBatchDraft(localId: number): void {
+    this.batchDrafts.update(list => list.filter(d => d.localId !== localId));
+  }
+
+  saveAllBatch(): void {
+    if (this.batchDrafts().length === 0 || this.savingBatch()) return;
+    this.savingBatch.set(true);
+    this.batchSaveProgress.set(0);
+    this.batchError.set('');
+
+    const drafts = this.batchDrafts();
+    let completed = 0;
+
+    const requests = drafts.map(d =>
+      this.svc.createEntry({
+        shared_debt: this.groupId,
+        description: d.description,
+        amount: d.amount,
+        date: d.date,
+        paid_by: d.paid_by,
+        participant_ids: d.participant_ids.length === this.members().length ? undefined : d.participant_ids,
+        payment_method: d.payment_method,
+        category_id: d.category_id,
+      })
+    );
+
+    forkJoin(requests).subscribe({
+      next: () => {
+        this.savingBatch.set(false);
+        this.batchDrafts.set([]);
+        this.showBatchSection.set(false);
+        this.refreshEntriesAndBalances();
+        this.loadMonthlyHistory();
+      },
+      error: err => {
+        this.savingBatch.set(false);
+        this.batchError.set(err?.error?.detail ?? 'Erro ao salvar alguns gastos.');
+      },
     });
   }
 

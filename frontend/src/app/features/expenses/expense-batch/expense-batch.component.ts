@@ -176,6 +176,8 @@ export class ExpenseBatchComponent implements OnInit {
   amountPrefix(amount: number): string { return amount >= 0 ? '+' : '-'; }
   draftAmount(d: DraftExpense): number { return d.isIncome ? Math.abs(d.amount) : -Math.abs(d.amount); }
 
+  goToShared(): void { this.router.navigate(['/shared-debts']); }
+
   private todayStr(): string { return new Date().toISOString().split('T')[0]; }
 
   hasError(field: string): boolean {
