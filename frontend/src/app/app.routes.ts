@@ -17,11 +17,7 @@ export const routes: Routes = [
       },
 
             // Expenses
-      {
-        path: 'expenses',
-        loadComponent: () =>
-          import('./features/expenses/expense-list/expense-list.component').then(m => m.ExpenseListComponent),
-      },
+      { path: 'expenses', redirectTo: 'home', pathMatch: 'full' },
       {
         path: 'expenses/new',
         loadComponent: () =>
@@ -118,21 +114,11 @@ export const routes: Routes = [
           import('./features/supermarket/supermarket-detail/supermarket-detail.component').then(m => m.SupermarketDetailComponent),
       },
 
-      // Histórico (todos os gastos, sem filtro de mês padrão)
-      {
-        path: 'history',
-        loadComponent: () =>
-          import('./features/expenses/expense-list/expense-list.component').then(m => m.ExpenseListComponent),
-        data: { historyMode: true },
-      },
+      // Histórico
+      { path: 'history', redirectTo: 'home', pathMatch: 'full' },
 
-      // Sem Categoria (gastos com category_id = 11)
-      {
-        path: 'uncategorized',
-        loadComponent: () =>
-          import('./features/expenses/expense-list/expense-list.component').then(m => m.ExpenseListComponent),
-        data: { uncategorizedMode: true },
-      },
+      // Sem categoria
+      { path: 'uncategorized', redirectTo: 'home', pathMatch: 'full' },
 
       // Analytics
       {
