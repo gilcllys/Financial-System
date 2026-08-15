@@ -24,6 +24,32 @@ export interface HomeCharts {
   weekly: { week: number; label: string; total: number }[];
 }
 
+export interface CardInvoiceDetail {
+  card_id: number;
+  card_name: string;
+  last_four_digits: string;
+  invoice_month: number;
+  invoice_year: number;
+  due_date: string;
+  total: number;
+  count: number;
+}
+
+export interface ConsolidatedSummary {
+  month: number;
+  year: number;
+  income: number;
+  cash_expenses: number;
+  cash_count: number;
+  card_invoices: number;
+  card_invoices_count: number;
+  card_invoices_detail: CardInvoiceDetail[];
+  shared_my_portion: number;
+  shared_count: number;
+  total_expenses: number;
+  balance: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AnalyticsService {
   private http = inject(HttpClient);
@@ -57,6 +83,16 @@ export class AnalyticsService {
     if (year) params = params.set('year', year);
     if (paymentMethod) params = params.set('payment_method', paymentMethod);
     return this.http.get<DailyAnalytics[]>(`${this.base}/daily/`, { params });
+  }
+
+
+  consolidatedSummary(month?: number, year?: number): Observable<ConsolidatedSummary> {
+    let params = new HttpParams();
+    if (month) params = params.set('month', month);
+    if (year)  params = params.set('year', year);
+    return this.http.get<ConsolidatedSummary>(
+      `${environment.apiBaseUrl}/api/expenses/expenses/consolidated-summary/`, { params }
+    );
   }
 
   /** Endpoint otimizado — retorna todos os dados da tela Home em 1 request */

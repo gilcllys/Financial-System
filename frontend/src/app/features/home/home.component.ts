@@ -8,10 +8,10 @@ import { DatePipe, SlicePipe } from '@angular/common';
 import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
 import { Chart, registerables } from 'chart.js';
 
-import { HomeService } from '../../core/services/home.service';
+import { HomeService, InstallmentGroup } from '../../core/services/home.service';
 import { ExpenseService } from '../../core/services/expense.service';
 import { CategoryService } from '../../core/services/category.service';
-import { AnalyticsService, MonthlyAnalytics, CategoryAnalytics } from '../../core/services/analytics.service';
+import { AnalyticsService, MonthlyAnalytics, CategoryAnalytics, ConsolidatedSummary } from '../../core/services/analytics.service';
 import { OpenInvoice, Expense, ExpenseCategory } from '../../core/models';
 import { SharedDebtGroup } from '../../core/services/shared-debt.service';
 
@@ -21,6 +21,14 @@ const MONTH_NAMES = [
   'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
 ];
+
+const EMPTY_CONSOLIDATED: ConsolidatedSummary = {
+  month: 0, year: 0,
+  income: 0, cash_expenses: 0, cash_count: 0,
+  card_invoices: 0, card_invoices_count: 0, card_invoices_detail: [],
+  shared_my_portion: 0, shared_count: 0,
+  total_expenses: 0, balance: 0,
+};
 
 @Component({
   selector: 'app-home',
@@ -32,40 +40,37 @@ const MONTH_NAMES = [
 export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('evolutionChart') chartCanvas!: ElementRef<HTMLCanvasElement>;
 
-  private homeService    = inject(HomeService);
-  private expenseService = inject(ExpenseService);
-  private categoryService = inject(CategoryService);
+  private homeService      = inject(HomeService);
+  private expenseService   = inject(ExpenseService);
+  private categoryService  = inject(CategoryService);
   private analyticsService = inject(AnalyticsService);
-  private destroy$ = new Subject<void>();
-  private searchSubject = new Subject<string>();
+  private destroy$         = new Subject<void>();
+  private searchSubject    = new Subject<string>();
 
   // ── Dashboard state ──────────────────────────────────────────────────────
-  dashLoading   = signal(true);
-  openInvoices  = signal<OpenInvoice[]>([]);
-  sharedDebts   = signal<SharedDebtGroup[]>([]);
-  byCategory    = signal<CategoryAnalytics[]>([]);
-  evolution     = signal<MonthlyAnalytics[]>([]);
+  dashLoading        = signal(true);
+  consolidated       = signal<ConsolidatedSummary>(EMPTY_CONSOLIDATED);
+  openInvoices       = signal<OpenInvoice[]>([]);
+  sharedDebts        = signal<SharedDebtGroup[]>([]);
+  byCategory         = signal<CategoryAnalytics[]>([]);
+  evolution          = signal<MonthlyAnalytics[]>([]);
+  installmentGroups  = signal<InstallmentGroup[]>([]);
 
   // ── Filter / table state ─────────────────────────────────────────────────
-  tableLoading  = signal(true);
-  expenses      = signal<Expense[]>([]);
-  categories    = signal<ExpenseCategory[]>([]);
-  deletingId    = signal<number | null>(null);
-  totalCount    = signal(0);
-  currentPage   = signal(1);
-  pageSize      = 20;
+  tableLoading   = signal(true);
+  expenses       = signal<Expense[]>([]);
+  categories     = signal<ExpenseCategory[]>([]);
+  deletingId     = signal<number | null>(null);
+  totalCount     = signal(0);
+  currentPage    = signal(1);
+  pageSize       = 20;
 
   filterMonth    = signal(new Date().getMonth() + 1);
   filterYear     = signal(new Date().getFullYear());
   filterCategory = signal<number | ''>('');
   searchTerm     = signal('');
 
-  // Summary driven by analytics (accurate totals for the selected period)
-  income   = signal(0);
-  expenses_total = signal(0);
-  balance  = signal(0);
-
-  // ── Read-only constants ───────────────────────────────────────────────────
+  // ── Constants ────────────────────────────────────────────────────────────
   readonly months = MONTH_NAMES.map((label, i) => ({ value: i + 1, label }));
   readonly years  = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
   readonly Math   = Math;
@@ -73,10 +78,19 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   get currentMonthName() { return MONTH_NAMES[this.filterMonth() - 1]; }
   get currentYear()      { return this.filterYear(); }
 
-  totalPages  = computed(() => Math.ceil(this.totalCount() / this.pageSize));
-  pageNumbers = computed(() => Array.from({ length: this.totalPages() }, (_, i) => i + 1));
+  totalPages    = computed(() => Math.ceil(this.totalCount() / this.pageSize));
+  pageNumbers   = computed(() => Array.from({ length: this.totalPages() }, (_, i) => i + 1));
   totalInvoices = computed(() => this.openInvoices().reduce((s, i) => s + i.total, 0));
   maxCategory   = computed(() => Math.max(...this.byCategory().map(c => c.total), 1));
+
+  /** Parcelas ativas (ainda não quitadas) — máximo 4 no preview */
+  activeInstallments = computed(() =>
+    this.installmentGroups().filter(g => g.paidInstallments < g.totalInstallments).slice(0, 4)
+  );
+
+  totalRemainingInstallments = computed(() =>
+    this.installmentGroups().reduce((s, g) => s + g.remainingAmount, 0)
+  );
 
   // ── Chart ────────────────────────────────────────────────────────────────
   private chart: Chart | null = null;
@@ -110,30 +124,27 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     this.chart?.destroy();
   }
 
-  // ── Dashboard load (open invoices + shared debts + evolution) ────────────
+  // ── Dashboard load ────────────────────────────────────────────────────────
   private loadDashboard(): void {
     this.dashLoading.set(true);
     this.homeService.load(this.filterMonth(), this.filterYear())
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: data => {
+          this.consolidated.set(data.consolidated);
           this.openInvoices.set(data.openInvoices);
           this.sharedDebts.set(data.sharedDebts);
           this.byCategory.set(data.byCategory);
+          this.installmentGroups.set(data.installmentGroups);
           this.dashLoading.set(false);
           if (this.chart) this.updateChart(data.evolution);
           else this.pendingChartData = data.evolution;
         },
         error: () => this.dashLoading.set(false),
       });
-
-    // Evolution always loads full year
-    this.analyticsService.monthly(this.filterYear())
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({ next: ev => { this.evolution.set(ev); } });
   }
 
-  // ── Table load ───────────────────────────────────────────────────────────
+  // ── Table + KPIs load (recarrega ao mudar filtro) ─────────────────────────
   loadTable(): void {
     this.tableLoading.set(true);
     this.expenseService.list({
@@ -153,23 +164,18 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
         error: () => this.tableLoading.set(false),
       });
 
-    // KPIs: reload analytics summary when period changes
+    // KPIs consolidados: recarrega ao trocar mês/ano
+    this.analyticsService.consolidatedSummary(this.filterMonth(), this.filterYear())
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({ next: data => this.consolidated.set(data) });
+
+    // Categorias: recarrega ao trocar mês/ano
     this.analyticsService.homeCharts(this.filterMonth(), this.filterYear())
       .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: data => {
-          this.income.set(data.summary.income);
-          this.expenses_total.set(data.summary.expenses);
-          this.balance.set(data.summary.balance);
-          this.byCategory.set(data.by_category);
-        },
-      });
+      .subscribe({ next: data => this.byCategory.set(data.by_category) });
   }
 
-  onFilterChange(): void {
-    this.currentPage.set(1);
-    this.loadTable();
-  }
+  onFilterChange(): void { this.currentPage.set(1); this.loadTable(); }
 
   onSearchInput(value: string): void {
     this.searchTerm.set(value);
@@ -190,7 +196,6 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
         this.expenses.update(list => list.filter(e => e.id !== id));
         this.totalCount.update(c => c - 1);
         this.deletingId.set(null);
-        // Reload KPIs
         this.loadTable();
       },
       error: () => this.deletingId.set(null),
@@ -208,8 +213,13 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
 
   amountClass(amount: number): string  { return amount >= 0 ? 'value--up' : 'value--down'; }
   amountPrefix(amount: number): string { return amount >= 0 ? '+' : '-'; }
+
   categoryBarWidth(total: number): string {
     return `${Math.min((total / this.maxCategory()) * 100, 100)}%`;
+  }
+
+  progressPct(g: InstallmentGroup): number {
+    return Math.round((g.paidInstallments / g.totalInstallments) * 100);
   }
 
   daysLabel(days: number): string {

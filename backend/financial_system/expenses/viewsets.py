@@ -854,6 +854,159 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
         return Response(result, status=status.HTTP_200_OK)
 
+
+    @action(detail=False, methods=['get'], url_path='consolidated-summary')
+    def consolidated_summary(self, request):
+        """
+        GET /api/expenses/expenses/consolidated-summary/?month=8&year=2026
+
+        Resumo financeiro consolidado com as 3 fontes reais de gasto:
+
+          1. Receitas do mês (Expense, amount > 0, filtro mês/ano calendário)
+          2. Gastos em dinheiro (Expense, payment_method='dinheiro', amount < 0)
+          3. Faturas abertas de cartão (período real da fatura, NÃO mês calendário)
+          4. Minha parte em dívidas compartilhadas (SharedEntry onde sou participante)
+
+        total_expenses = cash_expenses + card_invoices + shared_my_portion
+        balance        = income - total_expenses
+        """
+        from datetime import date as date_cls
+        from decimal import Decimal
+
+        from cards.behaviors import _compute_invoice_period, _current_invoice_month
+        from cards.models import CreditCard
+        from debts.models import SharedDebtMember, SharedEntry
+
+        today  = date_cls.today()
+        params = request.query_params
+        tenant = request.user.tenant_id
+
+        try:
+            month = int(params.get('month', today.month))
+            if not (1 <= month <= 12):
+                raise ValueError
+        except (ValueError, TypeError):
+            month = today.month
+
+        try:
+            year = int(params.get('year', today.year))
+            if year <= 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            year = today.year
+
+        base_qs = models.Expense.objects.filter(
+            tenant_id=tenant,
+            date__year=year,
+            date__month=month,
+        )
+
+        # ── 1. Receitas do mês ────────────────────────────────────────────────
+        income_agg = base_qs.aggregate(
+            income=Sum('amount', filter=Q(amount__gt=0)),
+            income_count=Count('id', filter=Q(amount__gt=0)),
+        )
+        income = round(float(income_agg['income'] or 0), 2)
+
+        # ── 2. Gastos em dinheiro (mês calendário) ────────────────────────────
+        cash_agg = (
+            base_qs
+            .filter(payment_method='dinheiro', amount__lt=0)
+            .aggregate(total=Sum(Abs('amount')), count=Count('id'))
+        )
+        cash_expenses = round(float(cash_agg['total'] or 0), 2)
+        cash_count    = cash_agg['count'] or 0
+
+        # ── 3. Faturas abertas de cartão (período real da fatura) ─────────────
+        cards = CreditCard.objects.filter(tenant_id=tenant)
+        card_invoices_total = 0.0
+        card_invoices_count = 0
+        card_invoices_detail = []
+
+        for card in cards:
+            inv_month, inv_year = _current_invoice_month(card)
+            period_start, period_end, due = _compute_invoice_period(
+                card, inv_month, inv_year
+            )
+            agg = (
+                models.Expense.objects
+                .filter(
+                    tenant_id=tenant,
+                    credit_card_id=card.id,
+                    date__gte=period_start,
+                    date__lte=period_end,
+                )
+                .aggregate(total=Sum(Abs('amount')), count=Count('id'))
+            )
+            total = round(float(agg['total'] or 0), 2)
+            cnt   = agg['count'] or 0
+            card_invoices_total += total
+            card_invoices_count += cnt
+            card_invoices_detail.append({
+                'card_id':         card.id,
+                'card_name':       card.name,
+                'last_four_digits': card.last_four_digits,
+                'invoice_month':   inv_month,
+                'invoice_year':    inv_year,
+                'due_date':        due.isoformat(),
+                'total':           total,
+                'count':           cnt,
+            })
+
+        card_invoices_total = round(card_invoices_total, 2)
+
+        # ── 4. Minha parte em dívidas compartilhadas (mês calendário) ─────────
+        my_member_ids = list(
+            SharedDebtMember.objects
+            .filter(tenant_id=tenant)
+            .values_list('id', flat=True)
+        )
+
+        entries_qs = (
+            SharedEntry.objects
+            .filter(
+                participants__member_id__in=my_member_ids,
+                date__year=year,
+                date__month=month,
+            )
+            .prefetch_related('participants')
+            .distinct()
+        )
+
+        shared_my_portion = Decimal('0')
+        shared_count = 0
+        for entry in entries_qs:
+            participant_count = entry.participants.count()
+            if participant_count > 0:
+                shared_my_portion += entry.amount / Decimal(participant_count)
+                shared_count += 1
+
+        shared_my_portion = round(float(shared_my_portion), 2)
+
+        # ── 5. Totais consolidados ─────────────────────────────────────────────
+        total_expenses = round(cash_expenses + card_invoices_total + shared_my_portion, 2)
+        balance        = round(income - total_expenses, 2)
+
+        return Response({
+            'month': month,
+            'year':  year,
+            # Receita
+            'income':       income,
+            # Gastos em dinheiro
+            'cash_expenses': cash_expenses,
+            'cash_count':    cash_count,
+            # Faturas de cartão (período real)
+            'card_invoices':        card_invoices_total,
+            'card_invoices_count':  card_invoices_count,
+            'card_invoices_detail': card_invoices_detail,
+            # Dívidas compartilhadas (minha parte)
+            'shared_my_portion': shared_my_portion,
+            'shared_count':      shared_count,
+            # Consolidado
+            'total_expenses': total_expenses,
+            'balance':        balance,
+        }, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['get'], url_path='home-charts')
     def home_charts(self, request):
         """

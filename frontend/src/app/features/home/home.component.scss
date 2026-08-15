@@ -627,3 +627,98 @@
     margin-left: 8px;
   }
 }
+
+// ── KPI Breakdown (3 fontes de despesa) ───────────────────────────────────────
+.kpi-card--breakdown { grid-column: span 1; }
+
+.kpi-breakdown {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+
+  &__item {
+    font-size: 10px;
+    color: #6b7280;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 2px 6px;
+    white-space: nowrap;
+  }
+
+  &__sep {
+    font-size: 10px;
+    color: #d1d5db;
+    font-weight: 700;
+  }
+}
+
+// ── Installment preview card ───────────────────────────────────────────────────
+.installment-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  gap: 12px;
+  border-bottom: 1px solid #f9fafb;
+  transition: background 0.12s;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: #fafafa; }
+
+  &__info { flex: 1; min-width: 0; }
+
+  &__name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  &__progress-bar {
+    flex: 1;
+    height: 6px;
+    background: #f3f4f6;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  &__progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #2563eb, #6366f1);
+    transition: width 0.4s ease;
+  }
+
+  &__pct {
+    font-size: 10px;
+    color: #9ca3af;
+    white-space: nowrap;
+  }
+
+  &__value { text-align: right; flex-shrink: 0; }
+
+  &__amount {
+    font-size: 13px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+  }
+
+  &__remaining {
+    font-size: 11px;
+    color: #9ca3af;
+    margin: 2px 0 0;
+  }
+}

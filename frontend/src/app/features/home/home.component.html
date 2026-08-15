@@ -48,21 +48,35 @@
   </select>
 </div>
 
-<!-- ── KPI Row ── -->
+<!-- ── KPI Row — consolidado por 3 fontes ── -->
 <div class="kpi-row">
   <div class="kpi-card">
     <p class="kpi-card__label">Receitas</p>
-    <p class="kpi-card__value kpi-card__value--green">{{ formatCurrency(income()) }}</p>
+    <p class="kpi-card__value kpi-card__value--green">{{ formatCurrency(consolidated().income) }}</p>
     <p class="kpi-card__sub">{{ currentMonthName }} {{ currentYear }}</p>
   </div>
-  <div class="kpi-card">
-    <p class="kpi-card__label">Despesas</p>
-    <p class="kpi-card__value kpi-card__value--red">{{ formatCurrency(expenses_total()) }}</p>
-    <p class="kpi-card__sub">{{ currentMonthName }} {{ currentYear }}</p>
+  <div class="kpi-card kpi-card--breakdown">
+    <p class="kpi-card__label">Despesas Totais</p>
+    <p class="kpi-card__value kpi-card__value--red">{{ formatCurrency(consolidated().total_expenses) }}</p>
+    <div class="kpi-breakdown">
+      <span class="kpi-breakdown__item" title="Gastos em dinheiro">
+        💵 {{ formatCurrency(consolidated().cash_expenses) }}
+      </span>
+      <span class="kpi-breakdown__sep">+</span>
+      <span class="kpi-breakdown__item" title="Faturas abertas de cartão">
+        💳 {{ formatCurrency(consolidated().card_invoices) }}
+      </span>
+      <span class="kpi-breakdown__sep">+</span>
+      <span class="kpi-breakdown__item" title="Minha parte em gastos compartilhados">
+        🤝 {{ formatCurrency(consolidated().shared_my_portion) }}
+      </span>
+    </div>
   </div>
   <div class="kpi-card">
     <p class="kpi-card__label">Saldo</p>
-    <p class="kpi-card__value kpi-card__value--blue">{{ formatCurrency(balance()) }}</p>
+    <p class="kpi-card__value" [class]="consolidated().balance >= 0 ? 'kpi-card__value--blue' : 'kpi-card__value--red'">
+      {{ consolidated().balance >= 0 ? '+' : '-' }} {{ formatCurrency(consolidated().balance) }}
+    </p>
     <p class="kpi-card__sub">disponível</p>
   </div>
   <div class="kpi-card">
@@ -135,6 +149,48 @@
       </div>
     </div>
 
+    <!-- Parcelamentos ── NOVO ── -->
+    <div class="card">
+      <div class="card__header">
+        <span class="card__title">📋 Parcelamentos Ativos</span>
+        <a routerLink="/installments" class="card__link">Ver todos →</a>
+      </div>
+      <div class="card__body">
+        @if (activeInstallments().length === 0) {
+          <p class="empty-msg">Nenhum parcelamento ativo.</p>
+        }
+        @for (g of activeInstallments(); track g.name) {
+          <div class="installment-item">
+            <div class="installment-item__info">
+              <p class="installment-item__name">{{ g.name }}</p>
+              <div class="installment-item__progress-wrap">
+                <div class="installment-item__progress-bar">
+                  <div class="installment-item__progress-fill"
+                       [style.width]="progressPct(g) + '%'">
+                  </div>
+                </div>
+                <span class="installment-item__pct">
+                  {{ g.paidInstallments }}/{{ g.totalInstallments }}
+                </span>
+              </div>
+            </div>
+            <div class="installment-item__value">
+              <p class="installment-item__amount">{{ formatCurrency(g.amountPerInstallment) }}/mês</p>
+              <p class="installment-item__remaining">
+                Restam {{ formatCurrency(g.remainingAmount) }}
+              </p>
+            </div>
+          </div>
+        }
+        @if (activeInstallments().length > 0) {
+          <div class="invoice-total-row">
+            <span>Total restante em parcelas</span>
+            <strong>{{ formatCurrency(totalRemainingInstallments()) }}</strong>
+          </div>
+        }
+      </div>
+    </div>
+
     <!-- Categorias -->
     <div class="card">
       <div class="card__header">
@@ -157,10 +213,38 @@
       </div>
     </div>
 
-    <!-- Gráfico de Evolução -->
+    <!-- Últimos Lançamentos -->
     <div class="card">
       <div class="card__header">
-        <span class="card__title">📈 Evolução {{ currentYear }}</span>
+        <span class="card__title">🕒 Últimos Lançamentos</span>
+        <a routerLink="/home" class="card__link">Ver tabela ↓</a>
+      </div>
+      <div class="card__body">
+        @if (expenses().length === 0 && !tableLoading()) {
+          <p class="empty-msg">Nenhum lançamento neste mês.</p>
+        }
+        @for (exp of expenses().slice(0, 5); track exp.id) {
+          <div class="expense-item">
+            <div class="expense-item__icon">{{ exp.amount >= 0 ? '💰' : '💸' }}</div>
+            <div class="expense-item__info">
+              <p class="expense-item__desc">{{ exp.description }}</p>
+              <p class="expense-item__meta">
+                {{ exp.payment_method === 'cartao' ? '💳' : '💵' }}
+                {{ exp.date | slice:8:10 }}/{{ exp.date | slice:5:7 }}
+              </p>
+            </div>
+            <p class="expense-item__amount" [class]="amountClass(exp.amount)">
+              {{ amountPrefix(exp.amount) }} {{ formatCurrency(exp.amount) }}
+            </p>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Gráfico de Evolução — full width -->
+    <div class="card card--full">
+      <div class="card__header">
+        <span class="card__title">📈 Evolução Mensal – {{ currentYear }}</span>
         <div class="chart-legend">
           <span class="chart-legend__item chart-legend__item--green">Receitas</span>
           <span class="chart-legend__item chart-legend__item--red">Despesas</span>
@@ -183,10 +267,7 @@
   </div>
 
   @if (tableLoading()) {
-    <div class="loading-state">
-      <div class="spinner"></div>
-      <p>Carregando...</p>
-    </div>
+    <div class="loading-state"><div class="spinner"></div><p>Carregando...</p></div>
   } @else if (expenses().length === 0) {
     <div class="empty-state">
       <div class="empty-state__icon">💸</div>
@@ -209,13 +290,9 @@
         <tbody>
           @for (e of expenses(); track e.id) {
             <tr>
-              <td class="expense-desc">
-                <span class="expense-desc__text">{{ e.description }}</span>
-              </td>
+              <td><span class="expense-desc__text">{{ e.description }}</span></td>
               <td><span class="badge badge--neutral">{{ categoryName(e.category_id) }}</span></td>
-              <td class="mono text-muted">
-                {{ e.date | slice:8:10 }}/{{ e.date | slice:5:7 }}/{{ e.date | slice:0:4 }}
-              </td>
+              <td class="mono text-muted">{{ e.date | slice:8:10 }}/{{ e.date | slice:5:7 }}/{{ e.date | slice:0:4 }}</td>
               <td class="text-right">
                 <span [class]="'mono ' + amountClass(e.amount)">
                   {{ amountPrefix(e.amount) }} {{ formatCurrency(e.amount) }}
@@ -223,13 +300,8 @@
               </td>
               <td>
                 <div class="action-buttons">
-                  <a [routerLink]="['/expenses', e.id, 'edit']" class="btn btn--ghost btn--sm" [attr.aria-label]="'Editar ' + e.description">✏️</a>
-                  <button
-                    class="btn btn--ghost btn--sm"
-                    (click)="delete(e.id)"
-                    [disabled]="deletingId() === e.id"
-                    [attr.aria-label]="'Excluir ' + e.description"
-                  >
+                  <a [routerLink]="['/expenses', e.id, 'edit']" class="btn btn--ghost btn--sm">✏️</a>
+                  <button class="btn btn--ghost btn--sm" (click)="delete(e.id)" [disabled]="deletingId() === e.id">
                     @if (deletingId() === e.id) { <span class="spinner spinner--sm"></span> } @else { 🗑️ }
                   </button>
                 </div>
@@ -241,14 +313,10 @@
     </div>
 
     @if (totalPages() > 1) {
-      <nav class="pagination" aria-label="Paginação">
+      <nav class="pagination">
         <button class="pagination__btn" (click)="goToPage(currentPage() - 1)" [disabled]="currentPage() === 1">‹</button>
         @for (p of pageNumbers(); track p) {
-          <button
-            class="pagination__btn"
-            [class.pagination__btn--active]="p === currentPage()"
-            (click)="goToPage(p)"
-          >{{ p }}</button>
+          <button class="pagination__btn" [class.pagination__btn--active]="p === currentPage()" (click)="goToPage(p)">{{ p }}</button>
         }
         <button class="pagination__btn" (click)="goToPage(currentPage() + 1)" [disabled]="currentPage() === totalPages()">›</button>
         <span class="pagination__info">{{ currentPage() }} de {{ totalPages() }} ({{ totalCount() }} registros)</span>
