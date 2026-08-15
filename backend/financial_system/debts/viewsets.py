@@ -9,9 +9,12 @@ from debts.behaviors import (
     BalancesBehavior,
     CreateSharedDebtBehavior,
     CreateSharedEntryBehavior,
+    HomeSummaryBehavior,
     InviteBehavior,
     JoinSharedDebtBehavior,
+    MonthlyHistoryBehavior,
     PersonalSummaryBehavior,
+    RecurringTemplateBehavior,
     UpdateSharedEntryBehavior,
 )
 from debts.models import SharedDebt, SharedEntry
@@ -54,6 +57,51 @@ class SharedDebtViewSet(viewsets.ModelViewSet):
     def balances(self, request, pk=None):
         shared_debt = self.get_object()
         return BalancesBehavior(shared_debt).run()
+
+
+    @action(detail=False, methods=['get'], url_path='home-summary')
+    def home_summary(self, request):
+        """GET /api/debts/shared-debts/home-summary/ — grupos com total e minha parte."""
+        return HomeSummaryBehavior(request.user).run()
+
+    @action(detail=True, methods=['get'], url_path='monthly-history')
+    def monthly_history(self, request, pk=None):
+        """GET /api/debts/shared-debts/{id}/monthly-history/ — histórico mensal."""
+        shared_debt = self.get_object()
+        return MonthlyHistoryBehavior(shared_debt, request.user).run()
+
+    @action(detail=True, methods=['get', 'post'], url_path='recurring-templates')
+    def recurring_templates(self, request, pk=None):
+        """GET/POST /api/debts/shared-debts/{id}/recurring-templates/"""
+        shared_debt = self.get_object()
+        behavior = RecurringTemplateBehavior(shared_debt, request.user)
+        if request.method == 'GET':
+            return behavior.list()
+        return behavior.create(request.data)
+
+    @action(detail=True, methods=['delete', 'patch'], url_path=r'recurring-templates/(?P<tpl_id>\d+)')
+    def recurring_template_detail(self, request, pk=None, tpl_id=None):
+        """DELETE/PATCH /api/debts/shared-debts/{id}/recurring-templates/{tpl_id}/"""
+        shared_debt = self.get_object()
+        behavior = RecurringTemplateBehavior(shared_debt, request.user)
+        if request.method == 'DELETE':
+            return behavior.delete(int(tpl_id))
+        return behavior.toggle_active(int(tpl_id))
+
+    @action(detail=True, methods=['post'], url_path='generate-month')
+    def generate_month(self, request, pk=None):
+        """POST /api/debts/shared-debts/{id}/generate-month/ body: {month, year}"""
+        shared_debt = self.get_object()
+        try:
+            month = int(request.data.get('month', 0))
+            year  = int(request.data.get('year', 0))
+            if not (1 <= month <= 12) or year < 2000:
+                raise ValueError
+        except (ValueError, TypeError):
+            from rest_framework.response import Response
+            from rest_framework import status as drf_status
+            return Response({'detail': 'month e year são obrigatórios.'}, status=drf_status.HTTP_400_BAD_REQUEST)
+        return RecurringTemplateBehavior(shared_debt, request.user).generate_month(month, year)
 
     def perform_destroy(self, instance):
         # Only the group owner may delete the group.

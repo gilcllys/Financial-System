@@ -218,3 +218,68 @@ class SharedDebtInvite(BaseModel):
         db_table = 'shared_debt_invites'
         verbose_name = 'Shared Debt Invite'
         verbose_name_plural = 'Shared Debt Invites'
+
+
+class SharedRecurringTemplate(BaseModel):
+    """
+    Gasto fixo recorrente mensal de um grupo compartilhado.
+
+    Ao ser materializado (via generate_month), cria uma SharedEntry real
+    para o mês/ano solicitado, caso ainda não exista.
+    """
+
+    PAYMENT_METHOD_CHOICES = [
+        ('dinheiro', 'Dinheiro'),
+        ('cartao', 'Cartao'),
+    ]
+
+    shared_debt = models.ForeignKey(
+        to=SharedDebt,
+        db_column='shared_debt_id',
+        on_delete=models.CASCADE,
+        related_name='recurring_templates',
+    )
+    description = models.CharField(max_length=255, db_column='description')
+    amount = models.DecimalField(
+        max_digits=10, decimal_places=2, db_column='amount',
+        help_text='Valor positivo da despesa mensal.',
+    )
+    paid_by = models.ForeignKey(
+        to=SharedDebtMember,
+        db_column='paid_by_id',
+        on_delete=models.PROTECT,
+        related_name='recurring_templates',
+    )
+    participant_ids = models.JSONField(
+        db_column='participant_ids',
+        default=list,
+        help_text='Lista de IDs de SharedDebtMember que dividem o gasto.',
+    )
+    payment_method = models.CharField(
+        max_length=10,
+        choices=PAYMENT_METHOD_CHOICES,
+        db_column='payment_method',
+        default='dinheiro',
+    )
+    category = models.ForeignKey(
+        to='catalog.ExpenseCategory',
+        db_column='category_id',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='recurring_templates',
+    )
+    day_of_month = models.PositiveSmallIntegerField(
+        db_column='day_of_month',
+        default=1,
+        help_text='Dia do mês em que a despesa se repete (1–28).',
+    )
+    is_active = models.BooleanField(
+        db_column='is_active',
+        default=True,
+        help_text='Falso = template pausado, não gera novas entradas.',
+    )
+
+    class Meta:
+        db_table = 'shared_recurring_templates'
+        verbose_name = 'Shared Recurring Template'
+        verbose_name_plural = 'Shared Recurring Templates'

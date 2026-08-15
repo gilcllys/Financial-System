@@ -160,3 +160,15 @@ fieldset.form-group > legend.form-label {
     outline-offset: 2px;
   }
 }
+
+// ── Generate result feedback ────────────────────────────────────────────────
+.generate-result {
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-md);
+  padding: var(--space-sm) var(--space-base);
+  margin-bottom: var(--space-base);
+
+  &__ok   { font-size: 13px; color: var(--color-semantic-up); margin: 0; }
+  &__skip { font-size: 13px; color: var(--color-muted); margin: 2px 0 0; }
+}

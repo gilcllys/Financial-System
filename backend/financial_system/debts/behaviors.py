@@ -504,3 +504,260 @@ class PersonalSummaryBehavior:
             },
         }
         return Response(data, status=status.HTTP_200_OK)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Home Summary: todos os grupos do usuário com total e minha parte (sem N+1)
+# ─────────────────────────────────────────────────────────────────────────────
+class HomeSummaryBehavior:
+    """
+    GET /api/debts/shared-debts/home-summary/
+
+    Retorna lista de grupos com:
+      - total_amount   : soma de todos os SharedEntry do grupo
+      - my_portion     : minha parte proporcional (participações)
+      - members        : lista de display_name dos membros (para avatares)
+    """
+
+    def __init__(self, user):
+        self.user = user
+
+    def run(self) -> Response:
+        from debts.models import SharedDebt, SharedDebtMember, SharedEntry, SharedEntryParticipant
+
+        # Grupos nos quais sou membro
+        groups = list(
+            SharedDebt.objects
+            .filter(members__tenant_id=self.user.tenant_id)
+            .distinct()
+            .prefetch_related('members', 'entries__participants')
+            .order_by('-id')
+        )
+
+        my_member_ids_by_group = {}
+        for g in groups:
+            for m in g.members.all():
+                if m.tenant_id == self.user.tenant_id:
+                    my_member_ids_by_group[g.id] = m.id
+
+        result = []
+        for g in groups:
+            my_member_id = my_member_ids_by_group.get(g.id)
+            total_amount = Decimal('0')
+            my_portion = Decimal('0')
+
+            for entry in g.entries.all():
+                total_amount += entry.amount
+                participants = [p.member_id for p in entry.participants.all()]
+                if participants and my_member_id in participants:
+                    my_portion += entry.amount / Decimal(len(participants))
+
+            members_names = [m.display_name for m in g.members.all()]
+
+            result.append({
+                'id': g.id,
+                'name': g.name,
+                'members': members_names,
+                'total_amount': round(float(total_amount), 2),
+                'my_portion': round(float(my_portion), 2),
+                'entry_count': g.entries.count(),
+            })
+
+        return Response(result, status=status.HTTP_200_OK)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Monthly History: histórico mensal de um grupo
+# ─────────────────────────────────────────────────────────────────────────────
+class MonthlyHistoryBehavior:
+    """
+    GET /api/debts/shared-debts/{id}/monthly-history/
+
+    Retorna lista de {year, month, month_name, total, my_portion, entry_count}
+    ordenada do mais recente ao mais antigo.
+    """
+
+    _MONTH_NAMES = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                    'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+
+    def __init__(self, shared_debt, user):
+        self.shared_debt = shared_debt
+        self.user = user
+
+    def run(self) -> Response:
+        # Descobrir meu member_id neste grupo
+        my_member = self.shared_debt.members.filter(
+            tenant_id=self.user.tenant_id
+        ).first()
+        my_member_id = my_member.id if my_member else None
+
+        entries = (
+            self.shared_debt.entries
+            .prefetch_related('participants')
+            .order_by('-date')
+        )
+
+        # Agregar por (year, month)
+        buckets: dict = {}
+        for entry in entries:
+            key = (entry.date.year, entry.date.month)
+            if key not in buckets:
+                buckets[key] = {'total': Decimal('0'), 'my_portion': Decimal('0'), 'count': 0}
+            buckets[key]['total'] += entry.amount
+            buckets[key]['count'] += 1
+            if my_member_id is not None:
+                participants = [p.member_id for p in entry.participants.all()]
+                if participants and my_member_id in participants:
+                    buckets[key]['my_portion'] += entry.amount / Decimal(len(participants))
+
+        result = [
+            {
+                'year': year,
+                'month': month,
+                'month_name': self._MONTH_NAMES[month],
+                'total': round(float(data['total']), 2),
+                'my_portion': round(float(data['my_portion']), 2),
+                'entry_count': data['count'],
+            }
+            for (year, month), data in sorted(buckets.items(), reverse=True)
+        ]
+        return Response(result, status=status.HTTP_200_OK)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Recurring Templates CRUD + generate_month
+# ─────────────────────────────────────────────────────────────────────────────
+class RecurringTemplateBehavior:
+    """Cria, lista e materializa templates recorrentes de um grupo."""
+
+    def __init__(self, shared_debt, user):
+        self.shared_debt = shared_debt
+        self.user = user
+
+    def list(self) -> Response:
+        from debts.models import SharedRecurringTemplate
+        from debts.serializer import SharedRecurringTemplateSerializer
+        qs = SharedRecurringTemplate.objects.filter(
+            shared_debt=self.shared_debt
+        ).select_related('paid_by', 'category').order_by('id')
+        return Response(
+            SharedRecurringTemplateSerializer(qs, many=True).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def create(self, data: dict) -> Response:
+        from debts.models import SharedDebtMember, SharedRecurringTemplate
+        from debts.serializer import SharedRecurringTemplateSerializer
+
+        member_ids = set(self.shared_debt.members.values_list('id', flat=True))
+
+        paid_by_id = data.get('paid_by')
+        if paid_by_id not in member_ids:
+            return Response({'detail': 'paid_by não é membro do grupo.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        participant_ids = data.get('participant_ids') or list(member_ids)
+        invalid = [p for p in participant_ids if p not in member_ids]
+        if invalid:
+            return Response({'detail': 'participant_ids inválidos.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        day = int(data.get('day_of_month', 1))
+        if not (1 <= day <= 28):
+            return Response({'detail': 'day_of_month deve ser entre 1 e 28.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        tpl = SharedRecurringTemplate.objects.create(
+            shared_debt=self.shared_debt,
+            description=data['description'],
+            amount=data['amount'],
+            paid_by_id=paid_by_id,
+            participant_ids=participant_ids,
+            payment_method=data.get('payment_method', 'dinheiro'),
+            category_id=data.get('category_id'),
+            day_of_month=day,
+            is_active=data.get('is_active', True),
+        )
+        return Response(
+            SharedRecurringTemplateSerializer(tpl).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    def toggle_active(self, template_id: int) -> Response:
+        from debts.models import SharedRecurringTemplate
+        from debts.serializer import SharedRecurringTemplateSerializer
+        try:
+            tpl = SharedRecurringTemplate.objects.get(
+                id=template_id, shared_debt=self.shared_debt
+            )
+        except SharedRecurringTemplate.DoesNotExist:
+            return Response({'detail': 'Template não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        tpl.is_active = not tpl.is_active
+        tpl.save(update_fields=['is_active', 'updated_at'])
+        return Response(SharedRecurringTemplateSerializer(tpl).data, status=status.HTTP_200_OK)
+
+    def delete(self, template_id: int) -> Response:
+        from debts.models import SharedRecurringTemplate
+        try:
+            tpl = SharedRecurringTemplate.objects.get(
+                id=template_id, shared_debt=self.shared_debt
+            )
+        except SharedRecurringTemplate.DoesNotExist:
+            return Response({'detail': 'Template não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        tpl.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def generate_month(self, month: int, year: int) -> Response:
+        """
+        Materializa todos os templates ativos para o mês/ano informado.
+        Cria um SharedEntry apenas se ainda não existir um com a mesma
+        descrição e data naquele mês (idempotente).
+        """
+        import calendar as cal_mod
+        from datetime import date as date_cls
+        from debts.models import SharedRecurringTemplate
+
+        templates = SharedRecurringTemplate.objects.filter(
+            shared_debt=self.shared_debt, is_active=True
+        )
+        created = []
+        skipped = []
+
+        for tpl in templates:
+            # Usar day_of_month, respeitando o último dia do mês
+            last_day = cal_mod.monthrange(year, month)[1]
+            day = min(tpl.day_of_month, last_day)
+            entry_date = date_cls(year, month, day)
+
+            # Idempotência: não duplica se já existir mesma descrição + mês
+            already = self.shared_debt.entries.filter(
+                description=tpl.description,
+                date__year=year,
+                date__month=month,
+            ).exists()
+
+            if already:
+                skipped.append(tpl.description)
+                continue
+
+            with transaction.atomic():
+                entry = SharedEntry.objects.create(
+                    shared_debt=self.shared_debt,
+                    paid_by_id=tpl.paid_by_id,
+                    description=tpl.description,
+                    amount=tpl.amount,
+                    date=entry_date,
+                    payment_method=tpl.payment_method,
+                    category_id=tpl.category_id,
+                    created_by_tenant_id=self.user.tenant_id,
+                )
+                SharedEntryParticipant.objects.bulk_create([
+                    SharedEntryParticipant(entry=entry, member_id=mid)
+                    for mid in tpl.participant_ids
+                ])
+            created.append(tpl.description)
+
+        return Response(
+            {'created': created, 'skipped': skipped},
+            status=status.HTTP_200_OK,
+        )

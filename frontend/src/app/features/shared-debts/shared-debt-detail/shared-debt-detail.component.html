@@ -247,3 +247,176 @@
     </div>
   }
 }
+
+<!-- ── Gastos Recorrentes ────────────────────────────────────────────────── -->
+  <div class="page-header" style="margin-top: var(--space-xl)">
+    <h2 class="section-title" style="margin:0">🔁 Gastos Fixos Mensais</h2>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn--secondary btn--sm" type="button"
+        (click)="generateMonth()" [disabled]="generatingMonth()">
+        @if (generatingMonth()) { <span class="spinner"></span> } ⚡ Gerar mês atual
+      </button>
+      <button class="btn btn--primary btn--sm" type="button" (click)="toggleRecurringForm()">
+        {{ showRecurringForm() ? '✕ Fechar' : '＋ Novo fixo' }}
+      </button>
+    </div>
+  </div>
+
+  @if (generateResult(); as result) {
+    <div class="generate-result" role="status">
+      @if (result.created.length) {
+        <p class="generate-result__ok">✓ Criados: {{ result.created.join(', ') }}</p>
+      }
+      @if (result.skipped.length) {
+        <p class="generate-result__skip">⏭ Já existiam: {{ result.skipped.join(', ') }}</p>
+      }
+    </div>
+  }
+
+  @if (showRecurringForm()) {
+    <div class="card" style="margin-bottom: var(--space-lg)">
+      <form [formGroup]="recurringForm" (ngSubmit)="saveRecurring()" novalidate>
+        <div class="form-row form-row--2col">
+          <div class="form-group">
+            <label class="form-label" for="r-description">Descrição *</label>
+            <input id="r-description" class="form-input" type="text"
+              formControlName="description" placeholder="Ex: Aluguel" />
+            @if (recurringForm.get('description')?.invalid && recurringForm.get('description')?.touched) {
+              <span class="form-error">Obrigatório.</span>
+            }
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="r-amount">Valor *</label>
+            <input id="r-amount" class="form-input mono" type="number" step="0.01" min="0.01"
+              formControlName="amount" placeholder="1200.00" />
+          </div>
+        </div>
+        <div class="form-row form-row--2col">
+          <div class="form-group">
+            <label class="form-label" for="r-paid_by">Pago por *</label>
+            <select id="r-paid_by" class="form-select" formControlName="paid_by">
+              <option [ngValue]="null" disabled>Selecione</option>
+              @for (m of members(); track m.id) {
+                <option [ngValue]="m.id">{{ m.display_name }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="r-day">Dia do mês (1–28)</label>
+            <input id="r-day" class="form-input mono" type="number" min="1" max="28"
+              formControlName="day_of_month" />
+          </div>
+        </div>
+        <div class="form-row form-row--2col">
+          <div class="form-group">
+            <label class="form-label" for="r-category">Categoria</label>
+            <select id="r-category" class="form-select" formControlName="category_id">
+              <option [ngValue]="null">Sem categoria</option>
+              @for (cat of categories(); track cat.id) {
+                <option [ngValue]="cat.id">{{ cat.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Método</label>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="radio" formControlName="payment_method" value="dinheiro" />
+                <span class="radio-btn">💵 Dinheiro</span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" formControlName="payment_method" value="cartao" />
+                <span class="radio-btn">💳 Cartão</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        @if (recurringError()) {
+          <div class="form-error-box" role="alert">{{ recurringError() }}</div>
+        }
+        <div class="form-actions">
+          <button type="submit" class="btn btn--primary" [disabled]="savingRecurring()">
+            @if (savingRecurring()) { <span class="spinner"></span> } Salvar gasto fixo
+          </button>
+        </div>
+      </form>
+    </div>
+  }
+
+  @if (recurringTemplates().length === 0 && !showRecurringForm()) {
+    <p class="empty-msg" style="padding: var(--space-base)">Nenhum gasto fixo configurado.</p>
+  }
+  @if (recurringTemplates().length > 0) {
+    <div class="data-table-wrapper" style="margin-bottom: var(--space-xl)">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Descrição</th>
+            <th>Categoria</th>
+            <th>Pago por</th>
+            <th>Dia</th>
+            <th class="text-right">Valor/mês</th>
+            <th>Status</th>
+            <th class="text-right">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (t of recurringTemplates(); track t.id) {
+            <tr>
+              <td style="font-weight:500">{{ t.description }}</td>
+              <td>
+                @if (t.category_name) {
+                  <span class="badge badge--primary">{{ t.category_name }}</span>
+                } @else { <span class="text-muted" style="font-size:12px">—</span> }
+              </td>
+              <td>{{ t.paid_by_name }}</td>
+              <td class="mono">todo dia {{ t.day_of_month }}</td>
+              <td class="text-right mono value-down">{{ formatCurrency(t.amount) }}</td>
+              <td>
+                <span class="badge" [class]="t.is_active ? 'badge--success' : 'badge--system'">
+                  {{ t.is_active ? 'Ativo' : 'Pausado' }}
+                </span>
+              </td>
+              <td class="text-right">
+                <button class="btn btn--secondary btn--sm" type="button"
+                  (click)="toggleRecurring(t.id)" title="{{ t.is_active ? 'Pausar' : 'Ativar' }}">
+                  {{ t.is_active ? '⏸' : '▶' }}
+                </button>
+                <button class="btn btn--danger btn--sm" type="button"
+                  (click)="deleteRecurring(t.id)">🗑️</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <!-- ── Histórico Mensal ──────────────────────────────────────────────────── -->
+  @if (monthlyHistory().length > 0) {
+    <div class="page-header" style="margin-top: var(--space-base)">
+      <h2 class="section-title" style="margin:0">📅 Histórico por Mês</h2>
+    </div>
+    <div class="data-table-wrapper" style="margin-bottom: var(--space-xl)">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Mês</th>
+            <th class="text-right">Total do grupo</th>
+            <th class="text-right">Sua parte</th>
+            <th class="text-right">Lançamentos</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of monthlyHistory(); track row.year + '-' + row.month) {
+            <tr>
+              <td style="font-weight:500">{{ row.month_name }} {{ row.year }}</td>
+              <td class="text-right mono value-down">{{ formatCurrency(row.total) }}</td>
+              <td class="text-right mono" style="color: var(--color-primary)">{{ formatCurrency(row.my_portion) }}</td>
+              <td class="text-right text-muted">{{ row.entry_count }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+}
