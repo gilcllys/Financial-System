@@ -12,7 +12,7 @@
     <span class="hamburger-bar"></span>
   </button>
 
-  <a routerLink="/expenses" class="mobile-header__brand" aria-label="Controle financeiro home">
+  <a routerLink="/home" class="mobile-header__brand" aria-label="Controle financeiro home">
     <img src="assets/atm-icon.svg" alt="" class="mobile-header__logo" aria-hidden="true" width="28" height="28">
     <span class="mobile-header__name">Controle financeiro</span>
   </a>
@@ -38,7 +38,7 @@
 >
   <!-- Brand / Logo -->
   <div class="sidebar__header">
-    <a routerLink="/expenses" class="sidebar__brand" (click)="closeDrawer()" aria-label="Controle financeiro home">
+    <a routerLink="/home" class="sidebar__brand" (click)="closeDrawer()" aria-label="Controle financeiro home">
       <img src="assets/atm-icon.svg" alt="" class="sidebar__logo-icon" aria-hidden="true" width="28" height="28">
       <span class="sidebar__logo-name">Controle financeiro</span>
     </a>
@@ -52,6 +52,17 @@
   <!-- Navigation links -->
   <nav class="sidebar__nav" aria-label="Menu principal">
     <a
+      routerLink="/home"
+      routerLinkActive="sidebar__link--active"
+      [routerLinkActiveOptions]="{exact: true}"
+      class="sidebar__link"
+      (click)="closeDrawer()"
+    >
+      <span class="sidebar__link-icon" aria-hidden="true">🏠</span>
+      <span class="sidebar__link-label">Início</span>
+    </a>
+
+        <a
       routerLink="/expenses"
       routerLinkActive="sidebar__link--active"
       class="sidebar__link"

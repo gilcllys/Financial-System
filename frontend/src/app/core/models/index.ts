@@ -158,3 +158,20 @@ export interface InvoiceExpensesResponse {
   expenses: Expense[];
   pagination: InvoicePagination;
 }
+
+// ─── Home Dashboard Models ─────────────────────────────────────────────────────
+
+export interface OpenInvoice {
+  card_id: number;
+  card_name: string;
+  last_four_digits: string;
+  invoice_month: number;
+  invoice_year: number;
+  invoice_name: string;
+  period_start: string;
+  period_end: string;
+  due_date: string;
+  days_to_close: number;
+  total: number;
+  count: number;
+}

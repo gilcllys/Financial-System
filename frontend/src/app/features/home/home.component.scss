@@ -1,0 +1,422 @@
+// ── Page Header ───────────────────────────────────────────────────────────────
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+
+  &__label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #2563eb;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 4px;
+  }
+
+  &__title {
+    font-size: 26px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+  }
+
+  &__subtitle {
+    font-size: 13px;
+    color: #9ca3af;
+    margin-top: 2px;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+}
+
+// ── Buttons ───────────────────────────────────────────────────────────────────
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+  transition: opacity 0.15s;
+
+  &:hover { opacity: 0.85; }
+
+  &--outline {
+    background: #fff;
+    border: 1px solid #d1d5db;
+    color: #374151;
+  }
+
+  &--primary {
+    background: #2563eb;
+    color: #fff;
+  }
+}
+
+// ── Loading ───────────────────────────────────────────────────────────────────
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+  gap: 16px;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+// ── KPI Row ───────────────────────────────────────────────────────────────────
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+
+  @media (max-width: 900px) { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 500px) { grid-template-columns: 1fr; }
+}
+
+.kpi-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 18px 20px;
+  border: 1px solid #e8eaf0;
+
+  &__label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: #9ca3af;
+    margin: 0 0 8px;
+  }
+
+  &__value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+
+    &--green { color: #10b981; }
+    &--red   { color: #ef4444; }
+    &--blue  { color: #2563eb; }
+  }
+
+  &__sub {
+    font-size: 11px;
+    color: #9ca3af;
+    margin: 4px 0 0;
+  }
+}
+
+// ── Dashboard Grid ────────────────────────────────────────────────────────────
+.dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+
+  @media (max-width: 768px) { grid-template-columns: 1fr; }
+}
+
+// ── Card base ─────────────────────────────────────────────────────────────────
+.card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e8eaf0;
+  overflow: hidden;
+
+  &--full { grid-column: 1 / -1; }
+
+  &__header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid #f3f4f6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  &__title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  &__link {
+    font-size: 12px;
+    color: #2563eb;
+    text-decoration: none;
+
+    &:hover { text-decoration: underline; }
+  }
+
+  &__body { }
+}
+
+.empty-msg {
+  padding: 24px 20px;
+  font-size: 13px;
+  color: #9ca3af;
+  text-align: center;
+}
+
+// ── Faturas ───────────────────────────────────────────────────────────────────
+.invoice-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  gap: 12px;
+  border-bottom: 1px solid #f9fafb;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.12s;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: #fafafa; }
+
+  &__icon {
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  &__info { flex: 1; }
+
+  &__name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+    margin: 0;
+  }
+
+  &__closing { margin: 3px 0 0; }
+
+  &__value { text-align: right; }
+
+  &__total {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+  }
+
+  &__count {
+    font-size: 11px;
+    color: #9ca3af;
+    margin: 2px 0 0;
+  }
+}
+
+.invoice-total-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 20px;
+  font-size: 13px;
+  color: #374151;
+  background: #f9fafb;
+  border-top: 1px solid #e8eaf0;
+
+  strong { color: #111827; font-weight: 700; }
+}
+
+// ── Badge ─────────────────────────────────────────────────────────────────────
+.badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 600;
+
+  &--red    { background: #fee2e2; color: #dc2626; }
+  &--yellow { background: #fef9c3; color: #b45309; }
+  &--green  { background: #d1fae5; color: #059669; }
+}
+
+// ── Shared Debts ──────────────────────────────────────────────────────────────
+.shared-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  gap: 12px;
+  border-bottom: 1px solid #f9fafb;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.12s;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: #fafafa; }
+
+  &__avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #2563eb;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  &__info { flex: 1; }
+
+  &__name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+    margin: 0;
+  }
+
+  &__date {
+    font-size: 11px;
+    color: #9ca3af;
+    margin: 2px 0 0;
+  }
+}
+
+.chevron {
+  font-size: 18px;
+  color: #d1d5db;
+}
+
+// ── Category bars ─────────────────────────────────────────────────────────────
+.cat-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #f9fafb;
+
+  &:last-child { border-bottom: none; }
+
+  &__label {
+    font-size: 12px;
+    color: #374151;
+    width: 100px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__bar-wrap {
+    flex: 1;
+    height: 8px;
+    background: #f3f4f6;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  &__bar {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #2563eb, #6366f1);
+    transition: width 0.4s ease;
+  }
+
+  &__value {
+    font-size: 12px;
+    font-weight: 600;
+    color: #111827;
+    width: 80px;
+    text-align: right;
+  }
+}
+
+// ── Recent Expenses ───────────────────────────────────────────────────────────
+.expense-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  gap: 12px;
+  border-bottom: 1px solid #f9fafb;
+  transition: background 0.12s;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: #fafafa; }
+
+  &__icon {
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  &__info { flex: 1; }
+
+  &__desc {
+    font-size: 13px;
+    font-weight: 500;
+    color: #111827;
+    margin: 0;
+  }
+
+  &__meta {
+    font-size: 11px;
+    color: #9ca3af;
+    margin: 2px 0 0;
+  }
+
+  &__amount {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+
+    &.value--up   { color: #10b981; }
+    &.value--down { color: #ef4444; }
+  }
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────────
+.chart-wrap {
+  padding: 16px 20px 20px;
+  height: 280px;
+  position: relative;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+
+  &__item {
+    font-size: 12px;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    &::before {
+      content: '';
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    &--green::before { background: #10b981; }
+    &--red::before   { background: #ef4444; }
+    &--blue::before  { background: #2563eb; }
+  }
+}

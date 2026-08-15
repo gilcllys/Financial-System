@@ -247,3 +247,59 @@ class InvoiceExpensesBehavior:
             },
             status=status.HTTP_200_OK,
         )
+
+
+class OpenInvoicesBehavior:
+    """
+    Retorna a fatura corrente (aberta) de cada cartão do tenant,
+    com o total de gastos do período e a data de fechamento/vencimento.
+
+    Endpoint: GET /api/cards/credit-cards/open-invoices/
+    """
+
+    def __init__(self, tenant_id: str):
+        self.tenant_id = tenant_id
+
+    def run(self) -> Response:
+        from cards.models import CreditCard
+        from expenses.models import Expense
+
+        cards = CreditCard.objects.filter(tenant_id=self.tenant_id)
+        result = []
+
+        for card in cards:
+            invoice_month, invoice_year = _current_invoice_month(card)
+            period_start, period_end, due = _compute_invoice_period(
+                card, invoice_month, invoice_year
+            )
+
+            agg = (
+                Expense.objects
+                .filter(
+                    tenant_id=self.tenant_id,
+                    credit_card_id=card.id,
+                    date__gte=period_start,
+                    date__lte=period_end,
+                )
+                .aggregate(total=Sum(Abs('amount')), count=Count('id'))
+            )
+
+            days_to_close = (period_end - date.today()).days
+
+            result.append({
+                'card_id': card.id,
+                'card_name': card.name,
+                'last_four_digits': card.last_four_digits,
+                'invoice_month': invoice_month,
+                'invoice_year': invoice_year,
+                'invoice_name': f'{_MONTH_NAMES[invoice_month]} {invoice_year}',
+                'period_start': period_start.isoformat(),
+                'period_end': period_end.isoformat(),
+                'due_date': due.isoformat(),
+                'days_to_close': days_to_close,
+                'total': round(float(agg['total'] or 0), 2),
+                'count': agg['count'] or 0,
+            })
+
+        result.sort(key=lambda x: x['days_to_close'])
+        return Response(result, status=status.HTTP_200_OK)

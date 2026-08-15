@@ -1,0 +1,179 @@
+<!-- ── Page header ── -->
+<div class="page-header">
+  <div>
+    <p class="page-header__label">🗓 Mês Atual</p>
+    <h1 class="page-header__title">{{ currentMonthName }} {{ currentYear }}</h1>
+    <p class="page-header__subtitle">Visão geral dos seus gastos</p>
+  </div>
+  <div class="page-header__actions">
+    <a routerLink="/expenses/batch" class="btn btn--outline">+ Vários gastos</a>
+    <a routerLink="/expenses/import" class="btn btn--outline">📥 Importar Excel</a>
+    <a routerLink="/expenses/new" class="btn btn--primary">+ Novo Gasto</a>
+  </div>
+</div>
+
+@if (loading()) {
+  <div class="loading-state">
+    <div class="spinner"></div>
+    <p>Carregando dashboard...</p>
+  </div>
+} @else {
+
+  <!-- ── KPI Row ── -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <p class="kpi-card__label">Receitas</p>
+      <p class="kpi-card__value kpi-card__value--green">{{ formatCurrency(summary().income) }}</p>
+      <p class="kpi-card__sub">no mês atual</p>
+    </div>
+    <div class="kpi-card">
+      <p class="kpi-card__label">Despesas</p>
+      <p class="kpi-card__value kpi-card__value--red">{{ formatCurrency(Math.abs(summary().expenses)) }}</p>
+      <p class="kpi-card__sub">no mês atual</p>
+    </div>
+    <div class="kpi-card">
+      <p class="kpi-card__label">Saldo</p>
+      <p class="kpi-card__value kpi-card__value--blue">{{ formatCurrency(summary().balance) }}</p>
+      <p class="kpi-card__sub">disponível</p>
+    </div>
+    <div class="kpi-card">
+      <p class="kpi-card__label">Total Registros</p>
+      <p class="kpi-card__value">{{ summary().count }}</p>
+      <p class="kpi-card__sub">lançamentos</p>
+    </div>
+  </div>
+
+  <!-- ── Dashboard grid ── -->
+  <div class="dash-grid">
+
+    <!-- Faturas Abertas -->
+    <div class="card">
+      <div class="card__header">
+        <span class="card__title">💳 Faturas Abertas</span>
+        <a routerLink="/cards" class="card__link">Ver cartões →</a>
+      </div>
+      <div class="card__body">
+        @if (openInvoices().length === 0) {
+          <p class="empty-msg">Nenhum cartão cadastrado.</p>
+        }
+        @for (inv of openInvoices(); track inv.card_id) {
+          <a [routerLink]="['/cards', inv.card_id, 'expenses']" class="invoice-item">
+            <div class="invoice-item__icon">💳</div>
+            <div class="invoice-item__info">
+              <p class="invoice-item__name">{{ inv.card_name }} ···· {{ inv.last_four_digits }}</p>
+              <p class="invoice-item__closing">
+                <span class="badge" [class]="daysClass(inv.days_to_close)">
+                  {{ daysLabel(inv.days_to_close) }}
+                </span>
+              </p>
+            </div>
+            <div class="invoice-item__value">
+              <p class="invoice-item__total">{{ formatCurrency(inv.total) }}</p>
+              <p class="invoice-item__count">{{ inv.count }} lançamentos</p>
+            </div>
+          </a>
+        }
+        @if (openInvoices().length > 0) {
+          <div class="invoice-total-row">
+            <span>Total em faturas abertas</span>
+            <strong>{{ formatCurrency(totalInvoices()) }}</strong>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Gastos Compartilhados -->
+    <div class="card">
+      <div class="card__header">
+        <span class="card__title">🤝 Gastos Compartilhados</span>
+        <a routerLink="/shared-debts" class="card__link">Ver todos →</a>
+      </div>
+      <div class="card__body">
+        @if (sharedDebts().length === 0) {
+          <p class="empty-msg">Nenhum gasto compartilhado ativo.</p>
+        }
+        @for (group of sharedDebts(); track group.id) {
+          <a [routerLink]="['/shared-debts', group.id]" class="shared-item">
+            <div class="shared-item__avatar">
+              {{ group.name.substring(0, 2).toUpperCase() }}
+            </div>
+            <div class="shared-item__info">
+              <p class="shared-item__name">{{ group.name }}</p>
+              <p class="shared-item__date">{{ group.created_at | date:'dd/MM/yyyy' }}</p>
+            </div>
+            <span class="chevron">›</span>
+          </a>
+        }
+      </div>
+    </div>
+
+    <!-- Gastos por Categoria -->
+    <div class="card">
+      <div class="card__header">
+        <span class="card__title">📊 Gastos por Categoria</span>
+        <a routerLink="/reports" class="card__link">Detalhes →</a>
+      </div>
+      <div class="card__body">
+        @if (byCategory().length === 0) {
+          <p class="empty-msg">Nenhum gasto categorizado.</p>
+        }
+        @for (cat of byCategory().slice(0, 6); track cat.category_id) {
+          <div class="cat-item">
+            <span class="cat-item__label">{{ cat.category_name }}</span>
+            <div class="cat-item__bar-wrap">
+              <div class="cat-item__bar" [style.width]="categoryBarWidth(cat.total)"></div>
+            </div>
+            <span class="cat-item__value">{{ formatCurrency(cat.total) }}</span>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Últimos Lançamentos -->
+    <div class="card">
+      <div class="card__header">
+        <span class="card__title">🕒 Últimos Lançamentos</span>
+        <a routerLink="/expenses" class="card__link">Ver todos →</a>
+      </div>
+      <div class="card__body">
+        @if (recentExpenses().length === 0) {
+          <p class="empty-msg">Nenhum lançamento neste mês.</p>
+        }
+        @for (exp of recentExpenses(); track exp.id) {
+          <div class="expense-item">
+            <div class="expense-item__icon">
+              {{ exp.amount >= 0 ? '💰' : '💸' }}
+            </div>
+            <div class="expense-item__info">
+              <p class="expense-item__desc">{{ exp.description }}</p>
+              <p class="expense-item__meta">
+                {{ exp.payment_method === 'cartao' ? '💳' : '💵' }}
+                {{ exp.date | date:'dd/MM' }}
+              </p>
+            </div>
+            <p class="expense-item__amount" [class]="amountClass(exp.amount)">
+              {{ amountPrefix(exp.amount) }} {{ formatCurrency(Math.abs(exp.amount)) }}
+            </p>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Gráfico de Evolução — full width -->
+    <div class="card card--full">
+      <div class="card__header">
+        <span class="card__title">📈 Evolução Mensal – {{ currentYear }}</span>
+        <div class="chart-legend">
+          <span class="chart-legend__item chart-legend__item--green">Receitas</span>
+          <span class="chart-legend__item chart-legend__item--red">Despesas</span>
+          <span class="chart-legend__item chart-legend__item--blue">Saldo</span>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas #evolutionChart></canvas>
+      </div>
+    </div>
+
+  </div><!-- /dash-grid -->
+
+}

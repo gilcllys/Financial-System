@@ -8,9 +8,15 @@ export const routes: Routes = [
     component: LayoutComponent,
     canActivate: [authGuard],
     children: [
-      { path: '', redirectTo: 'expenses', pathMatch: 'full' },
+      { path: '', redirectTo: 'home', pathMatch: 'full' },
 
-      // Expenses
+      {
+        path: 'home',
+        loadComponent: () =>
+          import('./features/home/home.component').then(m => m.HomeComponent),
+      },
+
+            // Expenses
       {
         path: 'expenses',
         loadComponent: () =>
