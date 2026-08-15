@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from cards import models, serializer
-from cards.behaviors import InvoiceExpensesBehavior, InvoicesBehavior
+from cards.behaviors import InvoiceExpensesBehavior, InvoicesBehavior, OpenInvoicesBehavior
 
 
 class CreditCardViewSet(viewsets.ModelViewSet):
@@ -87,6 +87,12 @@ class CreditCardViewSet(viewsets.ModelViewSet):
             page=page or 1, page_size=page_size or 20,
             search=search,
         ).run()
+
+
+    @action(detail=False, methods=['get'], url_path='open-invoices')
+    def open_invoices(self, request):
+        """GET /api/cards/credit-cards/open-invoices/"""
+        return OpenInvoicesBehavior(request.user.tenant_id).run()
 
     # ------------------------------------------------------------------
     # Helpers
