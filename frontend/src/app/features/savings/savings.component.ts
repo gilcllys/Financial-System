@@ -1,3 +1,4 @@
+import * as d3 from 'd3';
 import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
@@ -10,7 +11,7 @@ import {
 @Component({
   selector: 'app-savings',
   standalone: true,
-  imports: [RouterLink, ReactiveFormsModule],
+  imports: [RouterLink, ReactiveFormsModule, CurrencyPipe],
   templateUrl: './savings.component.html',
   styleUrls: ['./savings.component.scss'],
 })
@@ -31,6 +32,7 @@ export class SavingsComponent implements OnInit {
   depositError = signal('');
 
   @ViewChild('chartEl') chartEl!: ElementRef<HTMLDivElement>;
+  savTooltip = signal<{cx:number; cy:number; label:string; monthly:number; accumulated:number}|null>(null);
 
   goalForm = this.fb.group({
     name: ['', [Validators.required, Validators.minLength(2)]],
@@ -142,65 +144,67 @@ export class SavingsComponent implements OnInit {
   private renderChart(): void {
     const s = this.summary();
     if (!s || !this.chartEl || s.monthly_breakdown.length === 0) return;
+
+    const el = this.chartEl.nativeElement;
+    el.innerHTML = '';
     const data = s.monthly_breakdown;
+    const margin = {top:20, right:20, bottom:30, left:65};
+    const width = 540, height = 200;
+    const innerW = width - margin.left - margin.right;
+    const innerH = height - margin.top - margin.bottom;
     const labels = data.map(d => `${d.month_name.slice(0,3)}/${String(d.year).slice(2)}`);
-    const accumulated = data.map(d => d.accumulated);
-    const monthly = data.map(d => d.total);
-    const W = 540, H = 200, PL = 60, PR = 20, PT = 20, PB = 30;
-    const maxV = Math.max(...accumulated) * 1.15 || 1;
-    const n = labels.length;
-    const totalW = W - PL - PR;
-    const gap = n > 1 ? totalW / (n - 1) : totalW;
-    const sx = (i: number) => PL + i * gap;
-    const sy = (v: number) => PT + (1 - v / maxV) * (H - PT - PB);
-    const fmt = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
-    let o = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${H}px;overflow:visible">`;
-    for (let s2 = 0; s2 <= 4; s2++) {
-      const gv = maxV * s2 / 4;
-      const gy = sy(gv);
-      o += `<line x1="${PL}" y1="${gy.toFixed(1)}" x2="${W-PR}" y2="${gy.toFixed(1)}" stroke="#f3f4f6" stroke-width="1"/>`;
-      const lbl = gv >= 1000 ? `${(gv/1000).toFixed(1)}k` : gv.toFixed(0);
-      o += `<text x="${PL-6}" y="${(gy+4).toFixed(1)}" text-anchor="end" font-size="9" fill="#9ca3af" font-family="inherit">R$${lbl}</text>`;
-    }
+    const svg = d3.select(el).append('svg')
+      .attr('viewBox', `0 0 ${width} ${height}`)
+      .style('width','100%').style('height',`${height}px`).style('overflow','visible');
 
-    // Area fill
-    const pts = accumulated.map((_, i) => `${sx(i).toFixed(1)},${sy(accumulated[i]).toFixed(1)}`).join(' ');
-    const baseY = sy(0).toFixed(1);
-    o += `<polygon points="${sx(0).toFixed(1)},${baseY} ${pts} ${sx(n-1).toFixed(1)},${baseY}" fill="#a5b4fc" opacity="0.3"/>`;
-    o += `<polyline points="${pts}" fill="none" stroke="#6366f1" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const g = svg.append('g').attr('transform',`translate(${margin.left},${margin.top})`);
 
-    accumulated.forEach((_, i) => {
-      if (accumulated[i] === 0 && monthly[i] === 0) return;
-      o += `<circle cx="${sx(i).toFixed(1)}" cy="${sy(accumulated[i]).toFixed(1)}" r="4" fill="#6366f1" stroke="#fff" stroke-width="1.5"/>`;
-      o += `<circle class="chart-hit" cx="${sx(i).toFixed(1)}" cy="${sy(accumulated[i]).toFixed(1)}" r="12" fill="transparent" style="cursor:pointer" data-label="${labels[i]}" data-acc="${accumulated[i]}" data-monthly="${monthly[i]}"/>`;
-    });
+    const x = d3.scalePoint().domain(labels).range([0, innerW]);
+    const maxY = Math.max(...data.map(d => d.accumulated)) * 1.15 || 1;
+    const y = d3.scaleLinear().domain([0, maxY]).range([innerH, 0]);
 
-    labels.forEach((m, i) => {
-      o += `<text x="${sx(i).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="9" fill="#9ca3af" font-family="inherit">${m}</text>`;
-    });
-    o += `</svg>`;
-    this.chartEl.nativeElement.innerHTML = o;
+    g.append('g').call(d3.axisLeft(y).ticks(4).tickSize(-innerW).tickFormat(()=>''))
+      .call(gg => gg.select('.domain').remove())
+      .call(gg => gg.selectAll('line').attr('stroke','#f3f4f6'));
 
-    // Attach tooltip events
-    const svg = this.chartEl.nativeElement.querySelector('svg');
-    svg?.querySelectorAll('.chart-hit').forEach(el => {
-      el.addEventListener('mouseenter', (e: Event) => {
-        const me = e as MouseEvent;
-        const rect = this.chartEl.nativeElement.getBoundingClientRect();
-        const t = el as HTMLElement;
-        const tip = this.chartEl.nativeElement.querySelector('.sav-tooltip') as HTMLElement;
-        if (tip) {
-          tip.style.left = `${me.clientX - rect.left + 12}px`;
-          tip.style.top = `${me.clientY - rect.top - 50}px`;
-          tip.innerHTML = `<strong>${t.dataset['label']}</strong><div>Aporte: ${this.formatCurrency(parseFloat(t.dataset['monthly']!))}</div><div>Acumulado: <b>${this.formatCurrency(parseFloat(t.dataset['acc']!))}</b></div>`;
-          tip.style.display = 'block';
-        }
-      });
-      el.addEventListener('mouseleave', () => {
-        const tip = this.chartEl.nativeElement.querySelector('.sav-tooltip') as HTMLElement;
-        if (tip) tip.style.display = 'none';
-      });
+    g.append('g').attr('transform',`translate(0,${innerH})`)
+      .call(d3.axisBottom(x).tickSize(0))
+      .call(gg => gg.select('.domain').remove())
+      .call(gg => gg.selectAll('text').attr('fill','#9ca3af').attr('font-size','9').attr('font-family','inherit'));
+
+    g.append('g').call(d3.axisLeft(y).ticks(4).tickFormat((v: d3.NumberValue) => {
+      const n = +v;
+      return n >= 1000 ? `R$${(n/1000).toFixed(1)}k` : `R$${n.toFixed(0)}`;
+    }))
+      .call(gg => gg.select('.domain').remove())
+      .call(gg => gg.selectAll('text').attr('fill','#9ca3af').attr('font-size','9').attr('font-family','inherit'));
+
+    const areaFn = d3.area<typeof data[0]>()
+      .x((_,i)=>x(labels[i])!).y0(innerH).y1(d=>y(d.accumulated))
+      .curve(d3.curveMonotoneX);
+    const lineFn = d3.line<typeof data[0]>()
+      .x((_,i)=>x(labels[i])!).y(d=>y(d.accumulated))
+      .curve(d3.curveMonotoneX);
+
+    g.append('path').datum(data).attr('d', areaFn).attr('fill','#a5b4fc').attr('opacity','0.3');
+    g.append('path').datum(data).attr('d', lineFn)
+      .attr('fill','none').attr('stroke','#6366f1').attr('stroke-width','2.5')
+      .attr('stroke-linejoin','round').attr('stroke-linecap','round');
+
+    const tooltip = this.savTooltip;
+    data.forEach((d, i) => {
+      if (d.accumulated === 0) return;
+      const cx = x(labels[i])!;
+      const cy = y(d.accumulated);
+      g.append('circle').attr('cx',cx).attr('cy',cy).attr('r',4)
+        .attr('fill','#6366f1').attr('stroke','#fff').attr('stroke-width',1.5);
+      g.append('circle').attr('cx',cx).attr('cy',cy).attr('r',14)
+        .attr('fill','transparent').style('cursor','pointer')
+        .on('mousemove', (event: MouseEvent) => {
+          tooltip.set({ cx: event.clientX+14, cy: event.clientY-90, label: labels[i], monthly: d.total, accumulated: d.accumulated });
+        })
+        .on('mouseleave', () => tooltip.set(null));
     });
   }
 }

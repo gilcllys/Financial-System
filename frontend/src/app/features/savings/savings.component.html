@@ -147,8 +147,7 @@
             <span class="card__title">📈 Evolução do Patrimônio</span>
           </div>
           <div style="padding:16px;position:relative">
-            <div #chartEl style="position:relative"></div>
-            <div class="sav-tooltip" style="display:none;position:absolute;background:white;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:0.8rem;box-shadow:0 4px 12px rgba(0,0,0,0.12);pointer-events:none;z-index:100;min-width:160px"></div>
+            <div #chartEl></div>
           </div>
         </div>
       }
@@ -188,3 +187,19 @@
     }
   }
 </div>
+
+@if (savTooltip()) {
+  <div class="chart-tooltip"
+    [style.left.px]="savTooltip()!.cx"
+    [style.top.px]="savTooltip()!.cy">
+    <div class="chart-tooltip__title">📅 {{ savTooltip()!.label }}</div>
+    <div class="chart-tooltip__row">
+      <span><span class="dot dot--indigo"></span>Aporte do mês</span>
+      <span class="chart-tooltip__val">{{ savTooltip()!.monthly | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+    </div>
+    <div class="chart-tooltip__row">
+      <span><span class="dot dot--indigo"></span>Acumulado</span>
+      <span class="chart-tooltip__val chart-tooltip__val--bold">{{ savTooltip()!.accumulated | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+    </div>
+  </div>
+}
