@@ -127,9 +127,17 @@ class SharedDebtViewSet(viewsets.ModelViewSet):
         return Response(data)
 
 
+
+class SharedEntryPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
 class SharedEntryViewSet(viewsets.ModelViewSet):
     serializer_class = serializer.SharedEntrySerializer
     queryset = SharedEntry.objects.all()
+    pagination_class = SharedEntryPagination
 
     def get_queryset(self):
         qs = (
@@ -167,6 +175,18 @@ class SharedEntryViewSet(viewsets.ModelViewSet):
         if raw_month and raw_year:
             try:
                 qs = qs.filter(date__month=int(raw_month), date__year=int(raw_year))
+            except (ValueError, TypeError):
+                pass
+        elif raw_month:
+            try:
+                qs = qs.filter(date__month=int(raw_month))
+            except (ValueError, TypeError):
+                pass
+
+        raw_category = params.get('category')
+        if raw_category is not None:
+            try:
+                qs = qs.filter(category_id=int(raw_category))
             except (ValueError, TypeError):
                 pass
 

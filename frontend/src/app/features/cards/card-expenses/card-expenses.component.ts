@@ -212,7 +212,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     this.cardId = +this.route.snapshot.paramMap.get('id')!;
     this.cardSvc.get(this.cardId).subscribe({ next: c => this.card.set(c) });
     this.cardSvc.getAllCardExpenses(this.cardId).subscribe({ next: e => this.allCardExpenses.set(e) });
-    this.sharedSvc.listEntries({ credit_card: this.cardId }).subscribe({ next: e => this.sharedEntries.set(e) });
+    this.sharedSvc.listEntries({ credit_card: this.cardId }).subscribe({ next: res => this.sharedEntries.set(res.results) });
     this.cardSvc.getInvoices(this.cardId).subscribe({
       next: invoices => {
         this.invoices.set(invoices);

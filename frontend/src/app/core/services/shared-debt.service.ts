@@ -136,6 +136,13 @@ export interface CreateRecurringTemplatePayload {
   day_of_month?: number;
 }
 
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class SharedDebtService {
   private http = inject(HttpClient);
@@ -180,13 +187,22 @@ export class SharedDebtService {
   }
 
   // ─── Entries ────────────────────────────────────────────────────────────
-  listEntries(params: { shared_debt?: number; credit_card?: number; month?: number; year?: number }): Observable<SharedDebtEntry[]> {
+  listEntries(params: {
+    shared_debt?: number;
+    credit_card?: number;
+    month?: number;
+    year?: number;
+    category?: number | null;
+    page?: number;
+  }): Observable<PaginatedResponse<SharedDebtEntry>> {
     let httpParams = new HttpParams();
     if (params.shared_debt != null) httpParams = httpParams.set('shared_debt', params.shared_debt);
     if (params.credit_card != null) httpParams = httpParams.set('credit_card', params.credit_card);
-    if (params.month != null)       httpParams = httpParams.set('month', params.month);
-    if (params.year  != null)       httpParams = httpParams.set('year',  params.year);
-    return this.http.get<SharedDebtEntry[]>(`${this.base}/shared-entries/`, { params: httpParams });
+    if (params.month  != null)      httpParams = httpParams.set('month', params.month);
+    if (params.year   != null)      httpParams = httpParams.set('year',  params.year);
+    if (params.category != null)    httpParams = httpParams.set('category', params.category);
+    if (params.page   != null)      httpParams = httpParams.set('page', params.page);
+    return this.http.get<PaginatedResponse<SharedDebtEntry>>(`${this.base}/shared-entries/`, { params: httpParams });
   }
 
   createEntry(payload: CreateEntryPayload): Observable<SharedDebtEntry> {

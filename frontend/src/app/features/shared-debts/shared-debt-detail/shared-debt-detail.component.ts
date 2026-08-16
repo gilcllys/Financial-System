@@ -2,7 +2,7 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormsModule, FormBuilder, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/auth/auth.service';
 import { CardService } from '../../../core/services/card.service';
 import { CategoryService } from '../../../core/services/category.service';
@@ -16,6 +16,7 @@ import {
   BalancesResponse,
   MonthlyHistoryEntry,
   RecurringTemplate,
+  PaginatedResponse,
 } from '../../../core/services/shared-debt.service';
 
 
@@ -35,7 +36,7 @@ interface DraftSharedEntry {
 @Component({
   selector: 'app-shared-debt-detail',
   standalone: true,
-  imports: [RouterLink, ReactiveFormsModule, SlicePipe],
+  imports: [RouterLink, ReactiveFormsModule, FormsModule, SlicePipe],
   templateUrl: './shared-debt-detail.component.html',
   styleUrls: ['./shared-debt-detail.component.scss'],
 })
@@ -55,6 +56,15 @@ export class SharedDebtDetailComponent implements OnInit {
   members = signal<SharedDebtMember[]>([]);
   entries = signal<SharedDebtEntry[]>([]);
   balances = signal<BalancesResponse | null>(null);
+
+  // ── Filtros e paginação ─────────────────────────────────────────────────
+  readonly PAGE_SIZE = 20;
+  filterMonth = signal<number | null>(null);
+  filterCategory = signal<number | null>(null);
+  currentPage = signal(1);
+  totalCount = signal(0);
+  totalPages = computed(() => Math.max(1, Math.ceil(this.totalCount() / this.PAGE_SIZE)));
+  pageNumbers = computed(() => Array.from({ length: this.totalPages() }, (_, i) => i + 1));
   cards = signal<CreditCard[]>([]);
   loading = signal(true);
 
@@ -199,10 +209,44 @@ export class SharedDebtDetailComponent implements OnInit {
     this.loadRecurringTemplates();
   }
 
-  private refreshEntriesAndBalances(): void {
-    this.svc.listEntries({ shared_debt: this.groupId }).subscribe({ next: e => this.entries.set(e) });
+  private refreshEntriesAndBalances(resetPage = false): void {
+    if (resetPage) this.currentPage.set(1);
+    this.svc.listEntries({
+      shared_debt: this.groupId,
+      month: this.filterMonth() ?? undefined,
+      category: this.filterCategory() ?? undefined,
+      page: this.currentPage(),
+    }).subscribe({
+      next: (res: PaginatedResponse<SharedDebtEntry>) => {
+        this.entries.set(res.results);
+        this.totalCount.set(res.count);
+      }
+    });
     this.svc.balances(this.groupId).subscribe({ next: b => this.balances.set(b) });
   }
+
+  applyFilter(): void { this.refreshEntriesAndBalances(true); }
+
+  clearFilters(): void {
+    this.filterMonth.set(null);
+    this.filterCategory.set(null);
+    this.refreshEntriesAndBalances(true);
+  }
+
+  goToPage(page: number): void {
+    if (page < 1 || page > this.totalPages()) return;
+    this.currentPage.set(page);
+    this.refreshEntriesAndBalances();
+  }
+
+  readonly MONTHS = [
+    { value: 1, label: 'Janeiro' }, { value: 2, label: 'Fevereiro' },
+    { value: 3, label: 'Março' },   { value: 4, label: 'Abril' },
+    { value: 5, label: 'Maio' },    { value: 6, label: 'Junho' },
+    { value: 7, label: 'Julho' },   { value: 8, label: 'Agosto' },
+    { value: 9, label: 'Setembro' },{ value: 10, label: 'Outubro' },
+    { value: 11, label: 'Novembro' },{ value: 12, label: 'Dezembro' },
+  ];
 
   // ── Invite ──────────────────────────────────────────────────────────────
   invite(): void {

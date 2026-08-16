@@ -270,3 +270,55 @@ fieldset.form-group > legend.form-label {
     &::before { transform: translateX(18px); }
   }
 }
+
+.entries-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-sm);
+
+  .form-select--sm {
+    height: 34px;
+    font-size: 0.82rem;
+    padding: 0 8px;
+    min-width: 160px;
+  }
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  margin-top: var(--space-sm);
+
+  &__btn {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 6px;
+    border: 1px solid var(--color-hairline);
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--color-body);
+    transition: background 0.15s, color 0.15s;
+
+    &:hover:not(:disabled) {
+      background: var(--color-surface-raised, #f1f5f9);
+    }
+
+    &--active {
+      background: var(--color-primary, #6366f1);
+      color: #fff;
+      border-color: var(--color-primary, #6366f1);
+      font-weight: 600;
+    }
+
+    &:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+  }
+}

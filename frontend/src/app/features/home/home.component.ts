@@ -182,7 +182,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     this.sharedDebtService.listEntries({ month: this.filterMonth(), year: this.filterYear() })
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: entries => { this.sharedEntries.set(entries); this.sharedEntriesLoading.set(false); },
+        next: res => { this.sharedEntries.set(res.results); this.sharedEntriesLoading.set(false); },
         error: () => this.sharedEntriesLoading.set(false),
       });
   }
