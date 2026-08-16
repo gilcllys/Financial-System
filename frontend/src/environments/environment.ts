@@ -1,8 +1,8 @@
 export const environment = {
   production: true,
-  apiBaseUrl: 'https://financial-system.duckdns.org:4200',
+  apiBaseUrl: 'https://ec2-54-147-150-5.compute-1.amazonaws.com:4200',
   keycloak: {
-    url: 'https://identity-access-management.duckdns.org',
+    url: 'https://ec2-54-147-150-5.compute-1.amazonaws.com',
     realm: 'projetos-pessoais',
     clientId: 'financial-frontend',
   },
