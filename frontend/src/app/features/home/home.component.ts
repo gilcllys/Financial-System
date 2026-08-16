@@ -6,7 +6,6 @@ import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, SlicePipe } from '@angular/common';
 import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
-import { Chart, registerables } from 'chart.js';
 
 import { HomeService, InstallmentGroup } from '../../core/services/home.service';
 import { ExpenseService } from '../../core/services/expense.service';
@@ -14,8 +13,6 @@ import { CategoryService } from '../../core/services/category.service';
 import { AnalyticsService, MonthlyAnalytics, CategoryAnalytics, ConsolidatedSummary } from '../../core/services/analytics.service';
 import { OpenInvoice, Expense, ExpenseCategory } from '../../core/models';
 import { SharedDebtHomeSummary } from '../../core/services/shared-debt.service';
-
-Chart.register(...registerables);
 
 const MONTH_NAMES = [
   'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -38,8 +35,6 @@ const EMPTY_CONSOLIDATED: ConsolidatedSummary = {
   styleUrls: ['./home.component.scss'],
 })
 export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
-  @ViewChild('evolutionChart') chartCanvas!: ElementRef<HTMLCanvasElement>;
-
   private homeService      = inject(HomeService);
   private expenseService   = inject(ExpenseService);
   private categoryService  = inject(CategoryService);
@@ -92,10 +87,6 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     this.installmentGroups().reduce((s, g) => s + g.remainingAmount, 0)
   );
 
-  // ── Chart ────────────────────────────────────────────────────────────────
-  private chart: Chart | null = null;
-  private pendingChartData: MonthlyAnalytics[] | null = null;
-
   // ────────────────────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.categoryService.list().subscribe({ next: cats => this.categories.set(cats) });
@@ -111,9 +102,8 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    this.initChart([]);
     if (this.pendingChartData) {
-      this.updateChart(this.pendingChartData);
+      this.renderCharts(this.pendingChartData);
       this.pendingChartData = null;
     }
   }
@@ -121,7 +111,6 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
-    this.chart?.destroy();
   }
 
   // ── Dashboard load ────────────────────────────────────────────────────────
@@ -137,8 +126,8 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
           this.byCategory.set(data.byCategory);
           this.installmentGroups.set(data.installmentGroups);
           this.dashLoading.set(false);
-          if (this.chart) this.updateChart(data.evolution);
-          else this.pendingChartData = data.evolution;
+          this.pendingChartData = data.evolution;
+          this.renderChartsOrDefer(data.evolution);
         },
         error: () => this.dashLoading.set(false),
       });
@@ -235,68 +224,111 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     return 'badge--green';
   }
 
-  // ── Chart ────────────────────────────────────────────────────────────────
-  private initChart(data: MonthlyAnalytics[]): void {
-    const ctx = this.chartCanvas?.nativeElement?.getContext('2d');
-    if (!ctx) return;
-    this.chart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: data.map(d => d.month_name.substring(0, 3)),
-        datasets: [
-          {
-            label: 'Receitas',
-            data: data.map(d => d.income),
-            borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.08)',
-            tension: 0.4, fill: true, pointRadius: 4, pointBackgroundColor: '#10b981', borderWidth: 2.5,
-          },
-          {
-            label: 'Despesas',
-            data: data.map(d => Math.abs(d.expenses)),
-            borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)',
-            tension: 0.4, fill: true, pointRadius: 4, pointBackgroundColor: '#ef4444', borderWidth: 2.5,
-          },
-          {
-            label: 'Saldo',
-            data: data.map(d => d.balance),
-            borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.06)',
-            tension: 0.4, fill: false, pointRadius: 4, pointBackgroundColor: '#2563eb',
-            borderWidth: 2.5, borderDash: [5, 3],
-          },
-        ],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => ' R$ ' + (ctx.raw as number).toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
-            },
-          },
-        },
-        scales: {
-          y: {
-            grid: { color: '#f3f4f6' },
-            ticks: { callback: v => `R$ ${(+v / 1000).toFixed(0)}k`, font: { size: 11 } },
-            border: { display: false },
-          },
-          x: {
-            grid: { display: false },
-            ticks: { font: { size: 11 } },
-            border: { display: false },
-          },
-        },
-      },
-    });
+  @ViewChild('lineChartEl') lineChartEl!: ElementRef<HTMLDivElement>;
+  @ViewChild('compChartEl') compChartEl!: ElementRef<HTMLDivElement>;
+  private pendingChartData: MonthlyAnalytics[] | null = null;
+
+  private renderChartsOrDefer(data: MonthlyAnalytics[]): void {
+    if (this.lineChartEl) this.renderCharts(data);
+    else this.pendingChartData = data;
   }
 
-  private updateChart(data: MonthlyAnalytics[]): void {
-    if (!this.chart) { this.initChart(data); return; }
-    this.chart.data.labels = data.map(d => d.month_name.substring(0, 3));
-    this.chart.data.datasets[0].data = data.map(d => d.income);
-    this.chart.data.datasets[1].data = data.map(d => Math.abs(d.expenses));
-    this.chart.data.datasets[2].data = data.map(d => d.balance);
-    this.chart.update();
+  // ── SVG Chart rendering ────────────────────────────────────────────────
+  renderCharts(data: MonthlyAnalytics[]): void {
+    if (!this.lineChartEl || !this.compChartEl) return;
+    const WL=600,WC=380,H=240,PL=56,PR=16,PT=28,PB=34;
+    const labels=data.map(d=>d.month_name.substring(0,3));
+    const income=data.map(d=>d.income);
+    const exp=data.map(d=>d.expenses);
+    const cash=data.map(d=>d.cash_expenses);
+    const card=data.map(d=>d.card_expenses);
+    const shared=data.map(d=>d.shared_my_portion);
+    this.lineChartEl.nativeElement.innerHTML = this.buildLineChart(labels,income,exp,WL,H,PL,PR,PT,PB);
+    this.compChartEl.nativeElement.innerHTML = this.buildCompChart(labels,cash,card,shared,WC,H,PL,PR,PT,PB);
+  }
+
+  private buildLineChart(labels:string[],income:number[],exp:number[],W:number,H:number,PL:number,PR:number,PT:number,PB:number):string {
+    const n=labels.length;
+    const maxV=Math.max(...income,...exp)*1.15||1;
+    const totalW=W-PL-PR;
+    const gap=totalW/(n-1);
+    const sy=(v:number)=>PT+(1-Math.max(0,v)/maxV)*(H-PT-PB);
+    const sx=(i:number)=>PL+i*gap;
+    const fmt=(v:number)=>`R$ ${v.toLocaleString('pt-BR',{minimumFractionDigits:2})}`;
+    let o='';
+    o+=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${H}px;overflow:visible">`;
+    o+=`<text x="${W/2}" y="${PT-10}" text-anchor="middle" font-size="11" fill="#6b7280" font-weight="600" font-family="inherit">Receita x Despesa</text>`;
+    for(let s=0;s<=5;s++){
+      const gv=maxV*s/5;const gy=sy(gv);
+      o+=`<line x1="${PL}" y1="${gy.toFixed(1)}" x2="${W-PR}" y2="${gy.toFixed(1)}" stroke="#f3f4f6" stroke-width="1"/>`;
+      const lbl=gv>=1000?`${(gv/1000).toFixed(gv%1000===0?0:1)}k`:gv.toFixed(0);
+      o+=`<text x="${PL-6}" y="${(gy+4).toFixed(1)}" text-anchor="end" font-size="9" fill="#9ca3af" font-family="inherit">R$${lbl}</text>`;
+    }
+    const incomePts=income.map((_,i)=>`${sx(i).toFixed(1)},${sy(income[i]).toFixed(1)}`).join(' ');
+    const baseY=sy(0).toFixed(1);
+    o+=`<polygon points="${sx(0).toFixed(1)},${baseY} ${incomePts} ${sx(n-1).toFixed(1)},${baseY}" fill="#dcfce7" opacity="0.45"/>`;
+    const expPts=exp.map((_,i)=>`${sx(i).toFixed(1)},${sy(exp[i]).toFixed(1)}`).join(' ');
+    o+=`<polyline points="${expPts}" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+    o+=`<polyline points="${incomePts}" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-dasharray="6 3" stroke-linejoin="round" stroke-linecap="round"/>`;
+    income.forEach((_,i)=>{
+      if(income[i]===0&&exp[i]===0)return;
+      o+=`<circle cx="${sx(i).toFixed(1)}" cy="${sy(income[i]).toFixed(1)}" r="3.5" fill="#16a34a" stroke="#fff" stroke-width="1.5"/>`;
+      o+=`<circle cx="${sx(i).toFixed(1)}" cy="${sy(exp[i]).toFixed(1)}" r="3" fill="#ef4444" stroke="#fff" stroke-width="1.5"/>`;
+    });
+    labels.forEach((m,i)=>{
+      const active=income[i]>0||exp[i]>0;
+      o+=`<text x="${sx(i).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="10" fill="${active?'#6b7280':'#d1d5db'}" font-family="inherit">${m}</text>`;
+    });
+    o+=`</svg>`;
+    return o;
+  }
+
+  private buildCompChart(labels:string[],cash:number[],card:number[],shared:number[],W:number,H:number,PL:number,PR:number,PT:number,PB:number):string {
+    const n=labels.length;
+    const totals=cash.map((_,i)=>cash[i]+card[i]+shared[i]);
+    const maxV=Math.max(...totals)*1.2||1;
+    const totalW=W-PL-PR;
+    const gap=totalW/n;
+    const barW=Math.min(gap*0.72,26);
+    const bx=(i:number)=>PL+i*gap+gap/2-barW/2;
+    const sy=(v:number)=>PT+(1-v/maxV)*(H-PT-PB);
+    const baseY=sy(0);
+    const fmt=(v:number)=>`R$ ${v.toLocaleString('pt-BR',{minimumFractionDigits:2})}`;
+    let o='';
+    o+=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${H}px;overflow:visible">`;
+    o+=`<text x="${W/2}" y="${PT-10}" text-anchor="middle" font-size="11" fill="#6b7280" font-weight="600" font-family="inherit">Composição das Despesas</text>`;
+    for(let s=0;s<=4;s++){
+      const gv=maxV*s/4;const gy=sy(gv);
+      o+=`<line x1="${PL}" y1="${gy.toFixed(1)}" x2="${W-PR}" y2="${gy.toFixed(1)}" stroke="#f3f4f6" stroke-width="1"/>`;
+      const lbl=gv>=1000?`${(gv/1000).toFixed(1)}k`:gv.toFixed(0);
+      o+=`<text x="${PL-4}" y="${(gy+4).toFixed(1)}" text-anchor="end" font-size="8" fill="#9ca3af" font-family="inherit">R$${lbl}</text>`;
+    }
+    for(let i=0;i<n;i++){
+      const x=bx(i);const cx=x+barW/2;
+      const h1=Math.max(0,baseY-sy(cash[i]));
+      const h2=Math.max(0,baseY-sy(card[i]));
+      const h3=Math.max(0,baseY-sy(shared[i]));
+      const yc=baseY-h1;const yk=yc-h2;const ys=yk-h3;
+      if(cash[i]>0){
+        o+=`<rect x="${x.toFixed(1)}" y="${yc.toFixed(1)}" width="${barW.toFixed(1)}" height="${h1.toFixed(1)}" fill="#ef4444"/>`;
+        if(h1>=14) o+=`<text x="${cx.toFixed(1)}" y="${(yc+h1/2+4).toFixed(1)}" text-anchor="middle" font-size="8" fill="#fff" font-weight="bold" font-family="inherit">${(cash[i]/1000).toFixed(1)}k</text>`;
+      }
+      if(card[i]>0){
+        o+=`<rect x="${x.toFixed(1)}" y="${yk.toFixed(1)}" width="${barW.toFixed(1)}" height="${h2.toFixed(1)}" fill="#f97316"/>`;
+        if(h2>=14) o+=`<text x="${cx.toFixed(1)}" y="${(yk+h2/2+4).toFixed(1)}" text-anchor="middle" font-size="8" fill="#fff" font-weight="bold" font-family="inherit">${(card[i]/1000).toFixed(1)}k</text>`;
+      }
+      if(shared[i]>0){
+        o+=`<rect x="${x.toFixed(1)}" y="${ys.toFixed(1)}" width="${barW.toFixed(1)}" height="${h3.toFixed(1)}" fill="#fbbf24"/>`;
+        if(h3>=14) o+=`<text x="${cx.toFixed(1)}" y="${(ys+h3/2+4).toFixed(1)}" text-anchor="middle" font-size="8" fill="#fff" font-weight="bold" font-family="inherit">${(shared[i]/1000).toFixed(1)}k</text>`;
+      }
+      if(totals[i]>0){
+        const topY=Math.min(...[cash[i]>0?yc:9999,card[i]>0?yk:9999,shared[i]>0?ys:9999]);
+        o+=`<text x="${cx.toFixed(1)}" y="${(topY-3).toFixed(1)}" text-anchor="middle" font-size="8" fill="#374151" font-weight="bold" font-family="inherit">${(totals[i]/1000).toFixed(1)}k</text>`;
+      }
+      const active=totals[i]>0;
+      o+=`<text x="${cx.toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="${active?10:9}" fill="${active?'#6b7280':'#d1d5db'}" font-family="inherit">${labels[i]}</text>`;
+    }
+    o+=`</svg>`;
+    return o;
   }
 }

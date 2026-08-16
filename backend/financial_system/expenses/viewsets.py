@@ -616,6 +616,9 @@ class ExpenseViewSet(viewsets.ModelViewSet):
           - year           (int, default=ano atual)
           - payment_method (str, opcional) "dinheiro" | "cartao"
         """
+        from decimal import Decimal
+        from debts.models import SharedDebtMember, SharedEntry
+
         today = date.today()
         params = request.query_params
         try:
@@ -625,10 +628,9 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         except (ValueError, TypeError):
             year = today.year
 
-        qs = models.Expense.objects.filter(
-            tenant_id=request.user.tenant_id,
-            date__year=year,
-        )
+        tenant = request.user.tenant_id
+
+        qs = models.Expense.objects.filter(tenant_id=tenant, date__year=year)
         qs = _apply_payment_method_filter(qs, params, models.Expense)
 
         rows = (
@@ -638,25 +640,51 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             .annotate(
                 income=Sum('amount', filter=Q(amount__gt=0)),
                 expenses_total=Sum(Abs('amount'), filter=Q(amount__lt=0)),
+                cash_total=Sum(Abs('amount'), filter=Q(amount__lt=0, payment_method='dinheiro')),
+                card_total=Sum(Abs('amount'), filter=Q(amount__lt=0, payment_method='cartao')),
                 count=Count('id'),
             )
             .order_by('month_num')
         )
-
         month_map = {row['month_num']: row for row in rows}
+
+        # ── Shared my_portion per month ───────────────────────────────────
+        my_member_ids = list(
+            SharedDebtMember.objects
+            .filter(tenant_id=tenant)
+            .values_list('id', flat=True)
+        )
+        shared_entries = (
+            SharedEntry.objects
+            .filter(participants__member_id__in=my_member_ids, date__year=year)
+            .prefetch_related('participants')
+            .distinct()
+        )
+        shared_by_month: dict[int, float] = {}
+        for entry in shared_entries:
+            pc = entry.participants.count()
+            if pc > 0:
+                m = entry.date.month
+                shared_by_month[m] = shared_by_month.get(m, 0.0) + float(entry.amount / Decimal(pc))
 
         result = []
         for m in range(1, 13):
             row = month_map.get(m, {})
-            income = float(row.get('income') or 0)
-            expenses = float(row.get('expenses_total') or 0)
+            income        = float(row.get('income') or 0)
+            cash_exp      = float(row.get('cash_total') or 0)
+            card_exp      = float(row.get('card_total') or 0)
+            shared_exp    = round(shared_by_month.get(m, 0.0), 2)
+            total_exp     = round(cash_exp + card_exp + shared_exp, 2)
             result.append({
-                'month': m,
-                'month_name': _MONTH_NAMES[m],
-                'income': round(income, 2),
-                'expenses': round(expenses, 2),
-                'balance': round(income - expenses, 2),
-                'count': row.get('count', 0),
+                'month':            m,
+                'month_name':       _MONTH_NAMES[m],
+                'income':           round(income, 2),
+                'expenses':         total_exp,
+                'cash_expenses':    round(cash_exp, 2),
+                'card_expenses':    round(card_exp, 2),
+                'shared_my_portion': shared_exp,
+                'balance':          round(income - total_exp, 2),
+                'count':            row.get('count', 0),
             })
 
         return Response(result, status=status.HTTP_200_OK)
