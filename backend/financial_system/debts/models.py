@@ -150,6 +150,24 @@ class SharedEntry(BaseModel):
         null=False,
     )
 
+    installment_group_id = models.UUIDField(
+        db_column='installment_group_id',
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='UUID que agrupa todas as parcelas de um mesmo parcelamento.',
+    )
+    total_installments = models.PositiveSmallIntegerField(
+        db_column='total_installments',
+        default=1,
+        help_text='Total de parcelas (1 = não parcelado).',
+    )
+    installment_number = models.PositiveSmallIntegerField(
+        db_column='installment_number',
+        default=1,
+        help_text='Número desta parcela (1-based).',
+    )
+
     class Meta:
         db_table = 'shared_entries'
         verbose_name = 'Shared Entry'

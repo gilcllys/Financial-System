@@ -2,7 +2,7 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormsModule, FormBuilder, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/auth/auth.service';
 import { CardService } from '../../../core/services/card.service';
 import { CategoryService } from '../../../core/services/category.service';
@@ -16,6 +16,7 @@ import {
   BalancesResponse,
   MonthlyHistoryEntry,
   RecurringTemplate,
+  PaginatedResponse,
 } from '../../../core/services/shared-debt.service';
 
 
@@ -35,7 +36,7 @@ interface DraftSharedEntry {
 @Component({
   selector: 'app-shared-debt-detail',
   standalone: true,
-  imports: [RouterLink, ReactiveFormsModule, SlicePipe],
+  imports: [RouterLink, ReactiveFormsModule, FormsModule, SlicePipe],
   templateUrl: './shared-debt-detail.component.html',
   styleUrls: ['./shared-debt-detail.component.scss'],
 })
@@ -55,8 +56,56 @@ export class SharedDebtDetailComponent implements OnInit {
   members = signal<SharedDebtMember[]>([]);
   entries = signal<SharedDebtEntry[]>([]);
   balances = signal<BalancesResponse | null>(null);
+
+  // ── Filtros e paginação ─────────────────────────────────────────────────
+  readonly PAGE_SIZE = 20;
+  filterMonth = signal<number | null>(null);
+  filterCategory = signal<number | null>(null);
+  currentPage = signal(1);
+  totalCount = signal(0);
+  totalPages = computed(() => Math.max(1, Math.ceil(this.totalCount() / this.PAGE_SIZE)));
+  pageNumbers = computed(() => Array.from({ length: this.totalPages() }, (_, i) => i + 1));
   cards = signal<CreditCard[]>([]);
   loading = signal(true);
+
+  readonly pieColors = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#06b6d4','#f97316','#84cc16','#ec4899'];
+
+  categoryBreakdown = computed(() => {
+    const map = new Map<string, number>();
+    for (const e of this.entries()) {
+      const key = e.category_name ?? 'Sem categoria';
+      map.set(key, (map.get(key) ?? 0) + Number(e.amount));
+    }
+    return Array.from(map.entries())
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total);
+  });
+
+  pieSlices = computed(() => {
+    const data = this.categoryBreakdown();
+    const total = data.reduce((s, d) => s + d.total, 0);
+    if (total === 0) return [];
+    const cx = 90, cy = 90, r = 75;
+    let startAngle = -Math.PI / 2;
+    return data.map((d, i) => {
+      const slice = (d.total / total) * 2 * Math.PI;
+      const endAngle = startAngle + slice;
+      const x1 = cx + r * Math.cos(startAngle);
+      const y1 = cy + r * Math.sin(startAngle);
+      const x2 = cx + r * Math.cos(endAngle);
+      const y2 = cy + r * Math.sin(endAngle);
+      startAngle = endAngle;
+      return {
+        name: d.name,
+        color: this.pieColors[i % this.pieColors.length],
+        d: `M${cx},${cy} L${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${slice > Math.PI ? 1 : 0},1 ${x2.toFixed(1)},${y2.toFixed(1)} Z`
+      };
+    });
+  });
+
+  formatCurrencyPie(value: number): string {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  }
   categories = signal<ExpenseCategory[]>([]);
 
   inviteUrl = signal<string | null>(null);
@@ -116,7 +165,10 @@ export class SharedDebtDetailComponent implements OnInit {
     payment_method: ['dinheiro' as 'dinheiro' | 'cartao', Validators.required],
     credit_card_id: [null as number | null],
     category_id: [null as number | null],
+    total_installments_input: [1 as number, [Validators.min(1), Validators.max(120)]],
   });
+
+  isParcelado = signal(false);
 
   get isCartao(): boolean { return this.form.value.payment_method === 'cartao'; }
 
@@ -157,10 +209,44 @@ export class SharedDebtDetailComponent implements OnInit {
     this.loadRecurringTemplates();
   }
 
-  private refreshEntriesAndBalances(): void {
-    this.svc.listEntries({ shared_debt: this.groupId }).subscribe({ next: e => this.entries.set(e) });
+  private refreshEntriesAndBalances(resetPage = false): void {
+    if (resetPage) this.currentPage.set(1);
+    this.svc.listEntries({
+      shared_debt: this.groupId,
+      month: this.filterMonth() ?? undefined,
+      category: this.filterCategory() ?? undefined,
+      page: this.currentPage(),
+    }).subscribe({
+      next: (res: PaginatedResponse<SharedDebtEntry>) => {
+        this.entries.set(res.results);
+        this.totalCount.set(res.count);
+      }
+    });
     this.svc.balances(this.groupId).subscribe({ next: b => this.balances.set(b) });
   }
+
+  applyFilter(): void { this.refreshEntriesAndBalances(true); }
+
+  clearFilters(): void {
+    this.filterMonth.set(null);
+    this.filterCategory.set(null);
+    this.refreshEntriesAndBalances(true);
+  }
+
+  goToPage(page: number): void {
+    if (page < 1 || page > this.totalPages()) return;
+    this.currentPage.set(page);
+    this.refreshEntriesAndBalances();
+  }
+
+  readonly MONTHS = [
+    { value: 1, label: 'Janeiro' }, { value: 2, label: 'Fevereiro' },
+    { value: 3, label: 'Março' },   { value: 4, label: 'Abril' },
+    { value: 5, label: 'Maio' },    { value: 6, label: 'Junho' },
+    { value: 7, label: 'Julho' },   { value: 8, label: 'Agosto' },
+    { value: 9, label: 'Setembro' },{ value: 10, label: 'Outubro' },
+    { value: 11, label: 'Novembro' },{ value: 12, label: 'Dezembro' },
+  ];
 
   // ── Invite ──────────────────────────────────────────────────────────────
   invite(): void {
@@ -244,6 +330,7 @@ export class SharedDebtDetailComponent implements OnInit {
       payment_method: v.payment_method!,
       credit_card_id: v.payment_method === 'cartao' && this.payerIsMe ? v.credit_card_id : null,
       category_id: v.category_id ?? null,
+      total_installments_input: this.isParcelado() ? (v.total_installments_input ?? 2) : 1,
     };
 
     const editId = this.editingEntryId();
@@ -263,7 +350,9 @@ export class SharedDebtDetailComponent implements OnInit {
         payment_method: 'dinheiro',
         credit_card_id: null,
         category_id: null,
+        total_installments_input: 1,
       });
+      this.isParcelado.set(false);
       this.participantIds.set(new Set(this.members().map(m => m.id)));
       this.refreshEntriesAndBalances();
     this.loadMonthlyHistory();

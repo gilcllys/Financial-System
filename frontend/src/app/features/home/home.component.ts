@@ -12,7 +12,7 @@ import { ExpenseService } from '../../core/services/expense.service';
 import { CategoryService } from '../../core/services/category.service';
 import { AnalyticsService, MonthlyAnalytics, CategoryAnalytics, ConsolidatedSummary } from '../../core/services/analytics.service';
 import { OpenInvoice, Expense, ExpenseCategory } from '../../core/models';
-import { SharedDebtHomeSummary } from '../../core/services/shared-debt.service';
+import { SharedDebtService, SharedDebtHomeSummary, SharedDebtEntry } from '../../core/services/shared-debt.service';
 
 const MONTH_NAMES = [
   'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -39,6 +39,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   private expenseService   = inject(ExpenseService);
   private categoryService  = inject(CategoryService);
   private analyticsService = inject(AnalyticsService);
+  private sharedDebtService = inject(SharedDebtService);
   private destroy$         = new Subject<void>();
   private searchSubject    = new Subject<string>();
 
@@ -47,6 +48,11 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   consolidated       = signal<ConsolidatedSummary>(EMPTY_CONSOLIDATED);
   openInvoices       = signal<OpenInvoice[]>([]);
   sharedDebts        = signal<SharedDebtHomeSummary[]>([]);
+
+  // ── Tabs "Todos os Gastos" ───────────────────────────────────────────────
+  activeTab           = signal<'individual' | 'compartilhada'>('individual');
+  sharedEntries       = signal<SharedDebtEntry[]>([]);
+  sharedEntriesLoading = signal(false);
   byCategory         = signal<CategoryAnalytics[]>([]);
   evolution          = signal<MonthlyAnalytics[]>([]);
   installmentGroups  = signal<InstallmentGroup[]>([]);
@@ -158,7 +164,32 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
       .subscribe({ next: data => this.byCategory.set(data.by_category) });
   }
 
-  onFilterChange(): void { this.currentPage.set(1); this.loadTable(); }
+  onFilterChange(): void {
+    this.currentPage.set(1);
+    this.loadTable();
+    if (this.activeTab() === 'compartilhada') this.loadSharedEntries();
+  }
+
+  switchTab(tab: 'individual' | 'compartilhada'): void {
+    this.activeTab.set(tab);
+    if (tab === 'compartilhada' && this.sharedEntries().length === 0) {
+      this.loadSharedEntries();
+    }
+  }
+
+  loadSharedEntries(): void {
+    this.sharedEntriesLoading.set(true);
+    this.sharedDebtService.listEntries({ month: this.filterMonth(), year: this.filterYear() })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: res => { this.sharedEntries.set(res.results); this.sharedEntriesLoading.set(false); },
+        error: () => this.sharedEntriesLoading.set(false),
+      });
+  }
+
+  myPortion(entry: SharedDebtEntry): number {
+    return entry.participant_count > 0 ? Number(entry.amount) / entry.participant_count : Number(entry.amount);
+  }
 
   onSearchInput(value: string): void {
     this.searchTerm.set(value);

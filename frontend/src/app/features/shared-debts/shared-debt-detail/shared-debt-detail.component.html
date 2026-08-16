@@ -70,6 +70,32 @@
     </div>
   }
 
+  <!-- ── Gráfico por categoria ─────────────────────────────────────────────── -->
+  @if (categoryBreakdown().length > 0) {
+    <div class="card" style="margin-bottom: var(--space-md)">
+      <div class="card__header">
+        <span class="card__title">🍕 Gastos por Categoria</span>
+        <span class="text-muted" style="font-size:0.8rem">{{ categoryBreakdown().length }} categorias</span>
+      </div>
+      <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;padding:12px 16px">
+        <svg viewBox="0 0 180 180" style="width:160px;height:160px;flex-shrink:0">
+          @for (s of pieSlices(); track s.name) {
+            <path [attr.d]="s.d" [attr.fill]="s.color" stroke="white" stroke-width="2"/>
+          }
+        </svg>
+        <div style="flex:1;min-width:140px">
+          @for (item of categoryBreakdown(); track item.name; let i = $index) {
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:0.82rem">
+              <span [style.background]="pieColors[i % pieColors.length]" style="width:10px;height:10px;border-radius:50%;flex-shrink:0"></span>
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.name }}</span>
+              <span style="font-weight:600">{{ formatCurrencyPie(item.total) }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
   <!-- ── Despesas ─────────────────────────────────────────────────────────── -->
   <div class="page-header" style="margin-top: var(--space-lg)">
     <h2 class="section-title" style="margin:0">Despesas</h2>
@@ -82,6 +108,35 @@
         {{ showEntryForm() ? '✕ Fechar' : '＋ Nova despesa' }}
       </button>
     </div>
+  </div>
+
+  <!-- ── Filtros ──────────────────────────────────────────────────────────── -->
+  <div class="entries-filters">
+    <select class="form-select form-select--sm" [ngModel]="filterMonth()"
+      (ngModelChange)="filterMonth.set($event); applyFilter()">
+      <option [ngValue]="null">Todos os meses</option>
+      @for (m of MONTHS; track m.value) {
+        <option [ngValue]="m.value">{{ m.label }}</option>
+      }
+    </select>
+
+    <select class="form-select form-select--sm" [ngModel]="filterCategory()"
+      (ngModelChange)="filterCategory.set($event); applyFilter()">
+      <option [ngValue]="null">Todas as categorias</option>
+      @for (cat of categories(); track cat.id) {
+        <option [ngValue]="cat.id">{{ cat.name }}</option>
+      }
+    </select>
+
+    @if (filterMonth() !== null || filterCategory() !== null) {
+      <button class="btn btn--secondary btn--sm" type="button" (click)="clearFilters()">
+        ✕ Limpar filtros
+      </button>
+    }
+
+    <span class="text-muted" style="font-size:0.8rem;margin-left:auto">
+      {{ totalCount() }} despesa{{ totalCount() !== 1 ? 's' : '' }}
+    </span>
   </div>
 
   @if (showBatchSection()) {
@@ -294,6 +349,31 @@
           </div>
         }
 
+        @if (!editingEntryId()) {
+          <div class="form-row">
+            <div class="form-group">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+                <label class="form-label" style="margin:0">Parcelado?</label>
+                <label class="toggle-switch" aria-label="Ativar parcelamento">
+                  <input type="checkbox" [checked]="isParcelado()" (change)="isParcelado.set(!isParcelado())"/>
+                  <span class="toggle-slider"></span>
+                </label>
+                @if (isParcelado()) {
+                  <span class="text-muted" style="font-size:0.8rem">Será criada 1 entrada por parcela</span>
+                }
+              </div>
+              @if (isParcelado()) {
+                <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+                  <label class="form-label" for="total_installments_input" style="margin:0;white-space:nowrap">Nº de parcelas</label>
+                  <input id="total_installments_input" type="number" class="form-input"
+                    style="width:80px" min="2" max="120"
+                    formControlName="total_installments_input"/>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
         @if (entryError()) {
           <div class="form-error-box" role="alert">{{ entryError() }}</div>
         }
@@ -301,7 +381,7 @@
         <div class="form-actions">
           <button type="submit" class="btn btn--primary" [disabled]="savingEntry()">
             @if (savingEntry()) { <span class="spinner"></span> }
-            {{ editingEntryId() ? 'Salvar alterações' : 'Salvar despesa' }}
+            {{ editingEntryId() ? 'Salvar alterações' : (isParcelado() ? 'Salvar ' + (form.value.total_installments_input || 2) + ' parcelas' : 'Salvar despesa') }}
           </button>
         </div>
       </form>
@@ -333,6 +413,9 @@
               <td style="font-weight:500">
                 {{ e.description }}
                 <span class="badge--shared">{{ e.payment_method === 'cartao' ? '💳' : '💵' }} 👥</span>
+                @if (e.total_installments > 1) {
+                  <span class="badge--installment">{{ e.installment_number }}/{{ e.total_installments }}</span>
+                }
               </td>
               <td>
                 @if (e.category_name) {
@@ -356,6 +439,26 @@
         </tbody>
       </table>
     </div>
+
+    @if (totalPages() > 1) {
+      <div class="pagination">
+        <button class="pagination__btn" type="button"
+          [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)">
+          ‹
+        </button>
+        @for (p of pageNumbers(); track p) {
+          <button class="pagination__btn" type="button"
+            [class.pagination__btn--active]="p === currentPage()"
+            (click)="goToPage(p)">
+            {{ p }}
+          </button>
+        }
+        <button class="pagination__btn" type="button"
+          [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)">
+          ›
+        </button>
+      </div>
+    }
   }
 }
 

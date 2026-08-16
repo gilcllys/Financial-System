@@ -666,3 +666,32 @@
 .mono       { font-family: var(--font-mono); }
 .value--up   { color: var(--color-semantic-up); }
 .value--down { color: var(--color-semantic-down); }
+
+// ── Table Tabs ──────────────────────────────────────────────────────────────
+.table-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 12px 16px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+}
+
+.table-tab {
+  padding: 8px 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+
+  &:hover { color: var(--text); }
+
+  &--active {
+    color: var(--primary, #2563eb);
+    border-bottom-color: var(--primary, #2563eb);
+  }
+}

@@ -4,7 +4,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --prefer-offline
 COPY . .
-RUN npm run build -- --configuration production
+ARG BUILD_CONFIG=production
+RUN npm run build -- --configuration ${BUILD_CONFIG}
 
 # Stage 2: Serve with Nginx
 FROM nginx:1.27-alpine

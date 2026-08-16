@@ -1,4 +1,5 @@
 from rest_framework import viewsets
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -127,9 +128,17 @@ class SharedDebtViewSet(viewsets.ModelViewSet):
         return Response(data)
 
 
+
+class SharedEntryPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
 class SharedEntryViewSet(viewsets.ModelViewSet):
     serializer_class = serializer.SharedEntrySerializer
     queryset = SharedEntry.objects.all()
+    pagination_class = SharedEntryPagination
 
     def get_queryset(self):
         qs = (
@@ -159,6 +168,26 @@ class SharedEntryViewSet(viewsets.ModelViewSet):
                     credit_card_id=card_id,
                     paid_by__tenant_id=self.request.user.tenant_id,
                 )
+            except (ValueError, TypeError):
+                pass
+
+        raw_month = params.get('month')
+        raw_year  = params.get('year')
+        if raw_month and raw_year:
+            try:
+                qs = qs.filter(date__month=int(raw_month), date__year=int(raw_year))
+            except (ValueError, TypeError):
+                pass
+        elif raw_month:
+            try:
+                qs = qs.filter(date__month=int(raw_month))
+            except (ValueError, TypeError):
+                pass
+
+        raw_category = params.get('category')
+        if raw_category is not None:
+            try:
+                qs = qs.filter(category_id=int(raw_category))
             except (ValueError, TypeError):
                 pass
 
