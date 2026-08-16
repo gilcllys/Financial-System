@@ -45,6 +45,13 @@ class CreateSharedEntryInputSerializer(serializers.Serializer):
         default=None,
         help_text='ID da categoria (ExpenseCategory). Opcional.',
     )
+    total_installments_input = serializers.IntegerField(
+        required=False,
+        default=1,
+        min_value=1,
+        max_value=120,
+        help_text='Número de parcelas a gerar (1 = sem parcelamento).',
+    )
 
 
 class JoinSharedDebtInputSerializer(serializers.Serializer):

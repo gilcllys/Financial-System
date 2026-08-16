@@ -320,6 +320,31 @@
           </div>
         }
 
+        @if (!editingEntryId()) {
+          <div class="form-row">
+            <div class="form-group">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+                <label class="form-label" style="margin:0">Parcelado?</label>
+                <label class="toggle-switch" aria-label="Ativar parcelamento">
+                  <input type="checkbox" [checked]="isParcelado()" (change)="isParcelado.set(!isParcelado())"/>
+                  <span class="toggle-slider"></span>
+                </label>
+                @if (isParcelado()) {
+                  <span class="text-muted" style="font-size:0.8rem">Será criada 1 entrada por parcela</span>
+                }
+              </div>
+              @if (isParcelado()) {
+                <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+                  <label class="form-label" for="total_installments_input" style="margin:0;white-space:nowrap">Nº de parcelas</label>
+                  <input id="total_installments_input" type="number" class="form-input"
+                    style="width:80px" min="2" max="120"
+                    formControlName="total_installments_input"/>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
         @if (entryError()) {
           <div class="form-error-box" role="alert">{{ entryError() }}</div>
         }
@@ -327,7 +352,7 @@
         <div class="form-actions">
           <button type="submit" class="btn btn--primary" [disabled]="savingEntry()">
             @if (savingEntry()) { <span class="spinner"></span> }
-            {{ editingEntryId() ? 'Salvar alterações' : 'Salvar despesa' }}
+            {{ editingEntryId() ? 'Salvar alterações' : (isParcelado() ? 'Salvar ' + (form.value.total_installments_input || 2) + ' parcelas' : 'Salvar despesa') }}
           </button>
         </div>
       </form>
@@ -359,6 +384,9 @@
               <td style="font-weight:500">
                 {{ e.description }}
                 <span class="badge--shared">{{ e.payment_method === 'cartao' ? '💳' : '💵' }} 👥</span>
+                @if (e.total_installments > 1) {
+                  <span class="badge--installment">{{ e.installment_number }}/{{ e.total_installments }}</span>
+                }
               </td>
               <td>
                 @if (e.category_name) {

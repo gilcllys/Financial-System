@@ -34,6 +34,9 @@ export interface SharedDebtEntry {
   category: number | null;
   category_name: string | null;
   participant_count: number;
+  installment_group_id: string | null;
+  total_installments: number;
+  installment_number: number;
   created_by_tenant_id: string;
   created_at: string;
 }
@@ -80,6 +83,7 @@ export interface CreateEntryPayload {
   payment_method?: 'dinheiro' | 'cartao';
   credit_card_id?: number | null;
   category_id?: number | null;
+  total_installments_input?: number;
 }
 
 export interface PersonalSummary {

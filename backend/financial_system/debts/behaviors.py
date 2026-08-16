@@ -1,5 +1,7 @@
 from decimal import Decimal, ROUND_HALF_UP
 
+import uuid
+from dateutil.relativedelta import relativedelta
 from django.db import transaction
 from django.db.models import Count, Sum
 from django.db.models.functions import Abs
@@ -153,6 +155,7 @@ class CreateSharedEntryBehavior:
         self.payment_method = data.get('payment_method', 'dinheiro')
         self.credit_card_id = data.get('credit_card_id')
         self.category_id = data.get('category_id')
+        self.total_installments = int(data.get('total_installments_input', 1) or 1)
 
     def _member_ids(self):
         return set(
@@ -205,27 +208,38 @@ class CreateSharedEntryBehavior:
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+        total = self.total_installments
+        group_id = uuid.uuid4() if total > 1 else None
+
         with transaction.atomic():
-            entry = SharedEntry.objects.create(
-                shared_debt=self.shared_debt,
-                paid_by_id=self.paid_by_id,
-                description=self.description,
-                amount=self.amount,
-                date=self.date,
-                payment_method=self.payment_method,
-                credit_card_id=self.credit_card_id,
-                category_id=self.category_id,
-                created_by_tenant_id=self.user.tenant_id,
-            )
-            SharedEntryParticipant.objects.bulk_create(
-                [
-                    SharedEntryParticipant(entry=entry, member_id=member_id)
-                    for member_id in participant_ids
-                ]
-            )
+            entries = []
+            for i in range(total):
+                entry_date = self.date + relativedelta(months=i) if total > 1 else self.date
+                desc = f"{self.description} ({i + 1}/{total})" if total > 1 else self.description
+                entry = SharedEntry.objects.create(
+                    shared_debt=self.shared_debt,
+                    paid_by_id=self.paid_by_id,
+                    description=desc,
+                    amount=self.amount,
+                    date=entry_date,
+                    payment_method=self.payment_method,
+                    credit_card_id=self.credit_card_id,
+                    category_id=self.category_id,
+                    created_by_tenant_id=self.user.tenant_id,
+                    installment_group_id=group_id,
+                    total_installments=total,
+                    installment_number=i + 1,
+                )
+                SharedEntryParticipant.objects.bulk_create(
+                    [
+                        SharedEntryParticipant(entry=entry, member_id=member_id)
+                        for member_id in participant_ids
+                    ]
+                )
+                entries.append(entry)
 
         return Response(
-            SharedEntrySerializer(entry).data,
+            SharedEntrySerializer(entries[0]).data,
             status=status.HTTP_201_CREATED,
         )
 

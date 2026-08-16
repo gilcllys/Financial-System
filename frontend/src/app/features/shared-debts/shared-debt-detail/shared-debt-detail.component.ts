@@ -155,7 +155,10 @@ export class SharedDebtDetailComponent implements OnInit {
     payment_method: ['dinheiro' as 'dinheiro' | 'cartao', Validators.required],
     credit_card_id: [null as number | null],
     category_id: [null as number | null],
+    total_installments_input: [1 as number, [Validators.min(1), Validators.max(120)]],
   });
+
+  isParcelado = signal(false);
 
   get isCartao(): boolean { return this.form.value.payment_method === 'cartao'; }
 
@@ -283,6 +286,7 @@ export class SharedDebtDetailComponent implements OnInit {
       payment_method: v.payment_method!,
       credit_card_id: v.payment_method === 'cartao' && this.payerIsMe ? v.credit_card_id : null,
       category_id: v.category_id ?? null,
+      total_installments_input: this.isParcelado() ? (v.total_installments_input ?? 2) : 1,
     };
 
     const editId = this.editingEntryId();
@@ -302,7 +306,9 @@ export class SharedDebtDetailComponent implements OnInit {
         payment_method: 'dinheiro',
         credit_card_id: null,
         category_id: null,
+        total_installments_input: 1,
       });
+      this.isParcelado.set(false);
       this.participantIds.set(new Set(this.members().map(m => m.id)));
       this.refreshEntriesAndBalances();
     this.loadMonthlyHistory();
