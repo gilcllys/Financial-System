@@ -1,0 +1,73 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# docker-compose.local.yml — Ambiente de desenvolvimento local
+#
+# USO: docker compose -f docker-compose.local.yml up --build
+#
+# Diferenças em relação ao docker-compose.yml (produção):
+#  - Frontend buildado com --configuration development (aponta para localhost:8000)
+#  - Nginx com CSP liberado para http://localhost:8000
+#  - Backend exposto em 0.0.0.0:8000 (acessível pelo browser)
+#  - Volume separado (pgdata-local) para não misturar dados de dev com prod
+#  - Keycloak continua apontando para o EC2 remoto
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+
+  # ─── Banco de Dados ──────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    env_file:
+      - ./backend/.env
+    environment:
+      POSTGRES_DB: ${DB_NAME:-financial_db}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata-local:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"     # exposto localmente para debug com DBeaver etc.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-financial_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend (Django + Gunicorn) ─────────────────────────────────────────
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"               # exposto em 0.0.0.0 para o browser conseguir chamar
+    env_file:
+      - ./backend/.env
+    environment:
+      KEYCLOAK_SERVER_URL: https://ec2-54-147-150-5.compute-1.amazonaws.com
+      KEYCLOAK_REALM: projetos-pessoais
+      KEYCLOAK_CLIENT_ID: financial-backend
+      DB_HOST: db
+      DB_SSL_MODE: disable
+      GUNICORN_WORKERS: "2"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import socket; s=socket.socket(); s.settimeout(5); s.connect((\"localhost\",8000)); s.close()' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  # ─── Frontend (Angular dev build + nginx local) ──────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        BUILD_CONFIG: development    # usa environment.development.ts → apiBaseUrl: localhost:8000
+    volumes:
+      - ./frontend/nginx.local.conf:/etc/nginx/conf.d/default.conf:ro   # CSP com localhost
+    ports:
+      - "4200:80"                  # porta 4200 para diferenciar do ambiente prod (3000)
+    depends_on:
+      - backend
+
+volumes:
+  pgdata-local:                    # volume separado — não interfere nos dados de produção
