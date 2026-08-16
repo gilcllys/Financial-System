@@ -4,7 +4,15 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 export interface MonthlyAnalytics {
-  month: number; month_name: string; income: number; expenses: number; balance: number; count: number;
+  month: number;
+  month_name: string;
+  income: number;
+  expenses: number;
+  cash_expenses: number;
+  card_expenses: number;
+  shared_my_portion: number;
+  balance: number;
+  count: number;
 }
 export interface CategoryAnalytics {
   category_id: number; category_name: string; total: number; count: number; percentage: number;

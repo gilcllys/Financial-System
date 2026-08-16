@@ -492,6 +492,22 @@
   padding: 0 var(--space-xl) var(--space-lg);
 }
 
+.chart-dual {
+  display: flex;
+  gap: 16px;
+  padding: 8px var(--space-xl) var(--space-lg);
+
+  &__line {
+    flex: 3;
+    min-height: 240px;
+  }
+
+  &__comp {
+    flex: 2;
+    min-height: 240px;
+  }
+}
+
 .chart-legend {
   display: flex;
   gap: var(--space-base);
