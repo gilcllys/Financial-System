@@ -188,7 +188,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   myPortion(entry: SharedDebtEntry): number {
-    return entry.participant_count > 0 ? entry.amount / entry.participant_count : entry.amount;
+    return entry.participant_count > 0 ? Number(entry.amount) / entry.participant_count : Number(entry.amount);
   }
 
   onSearchInput(value: string): void {

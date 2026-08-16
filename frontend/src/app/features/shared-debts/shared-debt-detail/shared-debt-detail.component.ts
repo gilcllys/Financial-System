@@ -64,7 +64,7 @@ export class SharedDebtDetailComponent implements OnInit {
     const map = new Map<string, number>();
     for (const e of this.entries()) {
       const key = e.category_name ?? 'Sem categoria';
-      map.set(key, (map.get(key) ?? 0) + e.amount);
+      map.set(key, (map.get(key) ?? 0) + Number(e.amount));
     }
     return Array.from(map.entries())
       .map(([name, total]) => ({ name, total }))
