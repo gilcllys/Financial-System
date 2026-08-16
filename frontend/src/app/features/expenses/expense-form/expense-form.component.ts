@@ -1,7 +1,8 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
-import { ExpenseService } from '../../../core/services/expense.service';
+import { ExpenseService, RecurringExpenseTemplate, GenerateMonthResult } from '../../../core/services/expense.service';
 import { SharedDebtService, SharedDebtGroup, SharedDebtMember } from '../../../core/services/shared-debt.service';
 import { CardService } from '../../../core/services/card.service';
 import { CategoryService } from '../../../core/services/category.service';
@@ -10,7 +11,7 @@ import { CreditCard, ExpenseCategory } from '../../../core/models';
 @Component({
   selector: 'app-expense-form',
   standalone: true,
-  imports: [ReactiveFormsModule, FormsModule, RouterLink],
+  imports: [ReactiveFormsModule, FormsModule, RouterLink, DecimalPipe],
   templateUrl: './expense-form.component.html',
   styleUrls: ['./expense-form.component.scss'],
 })
@@ -24,7 +25,7 @@ export class ExpenseFormComponent implements OnInit {
   private sharedDebtSvc = inject(SharedDebtService);
 
   // ── Modo Individual / Compartilhado ──────────────────────────────────────
-  mode = signal<'individual' | 'shared'>('individual');
+  mode = signal<'individual' | 'shared' | 'recurring'>('individual');
   sharedGroups = signal<SharedDebtGroup[]>([]);
   sharedMembers = signal<SharedDebtMember[]>([]);
   selectedGroupId = signal<number | null>(null);
@@ -41,6 +42,61 @@ export class ExpenseFormComponent implements OnInit {
     category_id: [null as number | null],
   });
   get sharedIsCartao(): boolean { return this.sharedForm.value.payment_method === 'cartao'; }
+
+  // ── Gastos Fixos (Recorrentes) ───────────────────────────────────────────
+  recurringTemplates = signal<RecurringExpenseTemplate[]>([]);
+  showRecurringForm = signal(false);
+  savingRecurring = signal(false);
+  generateResult = signal<GenerateMonthResult | null>(null);
+  recurringForm = this.fb.group({
+    description: ['', Validators.required],
+    amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
+    day_of_month: [1, [Validators.required, Validators.min(1), Validators.max(28)]],
+    payment_method: ['dinheiro', Validators.required],
+    category_id: [null as number | null],
+  });
+
+  loadRecurringTemplates(): void {
+    this.expenseService.listRecurringTemplates().subscribe({ next: t => this.recurringTemplates.set(t) });
+  }
+
+  saveRecurring(): void {
+    if (this.recurringForm.invalid) { this.recurringForm.markAllAsTouched(); return; }
+    const v = this.recurringForm.getRawValue();
+    this.savingRecurring.set(true);
+    this.expenseService.createRecurringTemplate({
+      description: v.description!,
+      amount: v.amount!,
+      day_of_month: v.day_of_month!,
+      payment_method: v.payment_method!,
+      category_id: v.category_id ?? undefined,
+    }).subscribe({
+      next: () => {
+        this.savingRecurring.set(false);
+        this.showRecurringForm.set(false);
+        this.recurringForm.reset({ description: '', amount: null, day_of_month: 1, payment_method: 'dinheiro', category_id: null });
+        this.loadRecurringTemplates();
+      },
+      error: () => this.savingRecurring.set(false),
+    });
+  }
+
+  deleteRecurring(id: number): void {
+    if (!confirm('Excluir este gasto fixo?')) return;
+    this.expenseService.deleteRecurringTemplate(id).subscribe({ next: () => this.loadRecurringTemplates() });
+  }
+
+  toggleRecurring(id: number): void {
+    this.expenseService.toggleRecurringTemplate(id).subscribe({ next: () => this.loadRecurringTemplates() });
+  }
+
+  generateCurrentMonth(): void {
+    const now = new Date();
+    this.expenseService.generateMonthRecurring(now.getMonth() + 1, now.getFullYear()).subscribe({
+      next: res => { this.generateResult.set(res); this.loadRecurringTemplates(); },
+    });
+  }
+
 
   categories = signal<ExpenseCategory[]>([]);
   cards = signal<CreditCard[]>([]);
@@ -149,12 +205,13 @@ export class ExpenseFormComponent implements OnInit {
   }
 
 
-  setMode(m: 'individual' | 'shared'): void {
+  setMode(m: 'individual' | 'shared' | 'recurring'): void {
     this.mode.set(m);
     this.selectedGroupId.set(null);
     this.sharedMembers.set([]);
     this.participantIds.set(new Set());
-  }
+  
+    if (m === 'recurring') this.loadRecurringTemplates();}
 
   onGroupSelect(groupId: number): void {
     this.selectedGroupId.set(groupId);

@@ -12,6 +12,8 @@
       (click)="setMode('individual')">Individual</button>
     <button type="button" class="mode-toggle__btn" [class.mode-toggle__btn--active]="mode() === 'shared'"
       (click)="setMode('shared')">Compartilhado</button>
+    <button type="button" class="mode-toggle__btn" [class.mode-toggle__btn--active]="mode() === 'recurring'"
+      (click)="setMode('recurring')">🔁 Gastos Fixos</button>
   </div>
 }
 
@@ -362,4 +364,133 @@
     </form>
   </div>
 }
+}
+
+@if (mode() === 'recurring') {
+  <div class="card">
+    <div class="recurring-header">
+      <div>
+        <h2 class="section-title">🔁 Gastos Fixos</h2>
+        <p class="section-sub">Despesas que se repetem todo mês em um dia fixo</p>
+      </div>
+      <div class="recurring-actions">
+        <button type="button" class="btn btn--secondary btn--sm" (click)="generateCurrentMonth()">
+          ⚡ Gerar mês atual
+        </button>
+        <button type="button" class="btn btn--primary btn--sm" (click)="showRecurringForm.set(true)">
+          + Novo
+        </button>
+      </div>
+    </div>
+
+    @if (generateResult()) {
+      <div class="alert alert--success">
+        ✅ {{ generateResult()!.created }} despesas geradas · {{ generateResult()!.skipped }} já existiam
+      </div>
+    }
+
+    @if (showRecurringForm()) {
+      <div class="card card--inner">
+        <h3 class="form-section-title">Novo Gasto Fixo</h3>
+        <form [formGroup]="recurringForm" (ngSubmit)="saveRecurring()" novalidate>
+          <div class="form-row form-row--2col">
+            <div class="form-group">
+              <label class="form-label">Descrição *</label>
+              <input class="form-input" type="text" formControlName="description" placeholder="Ex: Netflix" />
+              @if (recurringForm.get('description')?.invalid && recurringForm.get('description')?.touched) {
+                <span class="form-error">Obrigatório</span>
+              }
+            </div>
+            <div class="form-group">
+              <label class="form-label">Valor (R$) *</label>
+              <input class="form-input mono" type="number" step="0.01" min="0.01" formControlName="amount" placeholder="49.90" />
+            </div>
+          </div>
+          <div class="form-row form-row--2col">
+            <div class="form-group">
+              <label class="form-label">Dia do mês *</label>
+              <input class="form-input mono" type="number" min="1" max="28" formControlName="day_of_month" placeholder="1-28" />
+              <span class="form-hint">Todo mês o gasto será lançado nesse dia</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Categoria</label>
+              <select class="form-select" formControlName="category_id">
+                <option [ngValue]="null">Sem categoria</option>
+                @for (cat of categories(); track cat.id) {
+                  <option [ngValue]="cat.id">{{ cat.name }}</option>
+                }
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <fieldset class="form-group">
+              <legend class="form-label">Método de Pagamento *</legend>
+              <div class="radio-group">
+                <label class="radio-option">
+                  <input type="radio" formControlName="payment_method" value="dinheiro" />
+                  <span class="radio-btn">💵 Dinheiro</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" formControlName="payment_method" value="cartao" />
+                  <span class="radio-btn">💳 Cartão</span>
+                </label>
+              </div>
+            </fieldset>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn--secondary" (click)="showRecurringForm.set(false)">Cancelar</button>
+            <button type="submit" class="btn btn--primary" [disabled]="savingRecurring()">
+              @if (savingRecurring()) { <span class="spinner"></span> } Salvar
+            </button>
+          </div>
+        </form>
+      </div>
+    }
+
+    @if (recurringTemplates().length === 0 && !showRecurringForm()) {
+      <div class="empty-state">
+        <p>Nenhum gasto fixo cadastrado ainda.</p>
+        <button type="button" class="btn btn--primary" (click)="showRecurringForm.set(true)">Cadastrar primeiro gasto fixo</button>
+      </div>
+    }
+
+    @if (recurringTemplates().length > 0) {
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Descrição</th>
+            <th>Valor</th>
+            <th>Dia</th>
+            <th>Pagamento</th>
+            <th>Categoria</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (t of recurringTemplates(); track t.id) {
+            <tr [class.row--inactive]="!t.is_active">
+              <td>{{ t.description }}</td>
+              <td class="mono">R$ {{ t.amount | number:'1.2-2' }}</td>
+              <td class="mono">dia {{ t.day_of_month }}</td>
+              <td>{{ t.payment_method }}</td>
+              <td>{{ t.category_name ?? '—' }}</td>
+              <td>
+                <span class="badge" [class.badge--active]="t.is_active" [class.badge--inactive]="!t.is_active">
+                  {{ t.is_active ? 'Ativo' : 'Inativo' }}
+                </span>
+              </td>
+              <td class="actions">
+                <button type="button" class="btn btn--ghost btn--sm" (click)="toggleRecurring(t.id)"
+                  [title]="t.is_active ? 'Desativar' : 'Ativar'">
+                  {{ t.is_active ? '⏸' : '▶' }}
+                </button>
+                <button type="button" class="btn btn--ghost btn--sm btn--danger" (click)="deleteRecurring(t.id)" title="Excluir">🗑</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
 }
