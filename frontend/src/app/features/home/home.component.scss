@@ -697,29 +697,62 @@
 }
 
 .chart-tooltip {
-  position: absolute;
-  background: white;
+  position: fixed;
+  background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 8px 12px;
+  border-radius: 10px;
+  padding: 10px 14px;
   font-size: 0.8rem;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.14);
   pointer-events: none;
-  z-index: 100;
-  min-width: 164px;
+  z-index: 9999;
+  min-width: 180px;
 
-  strong {
-    display: block;
-    margin-bottom: 4px;
+  &__title {
+    font-weight: 700;
     font-size: 0.82rem;
-    color: #374151;
+    color: #111827;
+    margin-bottom: 6px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #f3f4f6;
   }
 
   &__row {
     display: flex;
     justify-content: space-between;
-    gap: 16px;
+    align-items: center;
+    gap: 12px;
     color: #6b7280;
-    margin-top: 3px;
+    margin-top: 4px;
+    font-size: 0.79rem;
   }
+
+  &__row--total {
+    font-weight: 700;
+    color: #111827;
+    font-size: 0.82rem;
+  }
+
+  &__val {
+    font-weight: 600;
+    color: #374151;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__divider {
+    border-top: 1px solid #f3f4f6;
+    margin: 5px 0;
+  }
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+  &--green  { background: #16a34a; }
+  &--red    { background: #ef4444; }
+  &--orange { background: #f97316; }
+  &--yellow { background: #fbbf24; }
 }

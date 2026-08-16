@@ -270,7 +270,8 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('lineChartEl') lineChartEl!: ElementRef<HTMLDivElement>;
   @ViewChild('compChartEl') compChartEl!: ElementRef<HTMLDivElement>;
 
-  chartTooltip = signal<{x:number; y:number; month:string; income:number; expense:number} | null>(null);
+  chartTooltip = signal<{cx:number; cy:number; month:string; income:number; expense:number} | null>(null);
+  barTooltip = signal<{cx:number; cy:number; month:string; cash:number; card:number; shared:number; total:number} | null>(null);
 
   constructor() {
     // Renderiza os gráficos assim que dashLoading vira false e o DOM é atualizado
@@ -298,25 +299,46 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     this.lineChartEl.nativeElement.innerHTML = this.buildLineChart(labels,income,exp,WL,H,PL,PR,PT,PB);
     this.compChartEl.nativeElement.innerHTML = this.buildCompChart(labels,cash,card,shared,WC,H,PL,PR,PT,PB);
     this._attachLineTooltips();
+    this._attachBarTooltips();
   }
 
   private _attachLineTooltips(): void {
     const container = this.lineChartEl?.nativeElement;
     if (!container) return;
     container.querySelectorAll('.chart-hit').forEach(el => {
-      el.addEventListener('mouseenter', (e: Event) => {
+      el.addEventListener('mousemove', (e: Event) => {
         const me = e as MouseEvent;
-        const rect = container.getBoundingClientRect();
-        const t = el as HTMLElement;
+        const t = el as SVGElement;
         this.chartTooltip.set({
-          x: me.clientX - rect.left + 14,
-          y: me.clientY - rect.top - 52,
+          cx: me.clientX + 14,
+          cy: me.clientY - 80,
           month: t.dataset['month']!,
           income: parseFloat(t.dataset['income']!),
           expense: parseFloat(t.dataset['expense']!),
         });
       });
       el.addEventListener('mouseleave', () => this.chartTooltip.set(null));
+    });
+  }
+
+  private _attachBarTooltips(): void {
+    const container = this.compChartEl?.nativeElement;
+    if (!container) return;
+    container.querySelectorAll('.bar-hit').forEach(el => {
+      el.addEventListener('mousemove', (e: Event) => {
+        const me = e as MouseEvent;
+        const t = el as SVGElement;
+        this.barTooltip.set({
+          cx: me.clientX + 14,
+          cy: me.clientY - 120,
+          month: t.dataset['month']!,
+          cash: parseFloat(t.dataset['cash']!),
+          card: parseFloat(t.dataset['card']!),
+          shared: parseFloat(t.dataset['shared']!),
+          total: parseFloat(t.dataset['total']!),
+        });
+      });
+      el.addEventListener('mouseleave', () => this.barTooltip.set(null));
     });
   }
 
@@ -401,6 +423,11 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
       }
       const active=totals[i]>0;
       o+=`<text x="${cx.toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="${active?10:9}" fill="${active?'#6b7280':'#d1d5db'}" font-family="inherit">${labels[i]}</text>`;
+      if(active){
+        const hitY=Math.min(...[cash[i]>0?yc:9999,card[i]>0?yk:9999,shared[i]>0?ys:9999]);
+        const hitH=baseY-hitY;
+        o+=`<rect class="bar-hit" x="${(x-4).toFixed(1)}" y="${hitY.toFixed(1)}" width="${(barW+8).toFixed(1)}" height="${hitH.toFixed(1)}" fill="transparent" style="cursor:pointer" data-month="${labels[i]}" data-cash="${cash[i]}" data-card="${card[i]}" data-shared="${shared[i]}" data-total="${totals[i]}"/>`;
+      }
     }
     o+=`</svg>`;
     return o;

@@ -400,21 +400,7 @@
       </div>
       <div class="chart-dual">
         <div class="chart-dual__line" #lineChartEl style="position:relative"></div>
-  @if (chartTooltip()) {
-    <div class="chart-tooltip"
-      [style.left.px]="chartTooltip()!.x"
-      [style.top.px]="chartTooltip()!.y">
-      <strong>{{ chartTooltip()!.month }}</strong>
-      <div class="chart-tooltip__row">
-        <span style="color:#16a34a">● Receita</span>
-        <span>{{ chartTooltip()!.income | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
-      </div>
-      <div class="chart-tooltip__row">
-        <span style="color:#ef4444">● Despesa</span>
-        <span>{{ chartTooltip()!.expense | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
-      </div>
-    </div>
-  }
+
         <div class="chart-dual__comp" #compChartEl></div>
       </div>
     </div>
@@ -544,3 +530,45 @@
     }
   }
 </div>
+
+<!-- ── Chart tooltips (position:fixed, attached via DOM events) ── -->
+@if (chartTooltip()) {
+  <div class="chart-tooltip"
+    [style.left.px]="chartTooltip()!.cx"
+    [style.top.px]="chartTooltip()!.cy">
+    <div class="chart-tooltip__title">📅 {{ chartTooltip()!.month }}</div>
+    <div class="chart-tooltip__row">
+      <span><span class="dot dot--green"></span>Receita</span>
+      <span class="chart-tooltip__val">{{ chartTooltip()!.income | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+    </div>
+    <div class="chart-tooltip__row">
+      <span><span class="dot dot--red"></span>Despesa</span>
+      <span class="chart-tooltip__val">{{ chartTooltip()!.expense | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+    </div>
+  </div>
+}
+
+@if (barTooltip()) {
+  <div class="chart-tooltip"
+    [style.left.px]="barTooltip()!.cx"
+    [style.top.px]="barTooltip()!.cy">
+    <div class="chart-tooltip__title">📅 {{ barTooltip()!.month }}</div>
+    <div class="chart-tooltip__row">
+      <span><span class="dot dot--red"></span>Dinheiro</span>
+      <span class="chart-tooltip__val">{{ barTooltip()!.cash | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+    </div>
+    <div class="chart-tooltip__row">
+      <span><span class="dot dot--orange"></span>Cartão</span>
+      <span class="chart-tooltip__val">{{ barTooltip()!.card | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+    </div>
+    <div class="chart-tooltip__row">
+      <span><span class="dot dot--yellow"></span>Compartilhado</span>
+      <span class="chart-tooltip__val">{{ barTooltip()!.shared | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+    </div>
+    <div class="chart-tooltip__divider"></div>
+    <div class="chart-tooltip__row chart-tooltip__row--total">
+      <span>Total</span>
+      <span class="chart-tooltip__val">{{ barTooltip()!.total | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+    </div>
+  </div>
+}
