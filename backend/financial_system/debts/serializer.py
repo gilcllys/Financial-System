@@ -38,12 +38,21 @@ class SharedEntrySerializer(serializers.ModelSerializer):
         read_only=True,
         default=None,
     )
+    shared_debt_name = serializers.CharField(
+        source='shared_debt.name',
+        read_only=True,
+    )
+    participant_count = serializers.SerializerMethodField()
+
+    def get_participant_count(self, obj):
+        return obj.participants.count()
 
     class Meta:
         model = SharedEntry
         fields = [
             'id',
             'shared_debt',
+            'shared_debt_name',
             'paid_by',
             'paid_by_name',
             'description',
@@ -53,6 +62,7 @@ class SharedEntrySerializer(serializers.ModelSerializer):
             'credit_card',
             'category',
             'category_name',
+            'participant_count',
             'created_by_tenant_id',
             'created_at',
         ]

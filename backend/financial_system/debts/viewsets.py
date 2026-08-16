@@ -162,6 +162,14 @@ class SharedEntryViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError):
                 pass
 
+        raw_month = params.get('month')
+        raw_year  = params.get('year')
+        if raw_month and raw_year:
+            try:
+                qs = qs.filter(date__month=int(raw_month), date__year=int(raw_year))
+            except (ValueError, TypeError):
+                pass
+
         return qs
 
     def _get_group_as_member(self, shared_debt_id):

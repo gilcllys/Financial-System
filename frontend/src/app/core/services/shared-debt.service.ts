@@ -23,6 +23,7 @@ export interface SharedDebtMember {
 export interface SharedDebtEntry {
   id: number;
   shared_debt: number;
+  shared_debt_name: string;
   paid_by: number;
   paid_by_name: string;
   description: string;
@@ -32,6 +33,7 @@ export interface SharedDebtEntry {
   credit_card: number | null;
   category: number | null;
   category_name: string | null;
+  participant_count: number;
   created_by_tenant_id: string;
   created_at: string;
 }
@@ -174,10 +176,12 @@ export class SharedDebtService {
   }
 
   // ─── Entries ────────────────────────────────────────────────────────────
-  listEntries(params: { shared_debt?: number; credit_card?: number }): Observable<SharedDebtEntry[]> {
+  listEntries(params: { shared_debt?: number; credit_card?: number; month?: number; year?: number }): Observable<SharedDebtEntry[]> {
     let httpParams = new HttpParams();
     if (params.shared_debt != null) httpParams = httpParams.set('shared_debt', params.shared_debt);
     if (params.credit_card != null) httpParams = httpParams.set('credit_card', params.credit_card);
+    if (params.month != null)       httpParams = httpParams.set('month', params.month);
+    if (params.year  != null)       httpParams = httpParams.set('year',  params.year);
     return this.http.get<SharedDebtEntry[]>(`${this.base}/shared-entries/`, { params: httpParams });
   }
 
