@@ -1,6 +1,6 @@
 import {
   Component, OnInit, OnDestroy, AfterViewInit,
-  ElementRef, ViewChild, inject, signal, computed
+  ElementRef, ViewChild, inject, signal, computed, effect
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -101,12 +101,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loadTable();
   }
 
-  ngAfterViewInit(): void {
-    if (this.pendingChartData) {
-      this.renderCharts(this.pendingChartData);
-      this.pendingChartData = null;
-    }
-  }
+  ngAfterViewInit(): void { }
 
   ngOnDestroy(): void {
     this.destroy$.next();
@@ -125,9 +120,8 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
           this.sharedDebts.set(data.sharedDebts);
           this.byCategory.set(data.byCategory);
           this.installmentGroups.set(data.installmentGroups);
+          this.evolution.set(data.evolution);
           this.dashLoading.set(false);
-          this.pendingChartData = data.evolution;
-          this.renderChartsOrDefer(data.evolution);
         },
         error: () => this.dashLoading.set(false),
       });
@@ -226,11 +220,18 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @ViewChild('lineChartEl') lineChartEl!: ElementRef<HTMLDivElement>;
   @ViewChild('compChartEl') compChartEl!: ElementRef<HTMLDivElement>;
-  private pendingChartData: MonthlyAnalytics[] | null = null;
 
-  private renderChartsOrDefer(data: MonthlyAnalytics[]): void {
-    if (this.lineChartEl) this.renderCharts(data);
-    else this.pendingChartData = data;
+  constructor() {
+    // Renderiza os gráficos assim que dashLoading vira false e o DOM é atualizado
+    effect(() => {
+      if (!this.dashLoading()) {
+        const data = this.evolution();
+        // Promise.resolve garante execução após o Angular atualizar o DOM (ViewChild disponível)
+        Promise.resolve().then(() => {
+          if (data.length > 0) this.renderCharts(data);
+        });
+      }
+    });
   }
 
   // ── SVG Chart rendering ────────────────────────────────────────────────
