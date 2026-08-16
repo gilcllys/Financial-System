@@ -70,6 +70,17 @@
     </div>
   }
 
+  <!-- ── Gráfico por categoria ─────────────────────────────────────────────── -->
+  @if (categoryBreakdown().length > 0) {
+    <div class="card" style="margin-bottom: var(--space-md)">
+      <div class="card__header">
+        <span class="card__title">🍕 Gastos por Categoria</span>
+        <span class="text-muted" style="font-size:0.8rem">{{ categoryBreakdown().length }} categorias</span>
+      </div>
+      <div #pieChartEl style="padding: 12px 16px"></div>
+    </div>
+  }
+
   <!-- ── Despesas ─────────────────────────────────────────────────────────── -->
   <div class="page-header" style="margin-top: var(--space-lg)">
     <h2 class="section-title" style="margin:0">Despesas</h2>

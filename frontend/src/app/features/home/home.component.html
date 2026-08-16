@@ -383,6 +383,7 @@
             <tr>
               <th>Descrição</th>
               <th>Grupo</th>
+              <th>Categoria</th>
               <th>Data</th>
               <th>Pago por</th>
               <th class="text-right">Total</th>
@@ -393,7 +394,8 @@
             @for (e of sharedEntries(); track e.id) {
               <tr>
                 <td><span class="expense-desc__text">{{ e.description }}</span></td>
-                <td><span class="badge badge--neutral">{{ e.shared_debt_name }}</span></td>
+                <td><span class="badge badge--neutral">{{ e.shared_debt_name || '—' }}</span></td>
+                <td>@if (e.category_name) { <span class="badge badge--primary" style="font-size:11px">{{ e.category_name }}</span> } @else { <span class="text-muted">—</span> }</td>
                 <td class="mono text-muted">{{ e.date | slice:8:10 }}/{{ e.date | slice:5:7 }}/{{ e.date | slice:0:4 }}</td>
                 <td class="text-muted">{{ e.paid_by_name }}</td>
                 <td class="text-right mono">{{ formatCurrency(e.amount) }}</td>

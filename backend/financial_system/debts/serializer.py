@@ -45,7 +45,10 @@ class SharedEntrySerializer(serializers.ModelSerializer):
     participant_count = serializers.SerializerMethodField()
 
     def get_participant_count(self, obj):
-        return obj.participants.count()
+        count = obj.participants.count()
+        if count == 0:
+            count = obj.shared_debt.members.count()
+        return max(count, 1)
 
     class Meta:
         model = SharedEntry

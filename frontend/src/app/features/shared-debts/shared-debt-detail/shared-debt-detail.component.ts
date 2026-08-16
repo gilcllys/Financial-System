@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, effect, ViewChild, ElementRef } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
@@ -57,6 +57,19 @@ export class SharedDebtDetailComponent implements OnInit {
   balances = signal<BalancesResponse | null>(null);
   cards = signal<CreditCard[]>([]);
   loading = signal(true);
+
+  @ViewChild('pieChartEl') pieChartEl?: ElementRef<HTMLDivElement>;
+
+  categoryBreakdown = computed(() => {
+    const map = new Map<string, number>();
+    for (const e of this.entries()) {
+      const key = e.category_name ?? 'Sem categoria';
+      map.set(key, (map.get(key) ?? 0) + e.amount);
+    }
+    return Array.from(map.entries())
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total);
+  });
   categories = signal<ExpenseCategory[]>([]);
 
   inviteUrl = signal<string | null>(null);
@@ -131,6 +144,14 @@ export class SharedDebtDetailComponent implements OnInit {
     if (paidBy == null) return false;
     const member = this.members().find(m => m.id === paidBy);
     return !!member && !!member.tenant_id && member.tenant_id === this.myTenantId;
+  }
+
+  constructor() {
+    effect(() => {
+      const data = this.categoryBreakdown();
+      if (!this.pieChartEl) return;
+      Promise.resolve().then(() => this.renderPieChart(data));
+    });
   }
 
   ngOnInit(): void {
@@ -467,4 +488,41 @@ export class SharedDebtDetailComponent implements OnInit {
     const c = this.form.get(field);
     return !!(c?.invalid && c?.touched);
   }
+  private renderPieChart(data: {name: string, total: number}[]): void {
+    const el = this.pieChartEl?.nativeElement;
+    if (!el) return;
+    if (!data.length || data.reduce((s, d) => s + d.total, 0) === 0) {
+      el.innerHTML = '';
+      return;
+    }
+    const COLORS = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#06b6d4','#f97316','#84cc16','#ec4899'];
+    const total = data.reduce((s, d) => s + d.total, 0);
+    const cx = 90, cy = 90, r = 75;
+    let paths = '';
+    let startAngle = -Math.PI / 2;
+    data.forEach((d, i) => {
+      const slice = (d.total / total) * 2 * Math.PI;
+      const endAngle = startAngle + slice;
+      const x1 = cx + r * Math.cos(startAngle);
+      const y1 = cy + r * Math.sin(startAngle);
+      const x2 = cx + r * Math.cos(endAngle);
+      const y2 = cy + r * Math.sin(endAngle);
+      const largeArc = slice > Math.PI ? 1 : 0;
+      paths += `<path d="M${cx},${cy} L${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${largeArc},1 ${x2.toFixed(1)},${y2.toFixed(1)} Z" fill="${COLORS[i % COLORS.length]}" stroke="white" stroke-width="2"/>`;
+      startAngle = endAngle;
+    });
+    const legend = data.map((d, i) =>
+      `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:0.78rem">
+        <span style="width:10px;height:10px;border-radius:50%;background:${COLORS[i % COLORS.length]};flex-shrink:0"></span>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.name}</span>
+        <span style="font-weight:600">${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(d.total)}</span>
+      </div>`
+    ).join('');
+    el.innerHTML = `
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <svg viewBox="0 0 180 180" style="width:160px;height:160px;flex-shrink:0">${paths}</svg>
+        <div style="flex:1;min-width:140px">${legend}</div>
+      </div>`;
+  }
+
 }
