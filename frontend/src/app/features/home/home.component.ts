@@ -2,16 +2,17 @@ import {
   Component, OnInit, OnDestroy, AfterViewInit,
   ElementRef, ViewChild, inject, signal, computed, effect
 } from '@angular/core';
+import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { DatePipe, SlicePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe, SlicePipe } from '@angular/common';
 import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
 
 import { HomeService, InstallmentGroup } from '../../core/services/home.service';
-import { ExpenseService } from '../../core/services/expense.service';
 import { CategoryService } from '../../core/services/category.service';
 import { AnalyticsService, MonthlyAnalytics, CategoryAnalytics, ConsolidatedSummary } from '../../core/services/analytics.service';
 import { OpenInvoice, Expense, ExpenseCategory } from '../../core/models';
+import { ExpenseService, RecurringExpenseTemplate, GenerateMonthResult } from '../../core/services/expense.service';
 import { SharedDebtService, SharedDebtHomeSummary, SharedDebtEntry } from '../../core/services/shared-debt.service';
 
 const MONTH_NAMES = [
@@ -30,7 +31,7 @@ const EMPTY_CONSOLIDATED: ConsolidatedSummary = {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [RouterLink, FormsModule, SlicePipe, DatePipe],
+  imports: [CurrencyPipe, ReactiveFormsModule, RouterLink, FormsModule, SlicePipe, DatePipe],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss'],
 })
@@ -40,6 +41,22 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   private categoryService  = inject(CategoryService);
   private analyticsService = inject(AnalyticsService);
   private sharedDebtService = inject(SharedDebtService);
+  private expSvc = inject(ExpenseService);
+  private fb = inject(FormBuilder);
+
+  recurringTemplates = signal<RecurringExpenseTemplate[]>([]);
+  showRecurringSection = signal(false);
+  showRecurringForm = signal(false);
+  savingRecurring = signal(false);
+  recurringError = signal('');
+  generateResult = signal<GenerateMonthResult | null>(null);
+  recurringForm = this.fb.group({
+    description: ['', Validators.required],
+    amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
+    day_of_month: [1, [Validators.required, Validators.min(1), Validators.max(28)]],
+    payment_method: ['dinheiro', Validators.required],
+    category_id: [null as number | null],
+  });
   private destroy$         = new Subject<void>();
   private searchSubject    = new Subject<string>();
 
@@ -168,6 +185,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     this.currentPage.set(1);
     this.loadTable();
     if (this.activeTab() === 'compartilhada') this.loadSharedEntries();
+    this.loadRecurringTemplates();
   }
 
   switchTab(tab: 'individual' | 'compartilhada'): void {
@@ -252,6 +270,8 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('lineChartEl') lineChartEl!: ElementRef<HTMLDivElement>;
   @ViewChild('compChartEl') compChartEl!: ElementRef<HTMLDivElement>;
 
+  chartTooltip = signal<{x:number; y:number; month:string; income:number; expense:number} | null>(null);
+
   constructor() {
     // Renderiza os gráficos assim que dashLoading vira false e o DOM é atualizado
     effect(() => {
@@ -277,6 +297,27 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     const shared=data.map(d=>d.shared_my_portion);
     this.lineChartEl.nativeElement.innerHTML = this.buildLineChart(labels,income,exp,WL,H,PL,PR,PT,PB);
     this.compChartEl.nativeElement.innerHTML = this.buildCompChart(labels,cash,card,shared,WC,H,PL,PR,PT,PB);
+    this._attachLineTooltips();
+  }
+
+  private _attachLineTooltips(): void {
+    const container = this.lineChartEl?.nativeElement;
+    if (!container) return;
+    container.querySelectorAll('.chart-hit').forEach(el => {
+      el.addEventListener('mouseenter', (e: Event) => {
+        const me = e as MouseEvent;
+        const rect = container.getBoundingClientRect();
+        const t = el as HTMLElement;
+        this.chartTooltip.set({
+          x: me.clientX - rect.left + 14,
+          y: me.clientY - rect.top - 52,
+          month: t.dataset['month']!,
+          income: parseFloat(t.dataset['income']!),
+          expense: parseFloat(t.dataset['expense']!),
+        });
+      });
+      el.addEventListener('mouseleave', () => this.chartTooltip.set(null));
+    });
   }
 
   private buildLineChart(labels:string[],income:number[],exp:number[],W:number,H:number,PL:number,PR:number,PT:number,PB:number):string {
@@ -306,6 +347,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
       if(income[i]===0&&exp[i]===0)return;
       o+=`<circle cx="${sx(i).toFixed(1)}" cy="${sy(income[i]).toFixed(1)}" r="3.5" fill="#16a34a" stroke="#fff" stroke-width="1.5"/>`;
       o+=`<circle cx="${sx(i).toFixed(1)}" cy="${sy(exp[i]).toFixed(1)}" r="3" fill="#ef4444" stroke="#fff" stroke-width="1.5"/>`;
+      o+=`<circle class="chart-hit" cx="${sx(i).toFixed(1)}" cy="${(sy(income[i])+sy(exp[i]))/2}" r="14" fill="transparent" style="cursor:pointer" data-month="${labels[i]}" data-income="${income[i]}" data-expense="${exp[i]}"/>`;
     });
     labels.forEach((m,i)=>{
       const active=income[i]>0||exp[i]>0;
@@ -363,4 +405,46 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     o+=`</svg>`;
     return o;
   }
+  loadRecurringTemplates(): void {
+    this.expSvc.listRecurringTemplates().subscribe({
+      next: tpls => this.recurringTemplates.set(tpls),
+    });
+  }
+
+  saveRecurring(): void {
+    if (this.recurringForm.invalid) { this.recurringForm.markAllAsTouched(); return; }
+    this.savingRecurring.set(true);
+    const v = this.recurringForm.getRawValue();
+    this.expSvc.createRecurringTemplate({
+      description: v.description!,
+      amount: v.amount!,
+      day_of_month: v.day_of_month ?? 1,
+      payment_method: v.payment_method!,
+      category_id: v.category_id,
+    }).subscribe({
+      next: () => {
+        this.savingRecurring.set(false);
+        this.showRecurringForm.set(false);
+        this.recurringForm.reset({ description: '', amount: null, day_of_month: 1, payment_method: 'dinheiro', category_id: null });
+        this.loadRecurringTemplates();
+      },
+      error: err => { this.savingRecurring.set(false); this.recurringError.set(err?.error?.detail ?? 'Erro.'); },
+    });
+  }
+
+  deleteRecurring(id: number): void {
+    this.expSvc.deleteRecurringTemplate(id).subscribe({ next: () => this.loadRecurringTemplates() });
+  }
+
+  toggleRecurring(id: number): void {
+    this.expSvc.toggleRecurringTemplate(id).subscribe({ next: () => this.loadRecurringTemplates() });
+  }
+
+  generateCurrentMonth(): void {
+    const now = new Date();
+    this.expSvc.generateMonthRecurring(now.getMonth() + 1, now.getFullYear()).subscribe({
+      next: res => { this.generateResult.set(res); this.loadDashboard(); },
+    });
+  }
+
 }

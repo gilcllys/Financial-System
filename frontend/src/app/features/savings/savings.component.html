@@ -1,0 +1,190 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1 class="page-header__title">🐷 Investimentos & Poupança</h1>
+      <p class="page-header__subtitle">Seus cofrinhos e metas de investimento</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn--secondary btn--sm" type="button"
+        (click)="showDepositForm.set(!showDepositForm())">
+        {{ showDepositForm() ? '✕ Fechar' : '💰 Novo aporte' }}
+      </button>
+      <button class="btn btn--primary btn--sm" type="button"
+        (click)="showGoalForm.set(!showGoalForm())">
+        {{ showGoalForm() ? '✕ Fechar' : '＋ Novo cofrinho' }}
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state"><span class="spinner"></span> Carregando...</div>
+  } @else if (summary()) {
+
+    <!-- ── Grand Total ─────────────────────────────────────────────────── -->
+    <div class="savings-total-card">
+      <span class="savings-total-card__label">Total acumulado</span>
+      <span class="savings-total-card__value">{{ formatCurrency(summary()!.grand_total) }}</span>
+    </div>
+
+    <!-- ── New Goal Form ──────────────────────────────────────────────── -->
+    @if (showGoalForm()) {
+      <div class="card" style="margin-bottom:var(--space-md)">
+        <div class="card__header"><span class="card__title">Novo cofrinho</span></div>
+        <form [formGroup]="goalForm" (ngSubmit)="saveGoal()" novalidate style="padding:16px;display:flex;flex-direction:column;gap:12px">
+          <div class="form-row">
+            <div class="form-group" style="flex:1">
+              <label class="form-label">Nome</label>
+              <input class="form-input" type="text" formControlName="name" placeholder="Ex: Viagem, Reserva de emergência"/>
+            </div>
+            <div class="form-group" style="width:160px">
+              <label class="form-label">Meta (opcional)</label>
+              <input class="form-input" type="number" step="0.01" formControlName="target_amount" placeholder="R$ 0,00"/>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="width:80px">
+              <label class="form-label">Ícone</label>
+              <input class="form-input" type="text" formControlName="icon" maxlength="2"/>
+            </div>
+            <div class="form-group" style="width:120px">
+              <label class="form-label">Cor</label>
+              <input class="form-input" type="color" formControlName="color" style="height:38px;padding:2px 4px;cursor:pointer"/>
+            </div>
+          </div>
+          @if (goalError()) { <div class="form-error-box">{{ goalError() }}</div> }
+          <div class="form-actions">
+            <button class="btn btn--primary btn--sm" type="submit" [disabled]="savingGoal()">
+              @if (savingGoal()) { <span class="spinner"></span> } Salvar cofrinho
+            </button>
+          </div>
+        </form>
+      </div>
+    }
+
+    <!-- ── New Deposit Form ───────────────────────────────────────────── -->
+    @if (showDepositForm()) {
+      <div class="card" style="margin-bottom:var(--space-md)">
+        <div class="card__header"><span class="card__title">Novo aporte / retirada</span></div>
+        <form [formGroup]="depositForm" (ngSubmit)="saveDeposit()" novalidate style="padding:16px;display:flex;flex-direction:column;gap:12px">
+          <div class="form-row">
+            <div class="form-group" style="flex:1">
+              <label class="form-label">Cofrinho</label>
+              <select class="form-select" formControlName="goal_id">
+                <option [ngValue]="null">Selecione...</option>
+                @for (g of summary()!.goals; track g.id) {
+                  <option [ngValue]="g.id">{{ g.icon }} {{ g.name }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group" style="width:160px">
+              <label class="form-label">Valor (negativo = retirada)</label>
+              <input class="form-input" type="number" step="0.01" formControlName="amount" placeholder="500.00"/>
+            </div>
+            <div class="form-group" style="width:150px">
+              <label class="form-label">Data</label>
+              <input class="form-input" type="date" formControlName="date"/>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Descrição (opcional)</label>
+            <input class="form-input" type="text" formControlName="description" placeholder="Ex: Salário de agosto"/>
+          </div>
+          @if (depositError()) { <div class="form-error-box">{{ depositError() }}</div> }
+          <div class="form-actions">
+            <button class="btn btn--primary btn--sm" type="submit" [disabled]="savingDeposit()">
+              @if (savingDeposit()) { <span class="spinner"></span> } Salvar aporte
+            </button>
+          </div>
+        </form>
+      </div>
+    }
+
+    <!-- ── Goals Grid ─────────────────────────────────────────────────── -->
+    @if (summary()!.goals.length === 0) {
+      <div class="empty-state">
+        <div class="empty-state__icon">🐷</div>
+        <p class="empty-state__title">Nenhum cofrinho criado</p>
+        <p class="empty-state__text">Crie seu primeiro cofrinho para começar a guardar dinheiro.</p>
+      </div>
+    } @else {
+      <div class="goals-grid">
+        @for (goal of summary()!.goals; track goal.id) {
+          <div class="goal-card" [style.border-top-color]="goal.color">
+            <div class="goal-card__header">
+              <span class="goal-card__icon">{{ goal.icon }}</span>
+              <div class="goal-card__info">
+                <span class="goal-card__name">{{ goal.name }}</span>
+                @if (goal.target_amount) {
+                  <span class="goal-card__target text-muted">Meta: {{ formatCurrency(goal.target_amount) }}</span>
+                }
+              </div>
+              <button class="btn btn--danger btn--sm" type="button" (click)="deleteGoal(goal.id)"
+                style="margin-left:auto;opacity:0.6" title="Excluir cofrinho">🗑️</button>
+            </div>
+            <div class="goal-card__total" [style.color]="goal.color">
+              {{ formatCurrency(goal.total_deposited) }}
+            </div>
+            <div class="goal-card__meta text-muted">{{ goal.deposit_count }} aportes</div>
+            @if (goal.target_amount && goal.target_amount > 0) {
+              <div class="goal-card__progress-bar">
+                <div class="goal-card__progress-fill"
+                  [style.width.%]="goalProgress(goal)"
+                  [style.background]="goal.color">
+                </div>
+              </div>
+              <div class="goal-card__progress-label text-muted">
+                {{ goalProgress(goal).toFixed(0) }}% da meta
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- ── Cumulative Chart ──────────────────────────────────────────── -->
+      @if (summary()!.monthly_breakdown.length > 0) {
+        <div class="card" style="margin-top:var(--space-lg)">
+          <div class="card__header">
+            <span class="card__title">📈 Evolução do Patrimônio</span>
+          </div>
+          <div style="padding:16px;position:relative">
+            <div #chartEl style="position:relative"></div>
+            <div class="sav-tooltip" style="display:none;position:absolute;background:white;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:0.8rem;box-shadow:0 4px 12px rgba(0,0,0,0.12);pointer-events:none;z-index:100;min-width:160px"></div>
+          </div>
+        </div>
+      }
+
+      <!-- ── Recent Deposits Table ─────────────────────────────────────── -->
+      @if (summary()!.monthly_breakdown.length > 0) {
+        <div class="card" style="margin-top:var(--space-lg)">
+          <div class="card__header">
+            <span class="card__title">📋 Histórico mensal</span>
+          </div>
+          <div class="data-table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Mês</th>
+                  <th class="text-right">Aporte no mês</th>
+                  <th class="text-right">Acumulado</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of summary()!.monthly_breakdown.slice().reverse(); track row.month + '-' + row.year) {
+                  <tr>
+                    <td>{{ row.month_name }} {{ row.year }}</td>
+                    <td class="text-right">
+                      <span [class]="row.total >= 0 ? 'value-up mono' : 'value-down mono'">
+                        {{ formatCurrency(row.total) }}
+                      </span>
+                    </td>
+                    <td class="text-right mono" style="font-weight:600">{{ formatCurrency(row.accumulated) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+    }
+  }
+</div>

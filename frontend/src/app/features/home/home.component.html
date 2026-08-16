@@ -83,7 +83,126 @@
     <p class="kpi-card__label">Total Registros</p>
     <p class="kpi-card__value">{{ totalCount() }}</p>
     <p class="kpi-card__sub">lançamentos</p>
+  
+<!-- ── Gastos Fixos Individuais ─────────────────────────────────────────── -->
+<div class="section-block">
+  <div class="page-header" style="margin-top:var(--space-xl)">
+    <h2 class="section-title" style="margin:0">🔁 Gastos Fixos</h2>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn--secondary btn--sm" type="button" (click)="generateCurrentMonth()">
+        ⚡ Gerar mês atual
+      </button>
+      <button class="btn btn--primary btn--sm" type="button"
+        (click)="showRecurringForm.set(!showRecurringForm())">
+        {{ showRecurringForm() ? '✕ Fechar' : '＋ Novo fixo' }}
+      </button>
+    </div>
   </div>
+
+  @if (generateResult()) {
+    <div class="alert-box alert-box--success" style="margin-bottom:var(--space-sm)">
+      ✅ Criados: {{ generateResult()!.created.join(', ') || 'nenhum' }} |
+      Já existiam: {{ generateResult()!.skipped.join(', ') || 'nenhum' }}
+    </div>
+  }
+
+  @if (showRecurringForm()) {
+    <div class="card" style="margin-bottom:var(--space-md)">
+      <form [formGroup]="recurringForm" (ngSubmit)="saveRecurring()" novalidate
+        style="padding:16px;display:flex;flex-direction:column;gap:10px">
+        <div class="form-row">
+          <div class="form-group" style="flex:2">
+            <label class="form-label">Descrição</label>
+            <input class="form-input" type="text" formControlName="description" placeholder="Ex: Netflix, Aluguel"/>
+          </div>
+          <div class="form-group" style="flex:1">
+            <label class="form-label">Valor (R$)</label>
+            <input class="form-input" type="number" step="0.01" formControlName="amount"/>
+          </div>
+          <div class="form-group" style="width:90px">
+            <label class="form-label">Dia</label>
+            <input class="form-input" type="number" min="1" max="28" formControlName="day_of_month"/>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Forma de pagamento</label>
+            <div style="display:flex;gap:12px;align-items:center;padding:6px 0">
+              <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+                <input type="radio" formControlName="payment_method" value="dinheiro"/> Dinheiro
+              </label>
+              <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+                <input type="radio" formControlName="payment_method" value="cartao"/> Cartão
+              </label>
+            </div>
+          </div>
+          <div class="form-group" style="flex:1">
+            <label class="form-label">Categoria</label>
+            <select class="form-select" formControlName="category_id">
+              <option [ngValue]="null">Sem categoria</option>
+              @for (cat of categories(); track cat.id) {
+                <option [ngValue]="cat.id">{{ cat.name }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        @if (recurringError()) { <div class="form-error-box">{{ recurringError() }}</div> }
+        <div class="form-actions">
+          <button class="btn btn--primary btn--sm" type="submit" [disabled]="savingRecurring()">
+            @if (savingRecurring()) { <span class="spinner"></span> } Salvar gasto fixo
+          </button>
+        </div>
+      </form>
+    </div>
+  }
+
+  @if (recurringTemplates().length === 0) {
+    <p class="text-muted" style="font-size:0.85rem;padding:8px 0">Nenhum gasto fixo cadastrado.</p>
+  } @else {
+    <div class="data-table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Descrição</th>
+            <th>Categoria</th>
+            <th>Dia</th>
+            <th class="text-right">Valor</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (t of recurringTemplates(); track t.id) {
+            <tr [style.opacity]="t.is_active ? '1' : '0.5'">
+              <td style="font-weight:500">{{ t.description }}</td>
+              <td>
+                @if (t.category_name) {
+                  <span class="badge badge--primary">{{ t.category_name }}</span>
+                } @else {
+                  <span class="text-muted">—</span>
+                }
+              </td>
+              <td class="mono text-muted">dia {{ t.day_of_month }}</td>
+              <td class="text-right mono">R$ {{ t.amount }}</td>
+              <td>
+                <span [class]="t.is_active ? 'badge badge--success' : 'badge badge--muted'">
+                  {{ t.is_active ? 'Ativo' : 'Pausado' }}
+                </span>
+              </td>
+              <td style="display:flex;gap:4px;justify-content:flex-end">
+                <button class="btn btn--secondary btn--sm" type="button" (click)="toggleRecurring(t.id)"
+                  [title]="t.is_active ? 'Pausar' : 'Ativar'">{{ t.is_active ? '⏸' : '▶' }}</button>
+                <button class="btn btn--danger btn--sm" type="button" (click)="deleteRecurring(t.id)">🗑️</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
+
+</div>
 </div>
 
 <!-- ── Dashboard cards grid ── -->
@@ -280,7 +399,22 @@
         </div>
       </div>
       <div class="chart-dual">
-        <div class="chart-dual__line" #lineChartEl></div>
+        <div class="chart-dual__line" #lineChartEl style="position:relative"></div>
+  @if (chartTooltip()) {
+    <div class="chart-tooltip"
+      [style.left.px]="chartTooltip()!.x"
+      [style.top.px]="chartTooltip()!.y">
+      <strong>{{ chartTooltip()!.month }}</strong>
+      <div class="chart-tooltip__row">
+        <span style="color:#16a34a">● Receita</span>
+        <span>{{ chartTooltip()!.income | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+      </div>
+      <div class="chart-tooltip__row">
+        <span style="color:#ef4444">● Despesa</span>
+        <span>{{ chartTooltip()!.expense | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+      </div>
+    </div>
+  }
         <div class="chart-dual__comp" #compChartEl></div>
       </div>
     </div>
