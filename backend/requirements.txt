@@ -23,7 +23,7 @@ PyYAML==6.0.3
 # SEC-FIX: 2.33.0 corrige CVE-2024-47081 e CVE-2026-25645
 requests==2.33.0
 # SEC-FIX: 0.5.4 corrige GHSA-27jp-wm6q-gp25
-sqlparse==0.5.4
+sqlparse==0.6.0
 typing_extensions==4.15.0
 uritemplate==4.2.0
 # [SEC-A08] Upper bound para evitar breaking changes
