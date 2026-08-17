@@ -161,7 +161,7 @@ export class SavingsComponent implements OnInit {
     const g = svg.append('g').attr('transform',`translate(${margin.left},${margin.top})`);
 
     const x = d3.scalePoint().domain(labels).range([0, innerW]);
-    const maxY = Math.max(...data.map(d => d.accumulated)) * 1.15 || 1;
+    const maxY = Math.max(...data.map(d => Number(d.accumulated))) * 1.15 || 1;
     const y = d3.scaleLinear().domain([0, maxY]).range([innerH, 0]);
 
     g.append('g').call(d3.axisLeft(y).ticks(4).tickSize(-innerW).tickFormat(()=>''))
@@ -181,10 +181,10 @@ export class SavingsComponent implements OnInit {
       .call(gg => gg.selectAll('text').attr('fill','#9ca3af').attr('font-size','9').attr('font-family','inherit'));
 
     const areaFn = d3.area<typeof data[0]>()
-      .x((_,i)=>x(labels[i])!).y0(innerH).y1(d=>y(d.accumulated))
+      .x((_,i)=>x(labels[i])!).y0(innerH).y1(d=>y(Number(d.accumulated)))
       .curve(d3.curveMonotoneX);
     const lineFn = d3.line<typeof data[0]>()
-      .x((_,i)=>x(labels[i])!).y(d=>y(d.accumulated))
+      .x((_,i)=>x(labels[i])!).y(d=>y(Number(d.accumulated)))
       .curve(d3.curveMonotoneX);
 
     g.append('path').datum(data).attr('d', areaFn).attr('fill','#a5b4fc').attr('opacity','0.3');
@@ -194,15 +194,15 @@ export class SavingsComponent implements OnInit {
 
     const tooltip = this.savTooltip;
     data.forEach((d, i) => {
-      if (d.accumulated === 0) return;
+      if (Number(d.accumulated) === 0) return;
       const cx = x(labels[i])!;
-      const cy = y(d.accumulated);
+      const cy = y(Number(d.accumulated));
       g.append('circle').attr('cx',cx).attr('cy',cy).attr('r',4)
         .attr('fill','#6366f1').attr('stroke','#fff').attr('stroke-width',1.5);
       g.append('circle').attr('cx',cx).attr('cy',cy).attr('r',14)
         .attr('fill','transparent').style('cursor','pointer')
         .on('mousemove', (event: MouseEvent) => {
-          tooltip.set({ cx: event.clientX+14, cy: event.clientY-90, label: labels[i], monthly: d.total, accumulated: d.accumulated });
+          tooltip.set({ cx: event.clientX+14, cy: event.clientY-90, label: labels[i], monthly: Number(d.total), accumulated: Number(d.accumulated) });
         })
         .on('mouseleave', () => tooltip.set(null));
     });

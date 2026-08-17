@@ -302,6 +302,8 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
     const labels = data.map(d => d.month_name.substring(0, 3));
+    // Force numeric - DRF returns DecimalField as strings
+    const numData = data.map(d => ({ ...d, income: Number(d.income), expenses: Number(d.expenses) }));
 
     const svg = d3.select(el).append('svg')
       .attr('viewBox', `0 0 ${width} ${height}`)
@@ -314,7 +316,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     const g = svg.append('g').attr('transform',`translate(${margin.left},${margin.top})`);
 
     const x = d3.scalePoint().domain(labels).range([0, innerW]);
-    const maxY = Math.max(...data.map(d => Math.max(d.income, d.expenses))) * 1.15 || 1;
+    const maxY = Math.max(...data.map(d => Math.max(Number(d.income), Number(d.expenses)))) * 1.15 || 1;
     const y = d3.scaleLinear().domain([0, maxY]).range([innerH, 0]);
 
     g.append('g').attr('class','grid')
@@ -350,16 +352,16 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
       .attr('stroke-dasharray','6 3').attr('stroke-linejoin','round').attr('stroke-linecap','round');
 
     data.forEach((d, i) => {
-      if (d.income === 0 && d.expenses === 0) return;
+      if (Number(d.income) === 0 && Number(d.expenses) === 0) return;
       const cx = x(labels[i])!;
-      g.append('circle').attr('cx',cx).attr('cy',y(d.income)).attr('r',3.5)
+      g.append('circle').attr('cx',cx).attr('cy',y(Number(d.income))).attr('r',3.5)
         .attr('fill','#16a34a').attr('stroke','#fff').attr('stroke-width',1.5);
-      g.append('circle').attr('cx',cx).attr('cy',y(d.expenses)).attr('r',3.5)
+      g.append('circle').attr('cx',cx).attr('cy',y(Number(d.expenses))).attr('r',3.5)
         .attr('fill','#ef4444').attr('stroke','#fff').attr('stroke-width',1.5);
-      g.append('circle').attr('cx',cx).attr('cy',(y(d.income)+y(d.expenses))/2).attr('r',16)
+      g.append('circle').attr('cx',cx).attr('cy',(y(Number(d.income))+y(Number(d.expenses)))/2).attr('r',16)
         .attr('fill','transparent').style('cursor','pointer')
         .on('mousemove', (event: MouseEvent) => {
-          this.chartTooltip.set({ cx: event.clientX+14, cy: event.clientY-90, month: labels[i], income: d.income, expense: d.expenses });
+          this.chartTooltip.set({ cx: event.clientX+14, cy: event.clientY-90, month: labels[i], income: Number(d.income), expense: Number(d.expenses) });
         })
         .on('mouseleave', () => this.chartTooltip.set(null));
     });
@@ -387,7 +389,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     type BarRow = { month: string; cash: number; card: number; shared: number };
     const rows: BarRow[] = data.map(d => ({
       month: d.month_name.substring(0,3),
-      cash: d.cash_expenses, card: d.card_expenses, shared: d.shared_my_portion
+      cash: Number(d.cash_expenses), card: Number(d.card_expenses), shared: Number(d.shared_my_portion)
     }));
 
     const stackFn = d3.stack<BarRow>().keys(['cash','card','shared']);
