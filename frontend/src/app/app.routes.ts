@@ -145,6 +145,13 @@ export const routes: Routes = [
       },
       { path: 'vitoria', redirectTo: 'shared-debts', pathMatch: 'full' },
 
+      // Savings / Investimentos
+      {
+        path: 'savings',
+        loadComponent: () =>
+          import('./features/savings/savings.component').then(m => m.SavingsComponent),
+      },
+
     ],
   },
 

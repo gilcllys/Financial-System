@@ -11,7 +11,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from expenses import models, serializer
-from expenses.behaviors import CreateExpenseBehavior
+from expenses.behaviors import CreateExpenseBehavior, RecurringExpenseBehavior
 from catalog.models import ExpenseCategory
 
 # Nomes dos meses em português (índice 0 não utilizado)
@@ -1152,3 +1152,32 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             'daily':  daily,
             'weekly': weekly,
         }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get', 'post'], url_path='recurring-templates')
+    def recurring_templates(self, request):
+        """GET: listar templates, POST: criar template"""
+        behavior = RecurringExpenseBehavior(request.user.tenant_id)
+        if request.method == 'GET':
+            return behavior.list()
+        s = serializer.CreateRecurringExpenseInputSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        return behavior.create({**dict(s.validated_data), 'tenant_id': request.user.tenant_id})
+
+    @action(detail=False, methods=['delete', 'patch'],
+            url_path=r'recurring-templates/(?P<tpl_id>[0-9]+)')
+    def recurring_template_detail(self, request, tpl_id=None):
+        """DELETE: excluir, PATCH: toggle is_active"""
+        behavior = RecurringExpenseBehavior(request.user.tenant_id)
+        if request.method == 'DELETE':
+            return behavior.delete(int(tpl_id))
+        return behavior.toggle_active(int(tpl_id))
+
+    @action(detail=False, methods=['post'], url_path='recurring-templates/generate-month')
+    def generate_month_recurring(self, request):
+        """POST {month, year} → materializa todos os templates ativos"""
+        s = serializer.GenerateMonthInputSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        return RecurringExpenseBehavior(request.user.tenant_id).generate_month(
+            s.validated_data['month'], s.validated_data['year']
+        )
+

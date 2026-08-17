@@ -138,3 +138,87 @@ class CreateExpenseBehavior:
                 {'success': False, 'message': f'Erro ao criar despesa(s): {str(e)}', 'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+
+class RecurringExpenseBehavior:
+    """Cria, lista e materializa templates recorrentes individuais."""
+
+    def __init__(self, tenant_id: str):
+        self.tenant_id = tenant_id
+
+    def list(self) -> Response:
+        from expenses.models import RecurringExpenseTemplate
+        from expenses.serializer import RecurringExpenseTemplateSerializer
+        qs = RecurringExpenseTemplate.objects.filter(
+            tenant_id=self.tenant_id
+        ).select_related('category', 'credit_card').order_by('id')
+        return Response(RecurringExpenseTemplateSerializer(qs, many=True).data)
+
+    def create(self, data: dict) -> Response:
+        from expenses.models import RecurringExpenseTemplate
+        from expenses.serializer import RecurringExpenseTemplateSerializer
+        day = int(data.get('day_of_month', 1))
+        if not (1 <= day <= 28):
+            return Response({'detail': 'day_of_month deve ser entre 1 e 28.'}, status=status.HTTP_400_BAD_REQUEST)
+        tpl = RecurringExpenseTemplate.objects.create(
+            tenant_id=self.tenant_id,
+            description=data['description'],
+            amount=data['amount'],
+            day_of_month=day,
+            payment_method=data.get('payment_method', 'dinheiro'),
+            credit_card_id=data.get('credit_card_id'),
+            category_id=data.get('category_id'),
+        )
+        return Response(RecurringExpenseTemplateSerializer(tpl).data, status=status.HTTP_201_CREATED)
+
+    def toggle_active(self, template_id: int) -> Response:
+        from expenses.models import RecurringExpenseTemplate
+        from expenses.serializer import RecurringExpenseTemplateSerializer
+        try:
+            tpl = RecurringExpenseTemplate.objects.get(id=template_id, tenant_id=self.tenant_id)
+        except RecurringExpenseTemplate.DoesNotExist:
+            return Response({'detail': 'Template não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        tpl.is_active = not tpl.is_active
+        tpl.save(update_fields=['is_active', 'updated_at'])
+        return Response(RecurringExpenseTemplateSerializer(tpl).data)
+
+    def delete(self, template_id: int) -> Response:
+        from expenses.models import RecurringExpenseTemplate
+        try:
+            tpl = RecurringExpenseTemplate.objects.get(id=template_id, tenant_id=self.tenant_id)
+        except RecurringExpenseTemplate.DoesNotExist:
+            return Response({'detail': 'Template não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        tpl.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def generate_month(self, month: int, year: int) -> Response:
+        import calendar as cal_mod
+        from datetime import date as date_cls
+        from expenses.models import RecurringExpenseTemplate, Expense
+        templates = RecurringExpenseTemplate.objects.filter(tenant_id=self.tenant_id, is_active=True)
+        created, skipped = [], []
+        for tpl in templates:
+            last_day = cal_mod.monthrange(year, month)[1]
+            day = min(tpl.day_of_month, last_day)
+            entry_date = date_cls(year, month, day)
+            already = Expense.objects.filter(
+                tenant_id=self.tenant_id,
+                description=tpl.description,
+                date__year=year,
+                date__month=month,
+            ).exists()
+            if already:
+                skipped.append(tpl.description)
+                continue
+            Expense.objects.create(
+                tenant_id=self.tenant_id,
+                category_id=tpl.category_id,
+                description=tpl.description,
+                quantity=1,
+                amount=tpl.amount,
+                date=entry_date,
+                payment_method=tpl.payment_method,
+                credit_card_id=tpl.credit_card_id,
+            )
+            created.append(tpl.description)
+        return Response({'created': created, 'skipped': skipped})

@@ -13,6 +13,26 @@ function normalize(raw: any): Expense {
   };
 }
 
+
+export interface RecurringExpenseTemplate {
+  id: number;
+  description: string;
+  amount: number;
+  day_of_month: number;
+  payment_method: 'dinheiro' | 'cartao';
+  credit_card: number | null;
+  credit_card_name: string | null;
+  category: number | null;
+  category_name: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface GenerateMonthResult {
+  created: string[];
+  skipped: string[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class ExpenseService {
   private http = inject(HttpClient);
@@ -75,4 +95,28 @@ export class ExpenseService {
       total_installments: totalInstallments,
     });
   }
+  listRecurringTemplates(): Observable<RecurringExpenseTemplate[]> {
+    return this.http.get<RecurringExpenseTemplate[]>(`${this.base}/recurring-templates/`);
+  }
+
+  createRecurringTemplate(payload: {
+    description: string; amount: number; day_of_month?: number;
+    payment_method?: string; credit_card_id?: number | null; category_id?: number | null;
+  }): Observable<RecurringExpenseTemplate> {
+    return this.http.post<RecurringExpenseTemplate>(`${this.base}/recurring-templates/`, payload);
+  }
+
+  deleteRecurringTemplate(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/recurring-templates/${id}/`);
+  }
+
+  toggleRecurringTemplate(id: number): Observable<RecurringExpenseTemplate> {
+    return this.http.patch<RecurringExpenseTemplate>(`${this.base}/recurring-templates/${id}/`, {});
+  }
+
+  generateMonthRecurring(month: number, year: number): Observable<GenerateMonthResult> {
+    return this.http.post<GenerateMonthResult>(
+      `${this.base}/recurring-templates/generate-month/`, { month, year });
+  }
+
 }

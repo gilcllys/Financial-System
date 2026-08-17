@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'expenses',
     'debts',
     'supermarket',
+    'savings',
 ]
 
 MIDDLEWARE = [

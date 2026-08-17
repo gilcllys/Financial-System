@@ -135,6 +135,16 @@
     </a>
 
     <a
+      routerLink="/savings"
+      routerLinkActive="sidebar__link--active"
+      class="sidebar__link"
+      (click)="closeDrawer()"
+    >
+      <span class="sidebar__link-icon" aria-hidden="true">🐷</span>
+      <span class="sidebar__link-label">Investimentos</span>
+    </a>
+
+    <a
       routerLink="/categories"
       routerLinkActive="sidebar__link--active"
       class="sidebar__link"

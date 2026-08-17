@@ -2,16 +2,18 @@ import {
   Component, OnInit, OnDestroy, AfterViewInit,
   ElementRef, ViewChild, inject, signal, computed, effect
 } from '@angular/core';
+import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { DatePipe, SlicePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe, SlicePipe } from '@angular/common';
 import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
 
 import { HomeService, InstallmentGroup } from '../../core/services/home.service';
-import { ExpenseService } from '../../core/services/expense.service';
 import { CategoryService } from '../../core/services/category.service';
 import { AnalyticsService, MonthlyAnalytics, CategoryAnalytics, ConsolidatedSummary } from '../../core/services/analytics.service';
 import { OpenInvoice, Expense, ExpenseCategory } from '../../core/models';
+import { ExpenseService, RecurringExpenseTemplate, GenerateMonthResult } from '../../core/services/expense.service';
+import * as d3 from 'd3';
 import { SharedDebtService, SharedDebtHomeSummary, SharedDebtEntry } from '../../core/services/shared-debt.service';
 
 const MONTH_NAMES = [
@@ -30,7 +32,7 @@ const EMPTY_CONSOLIDATED: ConsolidatedSummary = {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [RouterLink, FormsModule, SlicePipe, DatePipe],
+  imports: [CurrencyPipe, ReactiveFormsModule, RouterLink, FormsModule, SlicePipe, DatePipe],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss'],
 })
@@ -40,6 +42,22 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   private categoryService  = inject(CategoryService);
   private analyticsService = inject(AnalyticsService);
   private sharedDebtService = inject(SharedDebtService);
+  private expSvc = inject(ExpenseService);
+  private fb = inject(FormBuilder);
+
+  recurringTemplates = signal<RecurringExpenseTemplate[]>([]);
+  showRecurringSection = signal(false);
+  showRecurringForm = signal(false);
+  savingRecurring = signal(false);
+  recurringError = signal('');
+  generateResult = signal<GenerateMonthResult | null>(null);
+  recurringForm = this.fb.group({
+    description: ['', Validators.required],
+    amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
+    day_of_month: [1, [Validators.required, Validators.min(1), Validators.max(28)]],
+    payment_method: ['dinheiro', Validators.required],
+    category_id: [null as number | null],
+  });
   private destroy$         = new Subject<void>();
   private searchSubject    = new Subject<string>();
 
@@ -168,6 +186,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     this.currentPage.set(1);
     this.loadTable();
     if (this.activeTab() === 'compartilhada') this.loadSharedEntries();
+    this.loadRecurringTemplates();
   }
 
   switchTab(tab: 'individual' | 'compartilhada'): void {
@@ -252,6 +271,9 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('lineChartEl') lineChartEl!: ElementRef<HTMLDivElement>;
   @ViewChild('compChartEl') compChartEl!: ElementRef<HTMLDivElement>;
 
+  chartTooltip = signal<{cx:number; cy:number; month:string; income:number; expense:number} | null>(null);
+  barTooltip = signal<{cx:number; cy:number; month:string; cash:number; card:number; shared:number; total:number} | null>(null);
+
   constructor() {
     // Renderiza os gráficos assim que dashLoading vira false e o DOM é atualizado
     effect(() => {
@@ -265,102 +287,206 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  // ── SVG Chart rendering ────────────────────────────────────────────────
+  // ── SVG Chart rendering (D3) ─────────────────────────────────────────
   renderCharts(data: MonthlyAnalytics[]): void {
     if (!this.lineChartEl || !this.compChartEl) return;
-    const WL=600,WC=380,H=240,PL=56,PR=16,PT=28,PB=34;
-    const labels=data.map(d=>d.month_name.substring(0,3));
-    const income=data.map(d=>d.income);
-    const exp=data.map(d=>d.expenses);
-    const cash=data.map(d=>d.cash_expenses);
-    const card=data.map(d=>d.card_expenses);
-    const shared=data.map(d=>d.shared_my_portion);
-    this.lineChartEl.nativeElement.innerHTML = this.buildLineChart(labels,income,exp,WL,H,PL,PR,PT,PB);
-    this.compChartEl.nativeElement.innerHTML = this.buildCompChart(labels,cash,card,shared,WC,H,PL,PR,PT,PB);
+    this.buildLineChartD3(data);
+    this.buildCompChartD3(data);
   }
 
-  private buildLineChart(labels:string[],income:number[],exp:number[],W:number,H:number,PL:number,PR:number,PT:number,PB:number):string {
-    const n=labels.length;
-    const maxV=Math.max(...income,...exp)*1.15||1;
-    const totalW=W-PL-PR;
-    const gap=totalW/(n-1);
-    const sy=(v:number)=>PT+(1-Math.max(0,v)/maxV)*(H-PT-PB);
-    const sx=(i:number)=>PL+i*gap;
-    const fmt=(v:number)=>`R$ ${v.toLocaleString('pt-BR',{minimumFractionDigits:2})}`;
-    let o='';
-    o+=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${H}px;overflow:visible">`;
-    o+=`<text x="${W/2}" y="${PT-10}" text-anchor="middle" font-size="11" fill="#6b7280" font-weight="600" font-family="inherit">Receita x Despesa</text>`;
-    for(let s=0;s<=5;s++){
-      const gv=maxV*s/5;const gy=sy(gv);
-      o+=`<line x1="${PL}" y1="${gy.toFixed(1)}" x2="${W-PR}" y2="${gy.toFixed(1)}" stroke="#f3f4f6" stroke-width="1"/>`;
-      const lbl=gv>=1000?`${(gv/1000).toFixed(gv%1000===0?0:1)}k`:gv.toFixed(0);
-      o+=`<text x="${PL-6}" y="${(gy+4).toFixed(1)}" text-anchor="end" font-size="9" fill="#9ca3af" font-family="inherit">R$${lbl}</text>`;
-    }
-    const incomePts=income.map((_,i)=>`${sx(i).toFixed(1)},${sy(income[i]).toFixed(1)}`).join(' ');
-    const baseY=sy(0).toFixed(1);
-    o+=`<polygon points="${sx(0).toFixed(1)},${baseY} ${incomePts} ${sx(n-1).toFixed(1)},${baseY}" fill="#dcfce7" opacity="0.45"/>`;
-    const expPts=exp.map((_,i)=>`${sx(i).toFixed(1)},${sy(exp[i]).toFixed(1)}`).join(' ');
-    o+=`<polyline points="${expPts}" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
-    o+=`<polyline points="${incomePts}" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-dasharray="6 3" stroke-linejoin="round" stroke-linecap="round"/>`;
-    income.forEach((_,i)=>{
-      if(income[i]===0&&exp[i]===0)return;
-      o+=`<circle cx="${sx(i).toFixed(1)}" cy="${sy(income[i]).toFixed(1)}" r="3.5" fill="#16a34a" stroke="#fff" stroke-width="1.5"/>`;
-      o+=`<circle cx="${sx(i).toFixed(1)}" cy="${sy(exp[i]).toFixed(1)}" r="3" fill="#ef4444" stroke="#fff" stroke-width="1.5"/>`;
+  private buildLineChartD3(data: MonthlyAnalytics[]): void {
+    const el = this.lineChartEl.nativeElement;
+    el.innerHTML = '';
+    const margin = {top:28, right:20, bottom:35, left:60};
+    const width = 600, height = 240;
+    const innerW = width - margin.left - margin.right;
+    const innerH = height - margin.top - margin.bottom;
+    const labels = data.map(d => d.month_name.substring(0, 3));
+    // Force numeric - DRF returns DecimalField as strings
+    const numData = data.map(d => ({ ...d, income: Number(d.income), expenses: Number(d.expenses) }));
+
+    const svg = d3.select(el).append('svg')
+      .attr('viewBox', `0 0 ${width} ${height}`)
+      .style('width','100%').style('height', `${height}px`).style('overflow','visible');
+
+    svg.append('text').attr('x', width/2).attr('y', margin.top - 10)
+      .attr('text-anchor','middle').attr('font-size','11').attr('fill','#6b7280')
+      .attr('font-weight','600').attr('font-family','inherit').text('Receita x Despesa');
+
+    const g = svg.append('g').attr('transform',`translate(${margin.left},${margin.top})`);
+
+    const x = d3.scalePoint().domain(labels).range([0, innerW]);
+    const maxY = Math.max(...data.map(d => Math.max(Number(d.income), Number(d.expenses)))) * 1.15 || 1;
+    const y = d3.scaleLinear().domain([0, maxY]).range([innerH, 0]);
+
+    g.append('g').attr('class','grid')
+      .call(d3.axisLeft(y).ticks(5).tickSize(-innerW).tickFormat(()=>''))
+      .call(gg => gg.select('.domain').remove())
+      .call(gg => gg.selectAll('line').attr('stroke','#f3f4f6'));
+
+    g.append('g').attr('transform',`translate(0,${innerH})`)
+      .call(d3.axisBottom(x).tickSize(0))
+      .call(gg => gg.select('.domain').remove())
+      .call(gg => gg.selectAll('text').attr('fill','#6b7280').attr('font-size','10').attr('font-family','inherit'));
+
+    g.append('g').call(d3.axisLeft(y).ticks(5).tickFormat((v:d3.NumberValue) => {
+      const n = +v;
+      return n >= 1000 ? `R$${(n/1000).toFixed(n%1000===0?0:1)}k` : `R$${n}`;
+    }))
+      .call(gg => gg.select('.domain').remove())
+      .call(gg => gg.selectAll('text').attr('fill','#9ca3af').attr('font-size','9').attr('font-family','inherit'));
+
+    const areaFn = d3.area<MonthlyAnalytics>()
+      .x((_,i) => x(labels[i])!)
+      .y0(innerH).y1(d => y(d.income));
+    g.append('path').datum(data).attr('d', areaFn).attr('fill','#dcfce7').attr('opacity','0.45');
+
+    const lineExp = d3.line<MonthlyAnalytics>().x((_,i)=>x(labels[i])!).y(d=>y(d.expenses));
+    const lineInc = d3.line<MonthlyAnalytics>().x((_,i)=>x(labels[i])!).y(d=>y(d.income));
+
+    g.append('path').datum(data).attr('d', lineExp)
+      .attr('fill','none').attr('stroke','#ef4444').attr('stroke-width','2.5')
+      .attr('stroke-linejoin','round').attr('stroke-linecap','round');
+    g.append('path').datum(data).attr('d', lineInc)
+      .attr('fill','none').attr('stroke','#16a34a').attr('stroke-width','2.5')
+      .attr('stroke-dasharray','6 3').attr('stroke-linejoin','round').attr('stroke-linecap','round');
+
+    data.forEach((d, i) => {
+      if (Number(d.income) === 0 && Number(d.expenses) === 0) return;
+      const cx = x(labels[i])!;
+      g.append('circle').attr('cx',cx).attr('cy',y(Number(d.income))).attr('r',3.5)
+        .attr('fill','#16a34a').attr('stroke','#fff').attr('stroke-width',1.5);
+      g.append('circle').attr('cx',cx).attr('cy',y(Number(d.expenses))).attr('r',3.5)
+        .attr('fill','#ef4444').attr('stroke','#fff').attr('stroke-width',1.5);
+      g.append('circle').attr('cx',cx).attr('cy',(y(Number(d.income))+y(Number(d.expenses)))/2).attr('r',16)
+        .attr('fill','transparent').style('cursor','pointer')
+        .on('mousemove', (event: MouseEvent) => {
+          this.chartTooltip.set({ cx: event.clientX+14, cy: event.clientY-90, month: labels[i], income: Number(d.income), expense: Number(d.expenses) });
+        })
+        .on('mouseleave', () => this.chartTooltip.set(null));
     });
-    labels.forEach((m,i)=>{
-      const active=income[i]>0||exp[i]>0;
-      o+=`<text x="${sx(i).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="10" fill="${active?'#6b7280':'#d1d5db'}" font-family="inherit">${m}</text>`;
-    });
-    o+=`</svg>`;
-    return o;
   }
 
-  private buildCompChart(labels:string[],cash:number[],card:number[],shared:number[],W:number,H:number,PL:number,PR:number,PT:number,PB:number):string {
-    const n=labels.length;
-    const totals=cash.map((_,i)=>cash[i]+card[i]+shared[i]);
-    const maxV=Math.max(...totals)*1.2||1;
-    const totalW=W-PL-PR;
-    const gap=totalW/n;
-    const barW=Math.min(gap*0.72,26);
-    const bx=(i:number)=>PL+i*gap+gap/2-barW/2;
-    const sy=(v:number)=>PT+(1-v/maxV)*(H-PT-PB);
-    const baseY=sy(0);
-    const fmt=(v:number)=>`R$ ${v.toLocaleString('pt-BR',{minimumFractionDigits:2})}`;
-    let o='';
-    o+=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${H}px;overflow:visible">`;
-    o+=`<text x="${W/2}" y="${PT-10}" text-anchor="middle" font-size="11" fill="#6b7280" font-weight="600" font-family="inherit">Composição das Despesas</text>`;
-    for(let s=0;s<=4;s++){
-      const gv=maxV*s/4;const gy=sy(gv);
-      o+=`<line x1="${PL}" y1="${gy.toFixed(1)}" x2="${W-PR}" y2="${gy.toFixed(1)}" stroke="#f3f4f6" stroke-width="1"/>`;
-      const lbl=gv>=1000?`${(gv/1000).toFixed(1)}k`:gv.toFixed(0);
-      o+=`<text x="${PL-4}" y="${(gy+4).toFixed(1)}" text-anchor="end" font-size="8" fill="#9ca3af" font-family="inherit">R$${lbl}</text>`;
-    }
-    for(let i=0;i<n;i++){
-      const x=bx(i);const cx=x+barW/2;
-      const h1=Math.max(0,baseY-sy(cash[i]));
-      const h2=Math.max(0,baseY-sy(card[i]));
-      const h3=Math.max(0,baseY-sy(shared[i]));
-      const yc=baseY-h1;const yk=yc-h2;const ys=yk-h3;
-      if(cash[i]>0){
-        o+=`<rect x="${x.toFixed(1)}" y="${yc.toFixed(1)}" width="${barW.toFixed(1)}" height="${h1.toFixed(1)}" fill="#ef4444"/>`;
-        if(h1>=14) o+=`<text x="${cx.toFixed(1)}" y="${(yc+h1/2+4).toFixed(1)}" text-anchor="middle" font-size="8" fill="#fff" font-weight="bold" font-family="inherit">${(cash[i]/1000).toFixed(1)}k</text>`;
-      }
-      if(card[i]>0){
-        o+=`<rect x="${x.toFixed(1)}" y="${yk.toFixed(1)}" width="${barW.toFixed(1)}" height="${h2.toFixed(1)}" fill="#f97316"/>`;
-        if(h2>=14) o+=`<text x="${cx.toFixed(1)}" y="${(yk+h2/2+4).toFixed(1)}" text-anchor="middle" font-size="8" fill="#fff" font-weight="bold" font-family="inherit">${(card[i]/1000).toFixed(1)}k</text>`;
-      }
-      if(shared[i]>0){
-        o+=`<rect x="${x.toFixed(1)}" y="${ys.toFixed(1)}" width="${barW.toFixed(1)}" height="${h3.toFixed(1)}" fill="#fbbf24"/>`;
-        if(h3>=14) o+=`<text x="${cx.toFixed(1)}" y="${(ys+h3/2+4).toFixed(1)}" text-anchor="middle" font-size="8" fill="#fff" font-weight="bold" font-family="inherit">${(shared[i]/1000).toFixed(1)}k</text>`;
-      }
-      if(totals[i]>0){
-        const topY=Math.min(...[cash[i]>0?yc:9999,card[i]>0?yk:9999,shared[i]>0?ys:9999]);
-        o+=`<text x="${cx.toFixed(1)}" y="${(topY-3).toFixed(1)}" text-anchor="middle" font-size="8" fill="#374151" font-weight="bold" font-family="inherit">${(totals[i]/1000).toFixed(1)}k</text>`;
-      }
-      const active=totals[i]>0;
-      o+=`<text x="${cx.toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="${active?10:9}" fill="${active?'#6b7280':'#d1d5db'}" font-family="inherit">${labels[i]}</text>`;
-    }
-    o+=`</svg>`;
-    return o;
+  private buildCompChartD3(data: MonthlyAnalytics[]): void {
+    const el = this.compChartEl.nativeElement;
+    el.innerHTML = '';
+    const margin = {top:28, right:20, bottom:35, left:50};
+    const width = 380, height = 240;
+    const innerW = width - margin.left - margin.right;
+    const innerH = height - margin.top - margin.bottom;
+    const labels = data.map(d => d.month_name.substring(0, 3));
+
+    const svg = d3.select(el).append('svg')
+      .attr('viewBox', `0 0 ${width} ${height}`)
+      .style('width','100%').style('height', `${height}px`).style('overflow','visible');
+
+    svg.append('text').attr('x', width/2).attr('y', margin.top - 10)
+      .attr('text-anchor','middle').attr('font-size','11').attr('fill','#6b7280')
+      .attr('font-weight','600').attr('font-family','inherit').text('Composição das Despesas');
+
+    const g = svg.append('g').attr('transform',`translate(${margin.left},${margin.top})`);
+
+    type BarRow = { month: string; cash: number; card: number; shared: number };
+    const rows: BarRow[] = data.map(d => ({
+      month: d.month_name.substring(0,3),
+      cash: Number(d.cash_expenses), card: Number(d.card_expenses), shared: Number(d.shared_my_portion)
+    }));
+
+    const stackFn = d3.stack<BarRow>().keys(['cash','card','shared']);
+    const stacked = stackFn(rows);
+    const colors: Record<string,string> = {cash:'#ef4444', card:'#f97316', shared:'#fbbf24'};
+
+    const x = d3.scaleBand().domain(labels).range([0, innerW]).padding(0.3);
+    const maxY = Math.max(...rows.map(r => r.cash+r.card+r.shared)) * 1.2 || 1;
+    const y = d3.scaleLinear().domain([0, maxY]).range([innerH, 0]);
+
+    g.append('g').attr('class','grid')
+      .call(d3.axisLeft(y).ticks(4).tickSize(-innerW).tickFormat(()=>''))
+      .call(gg => gg.select('.domain').remove())
+      .call(gg => gg.selectAll('line').attr('stroke','#f3f4f6'));
+
+    g.append('g').attr('transform',`translate(0,${innerH})`)
+      .call(d3.axisBottom(x).tickSize(0))
+      .call(gg => gg.select('.domain').remove())
+      .call(gg => gg.selectAll('text').attr('fill','#6b7280').attr('font-size','10').attr('font-family','inherit'));
+
+    g.append('g').call(d3.axisLeft(y).ticks(4).tickFormat((v:d3.NumberValue) => {
+      const n = +v;
+      return n >= 1000 ? `R$${(n/1000).toFixed(1)}k` : `R$${n}`;
+    }))
+      .call(gg => gg.select('.domain').remove())
+      .call(gg => gg.selectAll('text').attr('fill','#9ca3af').attr('font-size','9').attr('font-family','inherit'));
+
+    stacked.forEach(layer => {
+      const key = layer.key as string;
+      g.selectAll(null).data(layer).enter().append('rect')
+        .attr('x', (_,i) => x(labels[i])!)
+        .attr('y', (d:any) => y(d[1]))
+        .attr('height', (d:any) => Math.max(0, y(d[0]) - y(d[1])))
+        .attr('width', x.bandwidth())
+        .attr('fill', colors[key]);
+    });
+
+    rows.forEach((r, i) => {
+      const total = r.cash + r.card + r.shared;
+      if (total === 0) return;
+      g.append('rect')
+        .attr('x', x(labels[i])!).attr('y', y(total))
+        .attr('width', x.bandwidth()).attr('height', innerH - y(total))
+        .attr('fill','transparent').style('cursor','pointer')
+        .on('mousemove', (event: MouseEvent) => {
+          this.barTooltip.set({ cx: event.clientX+14, cy: event.clientY-130, month: labels[i], cash: r.cash, card: r.card, shared: r.shared, total });
+        })
+        .on('mouseleave', () => this.barTooltip.set(null));
+    });
   }
+
+  fmtCur(v: number | string | null | undefined): string {
+    const n = Number(v);
+    if (isNaN(n)) return '—';
+    return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
+  }
+
+  loadRecurringTemplates(): void {
+    this.expSvc.listRecurringTemplates().subscribe({
+      next: tpls => this.recurringTemplates.set(tpls),
+    });
+  }
+
+  saveRecurring(): void {
+    if (this.recurringForm.invalid) { this.recurringForm.markAllAsTouched(); return; }
+    this.savingRecurring.set(true);
+    const v = this.recurringForm.getRawValue();
+    this.expSvc.createRecurringTemplate({
+      description: v.description!,
+      amount: v.amount!,
+      day_of_month: v.day_of_month ?? 1,
+      payment_method: v.payment_method!,
+      category_id: v.category_id,
+    }).subscribe({
+      next: () => {
+        this.savingRecurring.set(false);
+        this.showRecurringForm.set(false);
+        this.recurringForm.reset({ description: '', amount: null, day_of_month: 1, payment_method: 'dinheiro', category_id: null });
+        this.loadRecurringTemplates();
+      },
+      error: err => { this.savingRecurring.set(false); this.recurringError.set(err?.error?.detail ?? 'Erro.'); },
+    });
+  }
+
+  deleteRecurring(id: number): void {
+    this.expSvc.deleteRecurringTemplate(id).subscribe({ next: () => this.loadRecurringTemplates() });
+  }
+
+  toggleRecurring(id: number): void {
+    this.expSvc.toggleRecurringTemplate(id).subscribe({ next: () => this.loadRecurringTemplates() });
+  }
+
+  generateCurrentMonth(): void {
+    const now = new Date();
+    this.expSvc.generateMonthRecurring(now.getMonth() + 1, now.getFullYear()).subscribe({
+      next: res => { this.generateResult.set(res); this.loadDashboard(); },
+    });
+  }
+
 }

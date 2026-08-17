@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import * as d3 from 'd3';
+import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild, effect } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
@@ -69,6 +70,9 @@ export class SharedDebtDetailComponent implements OnInit {
   loading = signal(true);
 
   readonly pieColors = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#06b6d4','#f97316','#84cc16','#ec4899'];
+  @ViewChild('pieChartEl') pieChartEl?: ElementRef<HTMLDivElement>;
+  pieTooltip = signal<{cx:number; cy:number; name:string; total:number; pct:number}|null>(null);
+
 
   categoryBreakdown = computed(() => {
     const map = new Map<string, number>();
@@ -81,30 +85,48 @@ export class SharedDebtDetailComponent implements OnInit {
       .sort((a, b) => b.total - a.total);
   });
 
-  pieSlices = computed(() => {
-    const data = this.categoryBreakdown();
-    const total = data.reduce((s, d) => s + d.total, 0);
-    if (total === 0) return [];
-    const cx = 90, cy = 90, r = 75;
-    let startAngle = -Math.PI / 2;
-    return data.map((d, i) => {
-      const slice = (d.total / total) * 2 * Math.PI;
-      const endAngle = startAngle + slice;
-      const x1 = cx + r * Math.cos(startAngle);
-      const y1 = cy + r * Math.sin(startAngle);
-      const x2 = cx + r * Math.cos(endAngle);
-      const y2 = cy + r * Math.sin(endAngle);
-      startAngle = endAngle;
-      return {
-        name: d.name,
-        color: this.pieColors[i % this.pieColors.length],
-        d: `M${cx},${cy} L${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${slice > Math.PI ? 1 : 0},1 ${x2.toFixed(1)},${y2.toFixed(1)} Z`
-      };
-    });
-  });
-
   formatCurrencyPie(value: number): string {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  }
+
+  renderPieChart(): void {
+    const data = this.categoryBreakdown();
+    const el = this.pieChartEl?.nativeElement;
+    if (!el || data.length === 0) return;
+    el.innerHTML = '';
+
+    const W = 200, H = 200, R = 80, r = 32;
+    const total = data.reduce((s, d) => s + d.total, 0);
+    const svg = d3.select(el).append('svg')
+      .attr('viewBox', `0 0 ${W} ${H}`)
+      .style('width','160px').style('height','160px').style('flex-shrink','0');
+
+    const g = svg.append('g').attr('transform',`translate(${W/2},${H/2})`);
+
+    const pie = d3.pie<{name:string;total:number}>().value(d => d.total).sort(null);
+    const arc = d3.arc<d3.PieArcDatum<{name:string;total:number}>>().innerRadius(r).outerRadius(R);
+    const arcHover = d3.arc<d3.PieArcDatum<{name:string;total:number}>>().innerRadius(r).outerRadius(R+6);
+
+    const arcs = pie(data);
+    const tooltip = this.pieTooltip;
+
+    g.selectAll('path')
+      .data(arcs)
+      .enter().append('path')
+      .attr('d', arc as any)
+      .attr('fill', (_, i) => this.pieColors[i % this.pieColors.length])
+      .attr('stroke', '#fff')
+      .attr('stroke-width', 2)
+      .style('cursor','pointer')
+      .on('mousemove', (event: MouseEvent, d: any) => {
+        tooltip.set({ cx: event.clientX+14, cy: event.clientY-100, name: d.data.name, total: d.data.total, pct: Math.round(d.data.total/total*100) });
+      })
+      .on('mouseleave', () => tooltip.set(null));
+
+    // Center label
+    g.append('text').attr('text-anchor','middle').attr('dy','0.35em')
+      .attr('font-size','10').attr('fill','#6b7280').attr('font-family','inherit')
+      .text(`${data.length} cat.`);
   }
   categories = signal<ExpenseCategory[]>([]);
 
@@ -183,6 +205,15 @@ export class SharedDebtDetailComponent implements OnInit {
     if (paidBy == null) return false;
     const member = this.members().find(m => m.id === paidBy);
     return !!member && !!member.tenant_id && member.tenant_id === this.myTenantId;
+  }
+
+  constructor() {
+    effect(() => {
+      const data = this.categoryBreakdown();
+      if (data.length > 0) {
+        Promise.resolve().then(() => this.renderPieChart());
+      }
+    });
   }
 
   ngOnInit(): void {
