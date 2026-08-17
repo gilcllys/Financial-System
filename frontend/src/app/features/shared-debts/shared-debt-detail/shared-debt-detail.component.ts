@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild, AfterViewChecked } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild, effect } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
@@ -41,7 +41,7 @@ interface DraftSharedEntry {
   templateUrl: './shared-debt-detail.component.html',
   styleUrls: ['./shared-debt-detail.component.scss'],
 })
-export class SharedDebtDetailComponent implements OnInit, AfterViewChecked {
+export class SharedDebtDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private svc = inject(SharedDebtService);
@@ -72,7 +72,7 @@ export class SharedDebtDetailComponent implements OnInit, AfterViewChecked {
   readonly pieColors = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#06b6d4','#f97316','#84cc16','#ec4899'];
   @ViewChild('pieChartEl') pieChartEl?: ElementRef<HTMLDivElement>;
   pieTooltip = signal<{cx:number; cy:number; name:string; total:number; pct:number}|null>(null);
-  private _lastPieData: string = '';
+
 
   categoryBreakdown = computed(() => {
     const map = new Map<string, number>();
@@ -91,10 +91,6 @@ export class SharedDebtDetailComponent implements OnInit, AfterViewChecked {
 
   renderPieChart(): void {
     const data = this.categoryBreakdown();
-    const key = JSON.stringify(data);
-    if (key === this._lastPieData) return;
-    this._lastPieData = key;
-
     const el = this.pieChartEl?.nativeElement;
     if (!el || data.length === 0) return;
     el.innerHTML = '';
@@ -209,6 +205,15 @@ export class SharedDebtDetailComponent implements OnInit, AfterViewChecked {
     if (paidBy == null) return false;
     const member = this.members().find(m => m.id === paidBy);
     return !!member && !!member.tenant_id && member.tenant_id === this.myTenantId;
+  }
+
+  constructor() {
+    effect(() => {
+      const data = this.categoryBreakdown();
+      if (data.length > 0) {
+        Promise.resolve().then(() => this.renderPieChart());
+      }
+    });
   }
 
   ngOnInit(): void {
@@ -582,8 +587,4 @@ export class SharedDebtDetailComponent implements OnInit, AfterViewChecked {
     const c = this.form.get(field);
     return !!(c?.invalid && c?.touched);
   }
-  ngAfterViewChecked(): void {
-    this.renderPieChart();
-  }
-
 }
