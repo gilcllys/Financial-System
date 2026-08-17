@@ -539,11 +539,11 @@
     <div class="chart-tooltip__title">📅 {{ chartTooltip()!.month }}</div>
     <div class="chart-tooltip__row">
       <span><span class="dot dot--green"></span>Receita</span>
-      <span class="chart-tooltip__val">{{ chartTooltip()!.income | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+      <span class="chart-tooltip__val">{{ fmtCur(chartTooltip()!.income) }}</span>
     </div>
     <div class="chart-tooltip__row">
       <span><span class="dot dot--red"></span>Despesa</span>
-      <span class="chart-tooltip__val">{{ chartTooltip()!.expense | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+      <span class="chart-tooltip__val">{{ fmtCur(chartTooltip()!.expense) }}</span>
     </div>
   </div>
 }
@@ -555,20 +555,20 @@
     <div class="chart-tooltip__title">📅 {{ barTooltip()!.month }}</div>
     <div class="chart-tooltip__row">
       <span><span class="dot dot--red"></span>Dinheiro</span>
-      <span class="chart-tooltip__val">{{ barTooltip()!.cash | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+      <span class="chart-tooltip__val">{{ fmtCur(barTooltip()!.cash) }}</span>
     </div>
     <div class="chart-tooltip__row">
       <span><span class="dot dot--orange"></span>Cartão</span>
-      <span class="chart-tooltip__val">{{ barTooltip()!.card | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+      <span class="chart-tooltip__val">{{ fmtCur(barTooltip()!.card) }}</span>
     </div>
     <div class="chart-tooltip__row">
       <span><span class="dot dot--yellow"></span>Compartilhado</span>
-      <span class="chart-tooltip__val">{{ barTooltip()!.shared | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+      <span class="chart-tooltip__val">{{ fmtCur(barTooltip()!.shared) }}</span>
     </div>
     <div class="chart-tooltip__divider"></div>
     <div class="chart-tooltip__row chart-tooltip__row--total">
       <span>Total</span>
-      <span class="chart-tooltip__val">{{ barTooltip()!.total | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+      <span class="chart-tooltip__val">{{ fmtCur(barTooltip()!.total) }}</span>
     </div>
   </div>
 }

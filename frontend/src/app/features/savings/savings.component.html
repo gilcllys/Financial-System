@@ -195,11 +195,11 @@
     <div class="chart-tooltip__title">📅 {{ savTooltip()!.label }}</div>
     <div class="chart-tooltip__row">
       <span><span class="dot dot--indigo"></span>Aporte do mês</span>
-      <span class="chart-tooltip__val">{{ savTooltip()!.monthly | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+      <span class="chart-tooltip__val">{{ formatCurrency(savTooltip()!.monthly) }}</span>
     </div>
     <div class="chart-tooltip__row">
       <span><span class="dot dot--indigo"></span>Acumulado</span>
-      <span class="chart-tooltip__val chart-tooltip__val--bold">{{ savTooltip()!.accumulated | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+      <span class="chart-tooltip__val chart-tooltip__val--bold">{{ formatCurrency(savTooltip()!.accumulated) }}</span>
     </div>
   </div>
 }

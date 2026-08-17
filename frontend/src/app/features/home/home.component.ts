@@ -441,6 +441,12 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  fmtCur(v: number | string | null | undefined): string {
+    const n = Number(v);
+    if (isNaN(n)) return '—';
+    return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
+  }
+
   loadRecurringTemplates(): void {
     this.expSvc.listRecurringTemplates().subscribe({
       next: tpls => this.recurringTemplates.set(tpls),
