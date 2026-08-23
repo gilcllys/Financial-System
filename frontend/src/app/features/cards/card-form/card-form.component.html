@@ -37,18 +37,18 @@
       <div class="form-row form-row--2col">
         <div class="form-group">
           <label class="form-label" for="due-date">Dia do Vencimento * <span class="form-hint">(1–31)</span></label>
-          <input id="due-date" class="form-input mono" [class.error]="hasError('due_date')"
-            type="number" min="1" max="31" formControlName="due_date" placeholder="10" />
-          @if (hasError('due_date')) {
+          <input id="due-date" class="form-input mono" [class.error]="hasError('due_day')"
+            type="number" min="1" max="31" formControlName="due_day" placeholder="10" />
+          @if (hasError('due_day')) {
             <span class="form-error" role="alert">Informe um dia válido (1–31).</span>
           }
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="best-date">Melhor dia para compra * <span class="form-hint">(1–31)</span></label>
-          <input id="best-date" class="form-input mono" [class.error]="hasError('best_purchase_date')"
-            type="number" min="1" max="31" formControlName="best_purchase_date" placeholder="17" />
-          @if (hasError('best_purchase_date')) {
+          <label class="form-label" for="closing-day">Dia de Fechamento * <span class="form-hint">(1–31)</span></label>
+          <input id="closing-day" class="form-input mono" [class.error]="hasError('closing_day')"
+            type="number" min="1" max="31" formControlName="closing_day" placeholder="17" />
+          @if (hasError('closing_day')) {
             <span class="form-error" role="alert">Informe um dia válido (1–31).</span>
           }
         </div>

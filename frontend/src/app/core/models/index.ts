@@ -39,15 +39,15 @@ export interface CreateExpensePayload {
 export interface CreditCard {
   id: number;
   name: string;
-  due_date: number;          // day 1-31
-  best_purchase_date: number; // day 1-31
+  due_day: number;          // day 1-31 (dia de vencimento)
+  closing_day: number;      // day 1-31 (dia de fechamento)
   last_four_digits: string;
 }
 
 export interface CreateCreditCardPayload {
   name: string;
-  due_date: number;
-  best_purchase_date: number;
+  due_day: number;
+  closing_day: number;
   last_four_digits: string;
 }
 

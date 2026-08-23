@@ -18,7 +18,7 @@ def _current_invoice_month(card):
     Determina (invoice_month, invoice_year) da fatura corrente (aberta hoje).
 
     Lógica verificada contra 2 faturas reais Itaú:
-      closing_day = best_purchase_date - 1
+      closing_day = card.closing_day  (dia real de fechamento)
 
       Se hoje.dia <= closing_day  → estamos no período de fechamento do mês
           atual (M = today.month)
@@ -29,7 +29,7 @@ def _current_invoice_month(card):
       que é um mês após o fechamento).
     """
     today = date.today()
-    closing_day = card.best_purchase_date - 1
+    closing_day = card.closing_day
 
     if today.day <= closing_day:
         closing_month = today.month
@@ -53,18 +53,18 @@ def _compute_invoice_period(card, invoice_month, invoice_year):
     por (invoice_month, invoice_year).
 
     Contrato (verificado contra faturas reais Itaú):
-      closing_day   = best_purchase_date - 1
+      closing_day   = card.closing_day  (dia real de fechamento)
       closing_month = invoice_month - 1   (com wraparound de ano)
 
       period_end   = date(closing_year, closing_month, closing_day)
-      period_start = date(start_year,   start_month,   best_purchase_date)
+      period_start = date(start_year,   start_month,   closing_day)
                      onde start_month = closing_month - 1 (com wraparound)
-      due_date     = date(invoice_year, invoice_month, card.due_date)
+      due_date     = date(invoice_year, invoice_month, card.due_day)
 
     Dias são limitados (clamped) ao número real de dias do mês para evitar
     datas inválidas (ex.: 31 de fevereiro).
     """
-    closing_day = card.best_purchase_date - 1
+    closing_day = card.closing_day
 
     if invoice_month == 1:
         closing_month, closing_year = 12, invoice_year - 1
@@ -80,10 +80,10 @@ def _compute_invoice_period(card, invoice_month, invoice_year):
         start_month, start_year = closing_month - 1, closing_year
 
     _, days_in_start = calendar.monthrange(start_year, start_month)
-    period_start = date(start_year, start_month, min(card.best_purchase_date, days_in_start))
+    period_start = date(start_year, start_month, min(closing_day, days_in_start))
 
     _, days_in_due = calendar.monthrange(invoice_year, invoice_month)
-    due = date(invoice_year, invoice_month, min(card.due_date, days_in_due))
+    due = date(invoice_year, invoice_month, min(card.due_day, days_in_due))
 
     return period_start, period_end, due
 

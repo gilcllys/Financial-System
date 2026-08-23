@@ -25,8 +25,8 @@ export class CardFormComponent implements OnInit {
   form = this.fb.group({
     name: ['', [Validators.required, Validators.minLength(2)]],
     last_four_digits: ['', [Validators.required, Validators.minLength(4), Validators.maxLength(4), Validators.pattern(/^\d{4}$/)]],
-    due_date: [null as number | null, [Validators.required, Validators.min(1), Validators.max(31)]],
-    best_purchase_date: [null as number | null, [Validators.required, Validators.min(1), Validators.max(31)]],
+    due_day: [null as number | null, [Validators.required, Validators.min(1), Validators.max(31)]],
+    closing_day: [null as number | null, [Validators.required, Validators.min(1), Validators.max(31)]],
   });
 
   ngOnInit(): void {
