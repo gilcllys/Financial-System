@@ -48,7 +48,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   private sharedSvc  = inject(SharedDebtService);
   private destroy$   = new Subject<void>();
 
-  // ── Canvas refs (static:false — canvases live inside @if blocks) ──────
+  // â”€â”€ Canvas refs (static:false â€” canvases live inside @if blocks) â”€â”€â”€â”€â”€â”€
   @ViewChild('dailyChartCanvas')  dailyCanvas?:  ElementRef<HTMLCanvasElement>;
   @ViewChild('weeklyChartCanvas') weeklyCanvas?: ElementRef<HTMLCanvasElement>;
   @ViewChild('donutChartCanvas')  donutCanvas?:  ElementRef<HTMLCanvasElement>;
@@ -60,17 +60,32 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   private monthlyChart?: Chart;
   private readonly installmentRe = /parcela\s+(\d+)\/(\d+)/i;
 
-  // ── State signals ──────────────────────────────────────────────────────
+  // â”€â”€ State signals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   cardId = 0;
   card               = signal<CreditCard | null>(null);
   invoices           = signal<Invoice[]>([]);
   selectedInvoice    = signal<Invoice | null>(null);
   selectedCategoryId = signal<number | null>(null);
   invoiceData        = signal<InvoiceExpensesResponse | null>(null);
-  /** Full invoice snapshot (page_size=200, no filters) — used for charts. */
+  /** Full invoice snapshot (page_size=200, no filters) â€” used for charts. */
   chartData          = signal<InvoiceExpensesResponse | null>(null);
   allCardExpenses    = signal<Expense[]>([]);
   sharedEntries      = signal<SharedDebtEntry[]>([]);
+
+  /** Shared entries filtradas pelo periodo da fatura selecionada (igual a despesas pessoais). */
+  filteredSharedEntries = computed((): SharedDebtEntry[] => {
+    const inv = this.selectedInvoice();
+    if (!inv) return [];
+    return this.sharedEntries().filter(e => e.date >= inv.period_start && e.date <= inv.period_end);
+  });
+
+  sharedInstallments = computed((): SharedDebtEntry[] =>
+    this.filteredSharedEntries().filter(e => e.total_installments > 1)
+  );
+
+  sharedNormal = computed((): SharedDebtEntry[] =>
+    this.filteredSharedEntries().filter(e => e.total_installments === 1)
+  );
   loadingInvoices    = signal(true);
   loadingExpenses    = signal(false);
   loadingChart       = signal(false);
@@ -79,7 +94,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
 
   searchControl = new FormControl<string>('', { nonNullable: true });
 
-  // ── Computed ───────────────────────────────────────────────────────────
+  // â”€â”€ Computed â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   pagination = computed((): InvoicePagination | null =>
     this.invoiceData()?.pagination ?? null,
   );
@@ -108,14 +123,14 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   totalTransactions = computed(() => this.invoiceData()?.summary.count  ?? 0);
 
   /**
-   * Category list for the dropdown — always unfiltered (uses chartData when
+   * Category list for the dropdown â€” always unfiltered (uses chartData when
    * available, falls back to invoiceData which may be filtered).
    */
   dropdownCategories = computed(() =>
     this.chartData()?.by_category ?? this.invoiceData()?.by_category ?? [],
   );
 
-  // ── Chart data: computed from the 200-expense chartData snapshot ───────
+  // â”€â”€ Chart data: computed from the 200-expense chartData snapshot â”€â”€â”€â”€â”€â”€â”€
   private dailyChartDataSig = computed(() => {
     const data = this.chartData();
     if (!data?.expenses.length) return null;
@@ -183,7 +198,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     };
   });
 
-  // ── Constructor: effect redraws charts whenever chartData changes ──────
+  // â”€â”€ Constructor: effect redraws charts whenever chartData changes â”€â”€â”€â”€â”€â”€
   constructor() {
     effect(() => {
       const daily  = this.dailyChartDataSig();
@@ -207,7 +222,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────
+  // â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   ngOnInit(): void {
     this.cardId = +this.route.snapshot.paramMap.get('id')!;
     this.cardSvc.get(this.cardId).subscribe({ next: c => this.card.set(c) });
@@ -227,7 +242,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
       error: () => this.loadingInvoices.set(false),
     });
 
-    // Debounced search — resets page 1, reloads expenses only (not charts)
+    // Debounced search â€” resets page 1, reloads expenses only (not charts)
     this.searchControl.valueChanges.pipe(
       debounceTime(400),
       distinctUntilChanged(),
@@ -247,7 +262,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     this.monthlyChart?.destroy();
   }
 
-  // ── User actions ───────────────────────────────────────────────────────
+  // â”€â”€ User actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   selectInvoice(invoice: Invoice): void {
     this.selectedInvoice.set(invoice);
     this.selectedCategoryId.set(null);
@@ -279,14 +294,14 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   }
 
   deleteExpense(expense: Expense): void {
-    if (!confirm(`Excluir "${expense.description}"? Esta ação não pode ser desfeita.`)) return;
+    if (!confirm(`Excluir "${expense.description}"? Esta aÃ§Ã£o nÃ£o pode ser desfeita.`)) return;
     this.expenseSvc.delete(expense.id).subscribe({
       next:  () => { const inv = this.selectedInvoice(); if (inv) this.loadPage(inv); },
       error: () => alert('Erro ao excluir o gasto. Tente novamente.'),
     });
   }
 
-  // ── Data loading ───────────────────────────────────────────────────────
+  // â”€â”€ Data loading â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   private loadPage(invoice?: Invoice): void {
     const inv = invoice ?? this.selectedInvoice();
     if (!inv) return;
@@ -319,7 +334,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ── Chart rendering ────────────────────────────────────────────────────
+  // â”€â”€ Chart rendering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   private renderDailyChart(data: { labels: string[]; values: number[] }): void {
     this.dailyChart?.destroy();
     const canvas = this.dailyCanvas?.nativeElement;
@@ -480,7 +495,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ── Formatters ─────────────────────────────────────────────────────────
+  // â”€â”€ Formatters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   formatAmount(amount: number): string {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency', currency: 'BRL',

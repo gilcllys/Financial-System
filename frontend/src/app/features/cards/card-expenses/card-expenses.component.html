@@ -357,10 +357,10 @@
   </div>
 }
 
-<!-- ── Compartilhado (independent: shown whenever there are shared entries on this card) ── -->
-@if (sharedEntries().length) {
+<!-- ── Compartilhado — filtrado pelo periodo da fatura selecionada ── -->
+@if (filteredSharedEntries().length) {
   <div class="data-table-wrapper" style="margin-top: var(--space-lg)">
-    <table class="data-table" role="table" aria-label="Gastos compartilhados do cartão">
+    <table class="data-table" role="table" aria-label="Gastos compartilhados da fatura">
       <thead>
         <tr>
           <th scope="col">Descrição</th>
@@ -371,30 +371,29 @@
         </tr>
       </thead>
       <tbody>
-        <tr><td colspan="5" class="table-subheader">👥 Compartilhado · {{ sharedEntries().length }}</td></tr>
-        @for (s of sharedEntries(); track s.id) {
-          <tr>
-            <td style="font-weight: 500">
-              {{ s.description }}
-              <span class="badge--shared">👥 {{ s.paid_by_name }}</span>
-            </td>
-            <td>
-              <span class="text-muted" style="font-size:13px">Compartilhado</span>
-            </td>
-            <td class="mono text-muted" style="font-size: 13px; white-space: nowrap">
-              {{ formatDateFull(s.date) }}
-            </td>
-            <td class="text-right">
-              <span class="value-down mono">{{ formatAmount(s.amount) }}</span>
-            </td>
-            <td class="text-right">
-              <a
-                [routerLink]="['/shared-debts', s.shared_debt]"
-                class="btn btn--secondary btn--sm"
-                aria-label="Ver grupo da despesa {{ s.description }}"
-              >Ver grupo</a>
-            </td>
-          </tr>
+        @if (sharedInstallments().length) {
+          <tr><td colspan="5" class="table-subheader">🔁 Parcelados Compartilhados · {{ sharedInstallments().length }}</td></tr>
+          @for (s of sharedInstallments(); track s.id) {
+            <tr>
+              <td style="font-weight: 500">{{ s.description }} <span class="badge--shared">👥 {{ s.paid_by_name }}</span></td>
+              <td><span class="text-muted" style="font-size:13px">Compartilhado</span></td>
+              <td class="mono text-muted" style="font-size: 13px; white-space: nowrap">{{ formatDateFull(s.date) }}</td>
+              <td class="text-right"><span class="value-down mono">{{ formatAmount(s.amount) }}</span></td>
+              <td class="text-right"><a [routerLink]="['/shared-debts', s.shared_debt]" class="btn btn--secondary btn--sm">Ver grupo</a></td>
+            </tr>
+          }
+        }
+        @if (sharedNormal().length) {
+          <tr><td colspan="5" class="table-subheader">👥 Compartilhado · {{ sharedNormal().length }}</td></tr>
+          @for (s of sharedNormal(); track s.id) {
+            <tr>
+              <td style="font-weight: 500">{{ s.description }} <span class="badge--shared">👥 {{ s.paid_by_name }}</span></td>
+              <td><span class="text-muted" style="font-size:13px">Compartilhado</span></td>
+              <td class="mono text-muted" style="font-size: 13px; white-space: nowrap">{{ formatDateFull(s.date) }}</td>
+              <td class="text-right"><span class="value-down mono">{{ formatAmount(s.amount) }}</span></td>
+              <td class="text-right"><a [routerLink]="['/shared-debts', s.shared_debt]" class="btn btn--secondary btn--sm">Ver grupo</a></td>
+            </tr>
+          }
         }
       </tbody>
     </table>
