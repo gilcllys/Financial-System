@@ -8,7 +8,7 @@ class CreditCard(BaseModel):
         db_column='tenant_id',
         db_index=True,
         null=False,
-        help_text='Identificador Ãºnico do tenant/usuÃ¡rio vindo do Keycloak (sub claim)',
+        help_text='Identificador único do tenant/usuário vindo do Keycloak (sub claim)',
     )
     name = models.CharField(
         max_length=100,
@@ -16,15 +16,15 @@ class CreditCard(BaseModel):
         db_index=True,
         null=False,
     )
-    due_date = models.IntegerField(
-        db_column='due_date',
+    due_day = models.IntegerField(
+        db_column='due_day',
         null=False,
-        help_text='Dia do vencimento da fatura (1-31)',
+        help_text='Dia do vencimento da fatura (1–31)',
     )
-    best_purchase_date = models.IntegerField(
-        db_column='best_purchase_date',
+    closing_day = models.IntegerField(
+        db_column='closing_day',
         null=False,
-        help_text='Melhor dia para compra (1-31)',
+        help_text='Dia de fechamento da fatura (1–31). Ex: se fecha no dia 26, guarde 26.',
     )
     last_four_digits = models.CharField(
         max_length=4,
