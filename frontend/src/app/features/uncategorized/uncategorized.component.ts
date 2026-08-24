@@ -98,5 +98,5 @@ export class UncategorizedComponent implements OnInit {
   fmt(v: number): string {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(v));
   }
-}
-
+}
+

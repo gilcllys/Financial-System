@@ -1,201 +1,201 @@
-
-<div class="mode-toggle" role="group" aria-label="Tipo de gasto">
-  <button type="button" class="mode-toggle__btn mode-toggle__btn--active">Individual</button>
-  <button type="button" class="mode-toggle__btn" (click)="goToShared()">Compartilhado</button>
-</div>
-
-<div class="page-header">
-  <div class="page-header__left">
-    <h1 class="page-header__title">Vários Gastos</h1>
-    <p class="page-header__subtitle">Monte uma lista e salve todos de uma vez</p>
-  </div>
-  <div class="page-header__actions">
-    <a routerLink="/expenses/new" class="btn btn--secondary btn--sm">＋ Adicionar 1 (form normal)</a>
-    <a routerLink="/expenses/import" class="btn btn--secondary btn--sm">📥 Importar Excel</a>
-    <a routerLink="/expenses" class="btn btn--secondary btn--sm">← Voltar</a>
-  </div>
-</div>
-
-<div class="card">
-  <form [formGroup]="form" (ngSubmit)="addToList()" novalidate aria-label="Adicionar gasto à lista">
-
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label" for="description">Descrição *</label>
-        <input id="description" class="form-input" [class.error]="hasError('description')" type="text"
-          formControlName="description" placeholder="Ex: Compra no supermercado" autocomplete="off" />
-        @if (hasError('description')) {
-          <span class="form-error" role="alert">Descrição é obrigatória (mín. 2 caracteres).</span>
-        }
-      </div>
-    </div>
-
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Tipo *</label>
-        <div class="type-toggle" role="group" aria-label="Tipo de lançamento">
-          <button type="button" class="type-toggle__btn" [class.type-toggle__btn--expense]="!isIncome()"
-            [class.active]="!isIncome()" (click)="toggleType(false)">📤 Despesa (saída)</button>
-          <button type="button" class="type-toggle__btn" [class.type-toggle__btn--income]="isIncome()"
-            [class.active]="isIncome()" (click)="toggleType(true)">📥 Receita (entrada)</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="form-row form-row--2col">
-      <div class="form-group">
-        <label class="form-label" for="amount">
-          Valor *
-          <span class="form-hint type-hint" [class.type-hint--income]="isIncome()" [class.type-hint--expense]="!isIncome()">
-            {{ isIncome() ? '+ Receita' : '- Despesa' }}
-          </span>
-        </label>
-        <input id="amount" class="form-input mono" [class.error]="hasError('amount')"
-          [class.input--income]="isIncome()" [class.input--expense]="!isIncome()" type="number" step="0.01"
-          min="0.01" formControlName="amount" placeholder="250.00" />
-        @if (hasError('amount')) {
-          <span class="form-error" role="alert">Valor é obrigatório (maior que zero).</span>
-        }
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="date">Data *</label>
-        <input id="date" class="form-input" type="date" formControlName="date" [class.error]="hasError('date')" />
-      </div>
-    </div>
-
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label" for="category_id">Categoria *</label>
-        <select id="category_id" class="form-select" [class.error]="hasError('category_id')" formControlName="category_id">
-          <option [value]="null" disabled>Selecione uma categoria</option>
-          @for (cat of categories(); track cat.id) {
-            <option [value]="cat.id">{{ cat.name }}</option>
-          }
-        </select>
-        @if (hasError('category_id')) {
-          <span class="form-error" role="alert">Categoria é obrigatória.</span>
-        }
-      </div>
-    </div>
-
-    <div class="form-row">
-      <fieldset class="form-group">
-        <legend class="form-label">Método de Pagamento *</legend>
-        <div class="radio-group" role="radiogroup">
-          <label class="radio-option">
-            <input type="radio" formControlName="payment_method" value="dinheiro" />
-            <span class="radio-btn">💵 Dinheiro</span>
-          </label>
-          <label class="radio-option">
-            <input type="radio" formControlName="payment_method" value="cartao" />
-            <span class="radio-btn">💳 Cartão</span>
-          </label>
-        </div>
-      </fieldset>
-    </div>
-
-    @if (isCartao) {
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label" for="credit_card_id">Cartão de Crédito *</label>
-          <select id="credit_card_id" class="form-select" [class.error]="hasError('credit_card_id')" formControlName="credit_card_id">
-            <option [value]="null" disabled>Selecione o cartão</option>
-            @for (card of cards(); track card.id) {
-              <option [value]="card.id">{{ card.name }} •••• {{ card.last_four_digits }}</option>
-            }
-          </select>
-          @if (hasError('credit_card_id')) {
-            <span class="form-error" role="alert">Selecione o cartão.</span>
-          }
-        </div>
-      </div>
-    }
-
-    <div class="form-row">
-      <label class="toggle-label" for="is_installment">
-        <span class="toggle-text">É parcelado?</span>
-        <span class="toggle-switch" role="switch" [attr.aria-checked]="isInstallment">
-          <input type="checkbox" id="is_installment" formControlName="is_installment" />
-          <span class="toggle-track"><span class="toggle-thumb"></span></span>
-        </span>
-      </label>
-    </div>
-
-    @if (isInstallment) {
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label" for="installments">Número de Parcelas *</label>
-          <input id="installments" class="form-input mono" type="number" min="2" max="60"
-            formControlName="installments" placeholder="Ex: 12" />
-          <span class="form-hint">Entre 2 e 60 parcelas</span>
-        </div>
-      </div>
-    }
-
-    <div class="form-actions">
-      <button type="submit" class="btn btn--primary">➕ Adicionar à lista</button>
-    </div>
-  </form>
-</div>
-
-<!-- Lista de rascunhos -->
-@if (drafts().length > 0) {
-  <div class="data-table-wrapper" aria-label="Lista de gastos a salvar">
-    <table class="data-table" role="table">
-      <thead>
-        <tr>
-          <th scope="col">Descrição</th>
-          <th scope="col">Categoria</th>
-          <th scope="col">Data</th>
-          <th scope="col">Método</th>
-          <th scope="col" class="text-right">Valor</th>
-          <th scope="col">Ações</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (d of drafts(); track d.localId) {
-          <tr>
-            <td>
-              {{ d.description }}
-              @if (d.is_installment) {
-                <span class="badge">{{ d.installments }}x</span>
-              }
-            </td>
-            <td><span class="badge">{{ d.category_name }}</span></td>
-            <td class="mono text-muted">{{ d.date | slice:8:10 }}/{{ d.date | slice:5:7 }}/{{ d.date | slice:0:4 }}</td>
-            <td>{{ d.payment_method === 'cartao' ? '💳 Cartão' : '💵 Dinheiro' }}</td>
-            <td class="text-right">
-              <span [class]="amountClass(draftAmount(d))" class="mono">
-                {{ amountPrefix(draftAmount(d)) }} {{ formatAmount(draftAmount(d)) }}
-              </span>
-            </td>
-            <td>
-              <div class="action-buttons">
-                <button class="btn btn--ghost btn--sm" (click)="edit(d)" [attr.aria-label]="'Editar ' + d.description">✏️</button>
-                <button class="btn btn--ghost btn--sm" (click)="duplicate(d)" [attr.aria-label]="'Duplicar ' + d.description">📄</button>
-                <button class="btn btn--ghost btn--sm" (click)="remove(d.localId)" [attr.aria-label]="'Remover ' + d.description">🗑️</button>
-              </div>
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  </div>
-}
-
-@if (errorMessage()) {
-  <div class="form-error-box" role="alert">{{ errorMessage() }}</div>
-}
-
-<!-- Rodapé / resumo -->
-<div class="card batch-summary">
-  <div class="batch-summary__info">
-    <span>{{ drafts().length }} gasto(s) na lista</span>
-    <span [class]="amountClass(signedSum())" class="mono">
-      Total: {{ amountPrefix(signedSum()) }} {{ formatAmount(signedSum()) }}
-    </span>
-  </div>
-  <button type="button" class="btn btn--primary" [disabled]="drafts().length === 0 || saving()" (click)="saveAll()">
-    @if (saving()) { <span class="spinner"></span> } 💾 Salvar todos ({{ drafts().length }})
-  </button>
-</div>
+
+<div class="mode-toggle" role="group" aria-label="Tipo de gasto">
+  <button type="button" class="mode-toggle__btn mode-toggle__btn--active">Individual</button>
+  <button type="button" class="mode-toggle__btn" (click)="goToShared()">Compartilhado</button>
+</div>
+
+<div class="page-header">
+  <div class="page-header__left">
+    <h1 class="page-header__title">Vários Gastos</h1>
+    <p class="page-header__subtitle">Monte uma lista e salve todos de uma vez</p>
+  </div>
+  <div class="page-header__actions">
+    <a routerLink="/expenses/new" class="btn btn--secondary btn--sm">＋ Adicionar 1 (form normal)</a>
+    <a routerLink="/expenses/import" class="btn btn--secondary btn--sm">📥 Importar Excel</a>
+    <a routerLink="/expenses" class="btn btn--secondary btn--sm">← Voltar</a>
+  </div>
+</div>
+
+<div class="card">
+  <form [formGroup]="form" (ngSubmit)="addToList()" novalidate aria-label="Adicionar gasto à lista">
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="description">Descrição *</label>
+        <input id="description" class="form-input" [class.error]="hasError('description')" type="text"
+          formControlName="description" placeholder="Ex: Compra no supermercado" autocomplete="off" />
+        @if (hasError('description')) {
+          <span class="form-error" role="alert">Descrição é obrigatória (mín. 2 caracteres).</span>
+        }
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Tipo *</label>
+        <div class="type-toggle" role="group" aria-label="Tipo de lançamento">
+          <button type="button" class="type-toggle__btn" [class.type-toggle__btn--expense]="!isIncome()"
+            [class.active]="!isIncome()" (click)="toggleType(false)">📤 Despesa (saída)</button>
+          <button type="button" class="type-toggle__btn" [class.type-toggle__btn--income]="isIncome()"
+            [class.active]="isIncome()" (click)="toggleType(true)">📥 Receita (entrada)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-row form-row--2col">
+      <div class="form-group">
+        <label class="form-label" for="amount">
+          Valor *
+          <span class="form-hint type-hint" [class.type-hint--income]="isIncome()" [class.type-hint--expense]="!isIncome()">
+            {{ isIncome() ? '+ Receita' : '- Despesa' }}
+          </span>
+        </label>
+        <input id="amount" class="form-input mono" [class.error]="hasError('amount')"
+          [class.input--income]="isIncome()" [class.input--expense]="!isIncome()" type="number" step="0.01"
+          min="0.01" formControlName="amount" placeholder="250.00" />
+        @if (hasError('amount')) {
+          <span class="form-error" role="alert">Valor é obrigatório (maior que zero).</span>
+        }
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="date">Data *</label>
+        <input id="date" class="form-input" type="date" formControlName="date" [class.error]="hasError('date')" />
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="category_id">Categoria *</label>
+        <select id="category_id" class="form-select" [class.error]="hasError('category_id')" formControlName="category_id">
+          <option [value]="null" disabled>Selecione uma categoria</option>
+          @for (cat of categories(); track cat.id) {
+            <option [value]="cat.id">{{ cat.name }}</option>
+          }
+        </select>
+        @if (hasError('category_id')) {
+          <span class="form-error" role="alert">Categoria é obrigatória.</span>
+        }
+      </div>
+    </div>
+
+    <div class="form-row">
+      <fieldset class="form-group">
+        <legend class="form-label">Método de Pagamento *</legend>
+        <div class="radio-group" role="radiogroup">
+          <label class="radio-option">
+            <input type="radio" formControlName="payment_method" value="dinheiro" />
+            <span class="radio-btn">💵 Dinheiro</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" formControlName="payment_method" value="cartao" />
+            <span class="radio-btn">💳 Cartão</span>
+          </label>
+        </div>
+      </fieldset>
+    </div>
+
+    @if (isCartao) {
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="credit_card_id">Cartão de Crédito *</label>
+          <select id="credit_card_id" class="form-select" [class.error]="hasError('credit_card_id')" formControlName="credit_card_id">
+            <option [value]="null" disabled>Selecione o cartão</option>
+            @for (card of cards(); track card.id) {
+              <option [value]="card.id">{{ card.name }} •••• {{ card.last_four_digits }}</option>
+            }
+          </select>
+          @if (hasError('credit_card_id')) {
+            <span class="form-error" role="alert">Selecione o cartão.</span>
+          }
+        </div>
+      </div>
+    }
+
+    <div class="form-row">
+      <label class="toggle-label" for="is_installment">
+        <span class="toggle-text">É parcelado?</span>
+        <span class="toggle-switch" role="switch" [attr.aria-checked]="isInstallment">
+          <input type="checkbox" id="is_installment" formControlName="is_installment" />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        </span>
+      </label>
+    </div>
+
+    @if (isInstallment) {
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="installments">Número de Parcelas *</label>
+          <input id="installments" class="form-input mono" type="number" min="2" max="60"
+            formControlName="installments" placeholder="Ex: 12" />
+          <span class="form-hint">Entre 2 e 60 parcelas</span>
+        </div>
+      </div>
+    }
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn--primary">➕ Adicionar à lista</button>
+    </div>
+  </form>
+</div>
+
+<!-- Lista de rascunhos -->
+@if (drafts().length > 0) {
+  <div class="data-table-wrapper" aria-label="Lista de gastos a salvar">
+    <table class="data-table" role="table">
+      <thead>
+        <tr>
+          <th scope="col">Descrição</th>
+          <th scope="col">Categoria</th>
+          <th scope="col">Data</th>
+          <th scope="col">Método</th>
+          <th scope="col" class="text-right">Valor</th>
+          <th scope="col">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (d of drafts(); track d.localId) {
+          <tr>
+            <td>
+              {{ d.description }}
+              @if (d.is_installment) {
+                <span class="badge">{{ d.installments }}x</span>
+              }
+            </td>
+            <td><span class="badge">{{ d.category_name }}</span></td>
+            <td class="mono text-muted">{{ d.date | slice:8:10 }}/{{ d.date | slice:5:7 }}/{{ d.date | slice:0:4 }}</td>
+            <td>{{ d.payment_method === 'cartao' ? '💳 Cartão' : '💵 Dinheiro' }}</td>
+            <td class="text-right">
+              <span [class]="amountClass(draftAmount(d))" class="mono">
+                {{ amountPrefix(draftAmount(d)) }} {{ formatAmount(draftAmount(d)) }}
+              </span>
+            </td>
+            <td>
+              <div class="action-buttons">
+                <button class="btn btn--ghost btn--sm" (click)="edit(d)" [attr.aria-label]="'Editar ' + d.description">✏️</button>
+                <button class="btn btn--ghost btn--sm" (click)="duplicate(d)" [attr.aria-label]="'Duplicar ' + d.description">📄</button>
+                <button class="btn btn--ghost btn--sm" (click)="remove(d.localId)" [attr.aria-label]="'Remover ' + d.description">🗑️</button>
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (errorMessage()) {
+  <div class="form-error-box" role="alert">{{ errorMessage() }}</div>
+}
+
+<!-- Rodapé / resumo -->
+<div class="card batch-summary">
+  <div class="batch-summary__info">
+    <span>{{ drafts().length }} gasto(s) na lista</span>
+    <span [class]="amountClass(signedSum())" class="mono">
+      Total: {{ amountPrefix(signedSum()) }} {{ formatAmount(signedSum()) }}
+    </span>
+  </div>
+  <button type="button" class="btn btn--primary" [disabled]="drafts().length === 0 || saving()" (click)="saveAll()">
+    @if (saving()) { <span class="spinner"></span> } 💾 Salvar todos ({{ drafts().length }})
+  </button>
+</div>

@@ -1,53 +1,53 @@
-﻿<!-- ── Page Header ──────────────────────────────────────────────────────────── -->
-<div class="page-header">
-  <div class="page-header__left">
-    @if (card()) {
-      <h1 class="page-header__title">
-        {{ card()!.name }}
-        <span class="mono text-muted">•••• {{ card()!.last_four_digits }}</span>
-      </h1>
-      <p class="page-header__subtitle">
-        Vence dia {{ card()!.due_day }} · Fechamento: dia {{ card()!.closing_day }}
-      </p>
-    }
-  </div>
-  <div style="display:flex;gap:8px;align-items:center">
-    <a routerLink="/cards" class="btn btn--secondary btn--sm">← Cartões</a>
-    <a [routerLink]="['/expenses/new']" [queryParams]="{card_id: cardId}" class="btn btn--primary btn--sm">＋ Novo Gasto</a>
-  </div>
-</div>
-
-<!-- ── Invoice Selector ──────────────────────────────────────────────────────── -->
-@if (loadingInvoices()) {
-  <div class="loading-wrapper" style="padding: var(--space-base)">
-    <span class="spinner"></span> Carregando faturas...
-  </div>
-} @else if (invoices().length > 0) {
-  <div class="invoice-selector" role="group" aria-label="Selecionar fatura">
-    @for (inv of invoices(); track inv.invoice_month + '-' + inv.invoice_year) {
-      <button
-        class="invoice-chip"
-        [class.invoice-chip--active]="selectedInvoice()?.invoice_month === inv.invoice_month && selectedInvoice()?.invoice_year === inv.invoice_year"
-        [class.invoice-chip--current]="inv.is_current"
-        (click)="selectInvoice(inv)"
-        [attr.aria-pressed]="selectedInvoice()?.invoice_month === inv.invoice_month && selectedInvoice()?.invoice_year === inv.invoice_year"
-      >
-        {{ inv.invoice_name }}
-        @if (inv.is_current) { <span class="current-badge">atual</span> }
-      </button>
-    }
-  </div>
-}
-
-<!-- ── Period Info ────────────────────────────────────────────────────────────── -->
-@if (selectedInvoice()) {
-  <p class="period-info">
-    📅 {{ formatDateFull(selectedInvoice()!.period_start) }}
-    → {{ formatDateFull(selectedInvoice()!.period_end) }}
-    · Vence {{ formatDateFull(selectedInvoice()!.due_date) }}
-  </p>
-}
-
+﻿<!-- ── Page Header ──────────────────────────────────────────────────────────── -->
+<div class="page-header">
+  <div class="page-header__left">
+    @if (card()) {
+      <h1 class="page-header__title">
+        {{ card()!.name }}
+        <span class="mono text-muted">•••• {{ card()!.last_four_digits }}</span>
+      </h1>
+      <p class="page-header__subtitle">
+        Vence dia {{ card()!.due_day }} · Fechamento: dia {{ card()!.closing_day }}
+      </p>
+    }
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <a routerLink="/cards" class="btn btn--secondary btn--sm">← Cartões</a>
+    <a [routerLink]="['/expenses/new']" [queryParams]="{card_id: cardId}" class="btn btn--primary btn--sm">＋ Novo Gasto</a>
+  </div>
+</div>
+
+<!-- ── Invoice Selector ──────────────────────────────────────────────────────── -->
+@if (loadingInvoices()) {
+  <div class="loading-wrapper" style="padding: var(--space-base)">
+    <span class="spinner"></span> Carregando faturas...
+  </div>
+} @else if (invoices().length > 0) {
+  <div class="invoice-selector" role="group" aria-label="Selecionar fatura">
+    @for (inv of invoices(); track inv.invoice_month + '-' + inv.invoice_year) {
+      <button
+        class="invoice-chip"
+        [class.invoice-chip--active]="selectedInvoice()?.invoice_month === inv.invoice_month && selectedInvoice()?.invoice_year === inv.invoice_year"
+        [class.invoice-chip--current]="inv.is_current"
+        (click)="selectInvoice(inv)"
+        [attr.aria-pressed]="selectedInvoice()?.invoice_month === inv.invoice_month && selectedInvoice()?.invoice_year === inv.invoice_year"
+      >
+        {{ inv.invoice_name }}
+        @if (inv.is_current) { <span class="current-badge">atual</span> }
+      </button>
+    }
+  </div>
+}
+
+<!-- ── Period Info ────────────────────────────────────────────────────────────── -->
+@if (selectedInvoice()) {
+  <p class="period-info">
+    📅 {{ formatDateFull(selectedInvoice()!.period_start) }}
+    → {{ formatDateFull(selectedInvoice()!.period_end) }}
+    · Vence {{ formatDateFull(selectedInvoice()!.due_date) }}
+  </p>
+}
+
 <!-- ── Summary Cards ─────────────────────────────────────────────────────────── -->
 <div class="summary-row" style="margin-bottom: var(--space-lg)">
   <div class="summary-card summary-card--invoice">
@@ -83,374 +83,374 @@
     <span class="summary-card__value mono">{{ totalTransactions() }}</span>
   </div>
 </div>
-<!-- ── Charts Section (independent from expense pagination) ──────────────────── -->
-@if (loadingChart()) {
-  <div class="charts-grid charts-grid--loading">
-    <div class="chart-card chart-card--placeholder">
-      <span class="spinner"></span>
-    </div>
-    <div class="chart-card chart-card--placeholder">
-      <span class="spinner"></span>
-    </div>
-    <div class="chart-card chart-card--placeholder chart-card--donut">
-      <span class="spinner"></span>
-    </div>
-    <div class="chart-card chart-card--placeholder">
-      <span class="spinner"></span>
-    </div>
-  </div>
-} @else if (chartData()) {
-  <div class="charts-grid" aria-label="Gráficos de gastos da fatura">
-    <div class="chart-card">
-      <h2 class="chart-card__title">Gastos por Dia</h2>
-      <div class="chart-card__body">
-        <div #dailyChartEl class="d3-chart-container" aria-label="Grafico de gastos diarios" role="img"></div>
-      </div>
-    </div>
-
-    <div class="chart-card">
-      <h2 class="chart-card__title">Gastos por Semana</h2>
-      <div class="chart-card__body">
-        <div #weeklyChartEl class="d3-chart-container" aria-label="Grafico de gastos semanais" role="img"></div>
-      </div>
-    </div>
-
-    <div class="chart-card chart-card--donut">
-      <h2 class="chart-card__title">Top 5 Categorias</h2>
-      <div class="chart-card__body">
-        <div #donutChartEl class="d3-chart-container" aria-label="Grafico de categorias" role="img"></div>
-      </div>
-    </div>
-
-    <div class="chart-card">
-      <h2 class="chart-card__title">Gasto Mensal — {{ selectedInvoice()?.invoice_year }}</h2>
-      <div class="chart-card__body">
-        @if (monthlyChartDataSig()) {
-          <div #monthlyChartEl class="d3-chart-container" aria-label="Grafico de gastos mensais" role="img"></div>
-        } @else {
-          <div class="empty-state" style="height:100%;display:flex;align-items:center;justify-content:center">
-            Sem dados mensais
-          </div>
-        }
-      </div>
-    </div>
-  </div>
-}
-
-<!-- ── Expense Detail Section ─────────────────────────────────────────────────── -->
-@if (loadingExpenses()) {
-  <div class="loading-wrapper">
-    <span class="spinner"></span> Carregando gastos da fatura...
-  </div>
-} @else if (invoiceData()) {
-
-  <!-- ── Category Breakdown ──────────────────────────────────────────────────── -->
-  @if (invoiceData()!.by_category.length > 0) {
-    <div class="category-breakdown" aria-label="Gastos por categoria">
-      <div class="category-breakdown__header">
-        <span class="category-breakdown__title">Por Categoria</span>
-        @if (selectedCategoryId()) {
-          <!-- X clear: only appears when a filter is active — replaces "Todos" button -->
-          <button
-            class="cat-clear-btn"
-            (click)="selectCategory(null)"
-            aria-label="Remover filtro de categoria"
-            type="button"
-          >✕ Limpar</button>
-        }
-      </div>
-
-      @for (cat of invoiceData()!.by_category; track cat.category_id; let i = $index) {
-        <button
-          class="cat-row"
-          [class.cat-row--active]="selectedCategoryId() === cat.category_id"
-          [class.cat-row--rank-first]="i === 0"
-          [style.--cat-color]="catColor(i)"
-          (click)="selectCategory(selectedCategoryId() === cat.category_id ? null : cat.category_id)"
-          [attr.aria-pressed]="selectedCategoryId() === cat.category_id"
-          type="button"
-        >
-          <!-- Rank: preattentive cue showing relative position -->
-          <span class="cat-row__rank" aria-hidden="true">#{{ i + 1 }}</span>
-
-          <!-- Bar + label stacked in the middle column -->
-          <div class="cat-row__main">
-            <div class="cat-row__label-row">
-              <span class="cat-row__name">{{ cat.category_name }}</span>
-              <span class="cat-row__count text-muted">{{ cat.count }}x</span>
-            </div>
-            <div
-              class="cat-row__bar-wrap"
-              role="progressbar"
-              [attr.aria-valuenow]="cat.percentage"
-              aria-valuemin="0"
-              aria-valuemax="100"
-            >
-              <div class="cat-row__bar" [style.width.%]="cat.percentage"></div>
-              <span class="cat-row__bar-pct" aria-hidden="true">{{ roundPct(cat.percentage) }}%</span>
-            </div>
-          </div>
-
-          <!-- Hero number: amount is primary, percentage is secondary -->
-          <div class="cat-row__values">
-            <span class="cat-row__amount mono">{{ formatAmount(cat.total) }}</span>
-          </div>
-        </button>
-      }
-    </div>
-  }
-
-  <!-- ── Search + Category Filter Bar ──────────────────────────────────────── -->
-  <div class="search-bar">
-    <div class="search-bar__input-wrap">
-      <span class="search-bar__icon" aria-hidden="true">🔍</span>
-      <input
-        class="search-bar__input"
-        type="search"
-        placeholder="Buscar por descrição..."
-        [formControl]="searchControl"
-        aria-label="Buscar gasto por descrição"
-        autocomplete="off"
-      />
-      @if (searchControl.value) {
-        <button
-          class="search-bar__clear"
-          (click)="clearSearch()"
-          aria-label="Limpar busca"
-          type="button"
-        >✕</button>
-      }
-    </div>
-
-    <select
-      class="search-bar__category-select"
-      (change)="onCategorySelectChange($event)"
-      aria-label="Filtrar por categoria"
-    >
-      <option value="">Todas as categorias</option>
-      @for (cat of dropdownCategories(); track cat.category_id) {
-        <option
-          [value]="cat.category_id"
-          [selected]="selectedCategoryId() === cat.category_id"
-        >{{ cat.category_name }}</option>
-      }
-    </select>
-  </div>
-
-  <!-- ── Expense Table ───────────────────────────────────────────────────────── -->
-  @if (filteredExpenses().length === 0) {
-    <div class="empty-state">
-      <div class="empty-state__icon">🧾</div>
-      <p class="empty-state__title">Nenhum gasto encontrado</p>
-      <p class="empty-state__text">
-        @if (selectedCategoryId() || searchControl.value) {
-          Tente ajustar os filtros de busca ou categoria.
-        } @else {
-          Esta fatura não possui gastos registrados.
-        }
-      </p>
-    </div>
-  } @else {
-    <div class="data-table-wrapper">
-      <table class="data-table" role="table" aria-label="Gastos da fatura">
-        <thead>
-          <tr>
-            <th scope="col">Descrição</th>
-            <th scope="col">Categoria</th>
-            <th scope="col">Data</th>
-            <th scope="col" class="text-right">Valor</th>
-            <th scope="col" class="text-right">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          @if (installmentExpenses().length) {
-            <tr><td colspan="5" class="table-subheader">🔁 Parcelados · {{ installmentExpenses().length }}</td></tr>
-          }
-          @for (e of installmentExpenses(); track e.id) {
-            <tr>
-              <td style="font-weight: 500">
-                {{ e.description }}
-                @if (installmentBadge(e); as badge) {
-                  <span class="badge--installment">{{ badge }}</span>
-                }
-              </td>
-              <td>
-                @if (e.category) {
-                  <span class="badge badge--system">{{ e.category.name }}</span>
-                } @else {
-                  <span class="text-muted" style="font-size:13px">—</span>
-                }
-              </td>
-              <td class="mono text-muted" style="font-size: 13px; white-space: nowrap">
-                {{ formatDateFull(e.date) }}
-              </td>
-              <td class="text-right">
-                <span class="value-down mono">{{ formatAmount(e.amount) }}</span>
-              </td>
-              <td class="text-right" style="display:flex;gap:6px;justify-content:flex-end">
-                <a
-                  [routerLink]="['/expenses', e.id, 'edit']"
-                  class="btn btn--secondary btn--sm"
-                  aria-label="Editar {{ e.description }}"
-                >✏️ Editar</a>
-                <button
-                  class="btn btn--danger btn--sm"
-                  (click)="deleteExpense(e)"
-                  aria-label="Excluir {{ e.description }}"
-                  type="button"
-                >🗑️</button>
-              </td>
-            </tr>
-          }
-          @if (normalExpenses().length) {
-            <tr><td colspan="5" class="table-subheader">💳 Gastos normais · {{ normalExpenses().length }}</td></tr>
-          }
-          @for (e of normalExpenses(); track e.id) {
-            <tr>
-              <td style="font-weight: 500">{{ e.description }}</td>
-              <td>
-                @if (e.category) {
-                  <span class="badge badge--system">{{ e.category.name }}</span>
-                } @else {
-                  <span class="text-muted" style="font-size:13px">—</span>
-                }
-              </td>
-              <td class="mono text-muted" style="font-size: 13px; white-space: nowrap">
-                {{ formatDateFull(e.date) }}
-              </td>
-              <td class="text-right">
-                <span class="value-down mono">{{ formatAmount(e.amount) }}</span>
-              </td>
-              <td class="text-right" style="display:flex;gap:6px;justify-content:flex-end">
-                <a
-                  [routerLink]="['/expenses', e.id, 'edit']"
-                  class="btn btn--secondary btn--sm"
-                  aria-label="Editar {{ e.description }}"
-                >✏️ Editar</a>
-                <button
-                  class="btn btn--danger btn--sm"
-                  (click)="deleteExpense(e)"
-                  aria-label="Excluir {{ e.description }}"
-                  type="button"
-                >🗑️</button>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-
-    <!-- ── Pagination ─────────────────────────────────────────────────────── -->
-    @if (pagination() && pagination()!.total_pages > 1) {
-      <div class="pagination" role="navigation" aria-label="Paginação de gastos">
-        <button class="btn btn--secondary btn--sm" [disabled]="currentPage()===1" (click)="changePage(1)" aria-label="Primeira página">«</button>
-        <button class="btn btn--secondary btn--sm" [disabled]="currentPage()===1" (click)="changePage(currentPage()-1)" aria-label="Página anterior">‹</button>
-
-        @for (p of pageRange(); track p) {
-          <button
-            class="btn btn--sm"
-            [class.btn--primary]="p === currentPage()"
-            [class.btn--secondary]="p !== currentPage()"
-            (click)="changePage(p)"
-            [attr.aria-current]="p === currentPage() ? 'page' : null"
-          >{{ p }}</button>
-        }
-
-        <button class="btn btn--secondary btn--sm" [disabled]="currentPage()===pagination()!.total_pages" (click)="changePage(currentPage()+1)" aria-label="Próxima página">›</button>
-        <button class="btn btn--secondary btn--sm" [disabled]="currentPage()===pagination()!.total_pages" (click)="changePage(pagination()!.total_pages)" aria-label="Última página">»</button>
-
-        <span class="pagination__info text-muted">
-          Página {{ currentPage() }} de {{ pagination()!.total_pages }}
-          · {{ pagination()!.total_count }} gastos
-        </span>
-      </div>
-    }
-  }
-
-} @else if (!loadingExpenses() && !loadingInvoices()) {
-  <div class="empty-state">
-    <div class="empty-state__icon">📭</div>
-    <p class="empty-state__title">Selecione uma fatura</p>
-    <p class="empty-state__text">Escolha uma fatura acima para ver os gastos.</p>
-  </div>
-}
-
-<!-- ── Compartilhado — filtrado pelo periodo da fatura selecionada ── -->
-@if (filteredSharedEntries().length) {
-  <!-- Banner resumo compartilhado -->
-  <div class="shared-invoice-summary" style="margin-top:var(--space-lg);display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-base);padding:var(--space-base);background:#f8faff;border:1px solid #dce8ff;border-radius:10px">
-    <div>
-      <p class="kpi-card__label" style="font-size:12px">Minha parte compartilhada</p>
-      <p class="value-down mono" style="font-size:1.1rem;font-weight:600">{{ formatAmount(sharedSummary().mySpend) }}</p>
-    </div>
-    <div>
-      <p class="kpi-card__label" style="font-size:12px">A receber de outros</p>
-      <p class="value-up mono" style="font-size:1.1rem;font-weight:600">{{ formatAmount(sharedSummary().toReceive) }}</p>
-    </div>
-    <div>
-      <p class="kpi-card__label" style="font-size:12px">Custo líquido</p>
-      <p class="mono" style="font-size:1.1rem;font-weight:600">{{ formatAmount(sharedSummary().mySpend - sharedSummary().toReceive) }}</p>
-    </div>
-  </div>
-
-  <div class="data-table-wrapper" style="margin-top:var(--space-base)">
-    <table class="data-table" role="table" aria-label="Gastos compartilhados da fatura">
-      <thead>
-        <tr>
-          <th scope="col">Descrição</th>
-          <th scope="col">Categoria</th>
-          <th scope="col">Data</th>
-          <th scope="col" class="text-right">Minha parte</th>
-          <th scope="col" class="text-right">Ações</th>
-        </tr>
-      </thead>
-      <tbody>
-        @if (sharedInstallments().length) {
-          <tr><td colspan="5" class="table-subheader">🔁 Parcelados Compartilhados · {{ sharedInstallments().length }}</td></tr>
-          @for (s of sharedInstallments(); track s.id) {
-            <tr [class.shared-row--i-paid]="iPaid(s)">
-              <td style="font-weight:500">
-                {{ s.description }}
-                <span class="badge--shared">👤 {{ s.paid_by_name }}</span>
-                @if (iPaid(s)) { <span class="badge badge--success" style="font-size:11px">você pagou</span> }
-              </td>
-              <td><span class="text-muted" style="font-size:13px">Compartilhado</span></td>
-              <td class="mono text-muted" style="font-size:13px;white-space:nowrap">{{ formatDateFull(s.date) }}</td>
-              <td class="text-right">
-                <span class="value-down mono">{{ formatAmount(myPortion(s)) }}</span>
-                <br><span class="text-muted" style="font-size:11px">de {{ formatAmount(s.amount) }} total ({{ s.participant_count }}px)</span>
-                @if (iPaid(s)) {
-                  <br><span class="value-up" style="font-size:11px">+{{ formatAmount(othersOwe(s)) }} a receber</span>
-                }
-              </td>
-              <td class="text-right"><a [routerLink]="['/shared-debts', s.shared_debt]" class="btn btn--secondary btn--sm">Ver grupo</a></td>
-            </tr>
-          }
-        }
-        @if (sharedNormal().length) {
-          <tr><td colspan="5" class="table-subheader">🤝 Compartilhado · {{ sharedNormal().length }}</td></tr>
-          @for (s of sharedNormal(); track s.id) {
-            <tr [class.shared-row--i-paid]="iPaid(s)">
-              <td style="font-weight:500">
-                {{ s.description }}
-                <span class="badge--shared">👤 {{ s.paid_by_name }}</span>
-                @if (iPaid(s)) { <span class="badge badge--success" style="font-size:11px">você pagou</span> }
-              </td>
-              <td><span class="text-muted" style="font-size:13px">Compartilhado</span></td>
-              <td class="mono text-muted" style="font-size:13px;white-space:nowrap">{{ formatDateFull(s.date) }}</td>
-              <td class="text-right">
-                <span class="value-down mono">{{ formatAmount(myPortion(s)) }}</span>
-                <br><span class="text-muted" style="font-size:11px">de {{ formatAmount(s.amount) }} total ({{ s.participant_count }}px)</span>
-                @if (iPaid(s)) {
-                  <br><span class="value-up" style="font-size:11px">+{{ formatAmount(othersOwe(s)) }} a receber</span>
-                }
-              </td>
-              <td class="text-right"><a [routerLink]="['/shared-debts', s.shared_debt]" class="btn btn--secondary btn--sm">Ver grupo</a></td>
-            </tr>
-          }
-        }
-      </tbody>
-    </table>
-  </div>
-}
-
+<!-- ── Charts Section (independent from expense pagination) ──────────────────── -->
+@if (loadingChart()) {
+  <div class="charts-grid charts-grid--loading">
+    <div class="chart-card chart-card--placeholder">
+      <span class="spinner"></span>
+    </div>
+    <div class="chart-card chart-card--placeholder">
+      <span class="spinner"></span>
+    </div>
+    <div class="chart-card chart-card--placeholder chart-card--donut">
+      <span class="spinner"></span>
+    </div>
+    <div class="chart-card chart-card--placeholder">
+      <span class="spinner"></span>
+    </div>
+  </div>
+} @else if (chartData()) {
+  <div class="charts-grid" aria-label="Gráficos de gastos da fatura">
+    <div class="chart-card">
+      <h2 class="chart-card__title">Gastos por Dia</h2>
+      <div class="chart-card__body">
+        <div #dailyChartEl class="d3-chart-container" aria-label="Grafico de gastos diarios" role="img"></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h2 class="chart-card__title">Gastos por Semana</h2>
+      <div class="chart-card__body">
+        <div #weeklyChartEl class="d3-chart-container" aria-label="Grafico de gastos semanais" role="img"></div>
+      </div>
+    </div>
+
+    <div class="chart-card chart-card--donut">
+      <h2 class="chart-card__title">Top 5 Categorias</h2>
+      <div class="chart-card__body">
+        <div #donutChartEl class="d3-chart-container" aria-label="Grafico de categorias" role="img"></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h2 class="chart-card__title">Gasto Mensal — {{ selectedInvoice()?.invoice_year }}</h2>
+      <div class="chart-card__body">
+        @if (monthlyChartDataSig()) {
+          <div #monthlyChartEl class="d3-chart-container" aria-label="Grafico de gastos mensais" role="img"></div>
+        } @else {
+          <div class="empty-state" style="height:100%;display:flex;align-items:center;justify-content:center">
+            Sem dados mensais
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ── Expense Detail Section ─────────────────────────────────────────────────── -->
+@if (loadingExpenses()) {
+  <div class="loading-wrapper">
+    <span class="spinner"></span> Carregando gastos da fatura...
+  </div>
+} @else if (invoiceData()) {
+
+  <!-- ── Category Breakdown ──────────────────────────────────────────────────── -->
+  @if (invoiceData()!.by_category.length > 0) {
+    <div class="category-breakdown" aria-label="Gastos por categoria">
+      <div class="category-breakdown__header">
+        <span class="category-breakdown__title">Por Categoria</span>
+        @if (selectedCategoryId()) {
+          <!-- X clear: only appears when a filter is active — replaces "Todos" button -->
+          <button
+            class="cat-clear-btn"
+            (click)="selectCategory(null)"
+            aria-label="Remover filtro de categoria"
+            type="button"
+          >✕ Limpar</button>
+        }
+      </div>
+
+      @for (cat of invoiceData()!.by_category; track cat.category_id; let i = $index) {
+        <button
+          class="cat-row"
+          [class.cat-row--active]="selectedCategoryId() === cat.category_id"
+          [class.cat-row--rank-first]="i === 0"
+          [style.--cat-color]="catColor(i)"
+          (click)="selectCategory(selectedCategoryId() === cat.category_id ? null : cat.category_id)"
+          [attr.aria-pressed]="selectedCategoryId() === cat.category_id"
+          type="button"
+        >
+          <!-- Rank: preattentive cue showing relative position -->
+          <span class="cat-row__rank" aria-hidden="true">#{{ i + 1 }}</span>
+
+          <!-- Bar + label stacked in the middle column -->
+          <div class="cat-row__main">
+            <div class="cat-row__label-row">
+              <span class="cat-row__name">{{ cat.category_name }}</span>
+              <span class="cat-row__count text-muted">{{ cat.count }}x</span>
+            </div>
+            <div
+              class="cat-row__bar-wrap"
+              role="progressbar"
+              [attr.aria-valuenow]="cat.percentage"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            >
+              <div class="cat-row__bar" [style.width.%]="cat.percentage"></div>
+              <span class="cat-row__bar-pct" aria-hidden="true">{{ roundPct(cat.percentage) }}%</span>
+            </div>
+          </div>
+
+          <!-- Hero number: amount is primary, percentage is secondary -->
+          <div class="cat-row__values">
+            <span class="cat-row__amount mono">{{ formatAmount(cat.total) }}</span>
+          </div>
+        </button>
+      }
+    </div>
+  }
+
+  <!-- ── Search + Category Filter Bar ──────────────────────────────────────── -->
+  <div class="search-bar">
+    <div class="search-bar__input-wrap">
+      <span class="search-bar__icon" aria-hidden="true">🔍</span>
+      <input
+        class="search-bar__input"
+        type="search"
+        placeholder="Buscar por descrição..."
+        [formControl]="searchControl"
+        aria-label="Buscar gasto por descrição"
+        autocomplete="off"
+      />
+      @if (searchControl.value) {
+        <button
+          class="search-bar__clear"
+          (click)="clearSearch()"
+          aria-label="Limpar busca"
+          type="button"
+        >✕</button>
+      }
+    </div>
+
+    <select
+      class="search-bar__category-select"
+      (change)="onCategorySelectChange($event)"
+      aria-label="Filtrar por categoria"
+    >
+      <option value="">Todas as categorias</option>
+      @for (cat of dropdownCategories(); track cat.category_id) {
+        <option
+          [value]="cat.category_id"
+          [selected]="selectedCategoryId() === cat.category_id"
+        >{{ cat.category_name }}</option>
+      }
+    </select>
+  </div>
+
+  <!-- ── Expense Table ───────────────────────────────────────────────────────── -->
+  @if (filteredExpenses().length === 0) {
+    <div class="empty-state">
+      <div class="empty-state__icon">🧾</div>
+      <p class="empty-state__title">Nenhum gasto encontrado</p>
+      <p class="empty-state__text">
+        @if (selectedCategoryId() || searchControl.value) {
+          Tente ajustar os filtros de busca ou categoria.
+        } @else {
+          Esta fatura não possui gastos registrados.
+        }
+      </p>
+    </div>
+  } @else {
+    <div class="data-table-wrapper">
+      <table class="data-table" role="table" aria-label="Gastos da fatura">
+        <thead>
+          <tr>
+            <th scope="col">Descrição</th>
+            <th scope="col">Categoria</th>
+            <th scope="col">Data</th>
+            <th scope="col" class="text-right">Valor</th>
+            <th scope="col" class="text-right">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (installmentExpenses().length) {
+            <tr><td colspan="5" class="table-subheader">🔁 Parcelados · {{ installmentExpenses().length }}</td></tr>
+          }
+          @for (e of installmentExpenses(); track e.id) {
+            <tr>
+              <td style="font-weight: 500">
+                {{ e.description }}
+                @if (installmentBadge(e); as badge) {
+                  <span class="badge--installment">{{ badge }}</span>
+                }
+              </td>
+              <td>
+                @if (e.category) {
+                  <span class="badge badge--system">{{ e.category.name }}</span>
+                } @else {
+                  <span class="text-muted" style="font-size:13px">—</span>
+                }
+              </td>
+              <td class="mono text-muted" style="font-size: 13px; white-space: nowrap">
+                {{ formatDateFull(e.date) }}
+              </td>
+              <td class="text-right">
+                <span class="value-down mono">{{ formatAmount(e.amount) }}</span>
+              </td>
+              <td class="text-right" style="display:flex;gap:6px;justify-content:flex-end">
+                <a
+                  [routerLink]="['/expenses', e.id, 'edit']"
+                  class="btn btn--secondary btn--sm"
+                  aria-label="Editar {{ e.description }}"
+                >✏️ Editar</a>
+                <button
+                  class="btn btn--danger btn--sm"
+                  (click)="deleteExpense(e)"
+                  aria-label="Excluir {{ e.description }}"
+                  type="button"
+                >🗑️</button>
+              </td>
+            </tr>
+          }
+          @if (normalExpenses().length) {
+            <tr><td colspan="5" class="table-subheader">💳 Gastos normais · {{ normalExpenses().length }}</td></tr>
+          }
+          @for (e of normalExpenses(); track e.id) {
+            <tr>
+              <td style="font-weight: 500">{{ e.description }}</td>
+              <td>
+                @if (e.category) {
+                  <span class="badge badge--system">{{ e.category.name }}</span>
+                } @else {
+                  <span class="text-muted" style="font-size:13px">—</span>
+                }
+              </td>
+              <td class="mono text-muted" style="font-size: 13px; white-space: nowrap">
+                {{ formatDateFull(e.date) }}
+              </td>
+              <td class="text-right">
+                <span class="value-down mono">{{ formatAmount(e.amount) }}</span>
+              </td>
+              <td class="text-right" style="display:flex;gap:6px;justify-content:flex-end">
+                <a
+                  [routerLink]="['/expenses', e.id, 'edit']"
+                  class="btn btn--secondary btn--sm"
+                  aria-label="Editar {{ e.description }}"
+                >✏️ Editar</a>
+                <button
+                  class="btn btn--danger btn--sm"
+                  (click)="deleteExpense(e)"
+                  aria-label="Excluir {{ e.description }}"
+                  type="button"
+                >🗑️</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── Pagination ─────────────────────────────────────────────────────── -->
+    @if (pagination() && pagination()!.total_pages > 1) {
+      <div class="pagination" role="navigation" aria-label="Paginação de gastos">
+        <button class="btn btn--secondary btn--sm" [disabled]="currentPage()===1" (click)="changePage(1)" aria-label="Primeira página">«</button>
+        <button class="btn btn--secondary btn--sm" [disabled]="currentPage()===1" (click)="changePage(currentPage()-1)" aria-label="Página anterior">‹</button>
+
+        @for (p of pageRange(); track p) {
+          <button
+            class="btn btn--sm"
+            [class.btn--primary]="p === currentPage()"
+            [class.btn--secondary]="p !== currentPage()"
+            (click)="changePage(p)"
+            [attr.aria-current]="p === currentPage() ? 'page' : null"
+          >{{ p }}</button>
+        }
+
+        <button class="btn btn--secondary btn--sm" [disabled]="currentPage()===pagination()!.total_pages" (click)="changePage(currentPage()+1)" aria-label="Próxima página">›</button>
+        <button class="btn btn--secondary btn--sm" [disabled]="currentPage()===pagination()!.total_pages" (click)="changePage(pagination()!.total_pages)" aria-label="Última página">»</button>
+
+        <span class="pagination__info text-muted">
+          Página {{ currentPage() }} de {{ pagination()!.total_pages }}
+          · {{ pagination()!.total_count }} gastos
+        </span>
+      </div>
+    }
+  }
+
+} @else if (!loadingExpenses() && !loadingInvoices()) {
+  <div class="empty-state">
+    <div class="empty-state__icon">📭</div>
+    <p class="empty-state__title">Selecione uma fatura</p>
+    <p class="empty-state__text">Escolha uma fatura acima para ver os gastos.</p>
+  </div>
+}
+
+<!-- ── Compartilhado — filtrado pelo periodo da fatura selecionada ── -->
+@if (filteredSharedEntries().length) {
+  <!-- Banner resumo compartilhado -->
+  <div class="shared-invoice-summary" style="margin-top:var(--space-lg);display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-base);padding:var(--space-base);background:#f8faff;border:1px solid #dce8ff;border-radius:10px">
+    <div>
+      <p class="kpi-card__label" style="font-size:12px">Minha parte compartilhada</p>
+      <p class="value-down mono" style="font-size:1.1rem;font-weight:600">{{ formatAmount(sharedSummary().mySpend) }}</p>
+    </div>
+    <div>
+      <p class="kpi-card__label" style="font-size:12px">A receber de outros</p>
+      <p class="value-up mono" style="font-size:1.1rem;font-weight:600">{{ formatAmount(sharedSummary().toReceive) }}</p>
+    </div>
+    <div>
+      <p class="kpi-card__label" style="font-size:12px">Custo líquido</p>
+      <p class="mono" style="font-size:1.1rem;font-weight:600">{{ formatAmount(sharedSummary().mySpend - sharedSummary().toReceive) }}</p>
+    </div>
+  </div>
+
+  <div class="data-table-wrapper" style="margin-top:var(--space-base)">
+    <table class="data-table" role="table" aria-label="Gastos compartilhados da fatura">
+      <thead>
+        <tr>
+          <th scope="col">Descrição</th>
+          <th scope="col">Categoria</th>
+          <th scope="col">Data</th>
+          <th scope="col" class="text-right">Minha parte</th>
+          <th scope="col" class="text-right">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (sharedInstallments().length) {
+          <tr><td colspan="5" class="table-subheader">🔁 Parcelados Compartilhados · {{ sharedInstallments().length }}</td></tr>
+          @for (s of sharedInstallments(); track s.id) {
+            <tr [class.shared-row--i-paid]="iPaid(s)">
+              <td style="font-weight:500">
+                {{ s.description }}
+                <span class="badge--shared">👤 {{ s.paid_by_name }}</span>
+                @if (iPaid(s)) { <span class="badge badge--success" style="font-size:11px">você pagou</span> }
+              </td>
+              <td><span class="text-muted" style="font-size:13px">Compartilhado</span></td>
+              <td class="mono text-muted" style="font-size:13px;white-space:nowrap">{{ formatDateFull(s.date) }}</td>
+              <td class="text-right">
+                <span class="value-down mono">{{ formatAmount(myPortion(s)) }}</span>
+                <br><span class="text-muted" style="font-size:11px">de {{ formatAmount(s.amount) }} total ({{ s.participant_count }}px)</span>
+                @if (iPaid(s)) {
+                  <br><span class="value-up" style="font-size:11px">+{{ formatAmount(othersOwe(s)) }} a receber</span>
+                }
+              </td>
+              <td class="text-right"><a [routerLink]="['/shared-debts', s.shared_debt]" class="btn btn--secondary btn--sm">Ver grupo</a></td>
+            </tr>
+          }
+        }
+        @if (sharedNormal().length) {
+          <tr><td colspan="5" class="table-subheader">🤝 Compartilhado · {{ sharedNormal().length }}</td></tr>
+          @for (s of sharedNormal(); track s.id) {
+            <tr [class.shared-row--i-paid]="iPaid(s)">
+              <td style="font-weight:500">
+                {{ s.description }}
+                <span class="badge--shared">👤 {{ s.paid_by_name }}</span>
+                @if (iPaid(s)) { <span class="badge badge--success" style="font-size:11px">você pagou</span> }
+              </td>
+              <td><span class="text-muted" style="font-size:13px">Compartilhado</span></td>
+              <td class="mono text-muted" style="font-size:13px;white-space:nowrap">{{ formatDateFull(s.date) }}</td>
+              <td class="text-right">
+                <span class="value-down mono">{{ formatAmount(myPortion(s)) }}</span>
+                <br><span class="text-muted" style="font-size:11px">de {{ formatAmount(s.amount) }} total ({{ s.participant_count }}px)</span>
+                @if (iPaid(s)) {
+                  <br><span class="value-up" style="font-size:11px">+{{ formatAmount(othersOwe(s)) }} a receber</span>
+                }
+              </td>
+              <td class="text-right"><a [routerLink]="['/shared-debts', s.shared_debt]" class="btn btn--secondary btn--sm">Ver grupo</a></td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+}
+

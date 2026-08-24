@@ -1,56 +1,56 @@
-// Google Fonts – Inter & JetBrains Mono
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
-@import 'styles/tokens';
-@import 'styles/base';
-@import 'styles/components';
-
-/* ── Global D3 chart tooltip ──────────────────────────────────────────── */
-.chart-tooltip {
-  position: fixed;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 0.8rem;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.14);
-  pointer-events: none;
-  z-index: 9999;
-  min-width: 190px;
-
-  &__title {
-    font-weight: 700;
-    font-size: 0.82rem;
-    color: #111827;
-    margin-bottom: 6px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid #f3f4f6;
-  }
-  &__row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    color: #6b7280;
-    margin-top: 4px;
-    font-size: 0.79rem;
-  }
-  &__row--total { font-weight: 700; color: #111827; font-size: 0.82rem; }
-  &__val { font-weight: 600; color: #374151; font-variant-numeric: tabular-nums; }
-  &__val--bold { font-weight: 700; color: #111827; }
-  &__divider { border-top: 1px solid #f3f4f6; margin: 5px 0; }
-}
-
-.dot {
-  display: inline-block;
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  margin-right: 5px;
-  flex-shrink: 0;
-  &--green  { background: #16a34a; }
-  &--red    { background: #ef4444; }
-  &--orange { background: #f97316; }
-  &--yellow { background: #fbbf24; }
-  &--indigo { background: #6366f1; }
-  &--blue   { background: #3b82f6; }
-}
+// Google Fonts – Inter & JetBrains Mono
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@import 'styles/tokens';
+@import 'styles/base';
+@import 'styles/components';
+
+/* ── Global D3 chart tooltip ──────────────────────────────────────────── */
+.chart-tooltip {
+  position: fixed;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.14);
+  pointer-events: none;
+  z-index: 9999;
+  min-width: 190px;
+
+  &__title {
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: #111827;
+    margin-bottom: 6px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    color: #6b7280;
+    margin-top: 4px;
+    font-size: 0.79rem;
+  }
+  &__row--total { font-weight: 700; color: #111827; font-size: 0.82rem; }
+  &__val { font-weight: 600; color: #374151; font-variant-numeric: tabular-nums; }
+  &__val--bold { font-weight: 700; color: #111827; }
+  &__divider { border-top: 1px solid #f3f4f6; margin: 5px 0; }
+}
+
+.dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+  flex-shrink: 0;
+  &--green  { background: #16a34a; }
+  &--red    { background: #ef4444; }
+  &--orange { background: #f97316; }
+  &--yellow { background: #fbbf24; }
+  &--indigo { background: #6366f1; }
+  &--blue   { background: #3b82f6; }
+}
