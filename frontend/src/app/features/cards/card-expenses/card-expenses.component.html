@@ -50,7 +50,7 @@
 
 <!-- ── Summary Cards ─────────────────────────────────────────────────────────── -->
 <div class="summary-row" style="margin-bottom: var(--space-lg)">
-  <div class="summary-card">
+  <div class="summary-card summary-card--invoice">
     <span class="summary-card__label">
       Total da Fatura
       @if (selectedCategoryId() || searchControl.value) {
@@ -58,13 +58,31 @@
       }
     </span>
     <span class="summary-card__value value-down mono">{{ formatAmount(filteredTotal()) }}</span>
+
+    @if (invoiceData()) {
+      <div class="invoice-composition">
+        <div class="invoice-composition__row">
+          <span class="invoice-composition__dot invoice-composition__dot--personal"></span>
+          <span class="invoice-composition__label">Gastos individuais</span>
+          <span class="invoice-composition__value mono">{{ formatAmount(expensesTotal()) }}</span>
+        </div>
+        <div class="invoice-composition__row">
+          <span class="invoice-composition__dot invoice-composition__dot--shared"></span>
+          <span class="invoice-composition__label">Minha parte (compartilhado)</span>
+          <span class="invoice-composition__value mono">{{ formatAmount(sharedTotal()) }}</span>
+        </div>
+        <div class="invoice-composition__total">
+          <span class="invoice-composition__label invoice-composition__label--strong">Total a pagar</span>
+          <span class="invoice-composition__value invoice-composition__value--strong mono">{{ formatAmount(filteredTotal()) }}</span>
+        </div>
+      </div>
+    }
   </div>
   <div class="summary-card">
     <span class="summary-card__label">Transações</span>
     <span class="summary-card__value mono">{{ totalTransactions() }}</span>
   </div>
 </div>
-
 <!-- ── Charts Section (independent from expense pagination) ──────────────────── -->
 @if (loadingChart()) {
   <div class="charts-grid charts-grid--loading">

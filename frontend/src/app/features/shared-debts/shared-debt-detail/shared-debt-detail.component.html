@@ -117,7 +117,13 @@
                   </td>
                   <td>
                     @if (e.payment_method === 'cartao') {
-                      <span class="chip chip--card">Cartao</span>
+                      @if (e.credit_card_name) {
+                        <span class="chip chip--card" [title]="e.credit_card_name">
+                          💳 {{ e.credit_card_name }}
+                        </span>
+                      } @else {
+                        <span class="chip chip--card">Cartao</span>
+                      }
                     } @else {
                       <span class="chip chip--cash">Dinheiro</span>
                     }

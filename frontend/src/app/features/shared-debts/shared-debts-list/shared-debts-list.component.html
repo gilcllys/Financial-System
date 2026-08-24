@@ -99,10 +99,10 @@
             <!-- Member Avatars -->
             <div class="sd-group__avatars" aria-label="Membros">
               @for (m of balances.members; track m.member_id) {
-                <div class="sd-avatar" [class.sd-avatar--me]="m.member_id === myId"
-                  [attr.title]="m.member_id === myId ? 'Você' : m.display_name">
-                  {{ initials(m.member_id === myId ? 'Você' : m.display_name) }}
-                  <span class="sd-avatar__name">{{ m.member_id === myId ? 'Você' : m.display_name }}</span>
+                @let label = m.member_id === myId ? 'Você' : m.display_name;
+                <div class="sd-avatar" [class.sd-avatar--me]="m.member_id === myId" [attr.title]="label">
+                  <div class="sd-avatar__circle">{{ initials(label) }}</div>
+                  <span class="sd-avatar__name">{{ label }}</span>
                 </div>
               }
             </div>

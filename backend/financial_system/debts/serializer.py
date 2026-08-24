@@ -23,12 +23,23 @@ class SharedEntrySerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True, default=None)
     shared_debt_name = serializers.CharField(source='shared_debt.name', read_only=True)
     participant_count = serializers.SerializerMethodField()
+    credit_card_name = serializers.SerializerMethodField()
 
     def get_participant_count(self, obj):
         count = obj.participants.count()
         if count == 0:
             count = obj.shared_debt.members.count()
         return max(count, 1)
+
+    def get_credit_card_name(self, obj):
+        # So exibe o nome do cartao para o proprio pagador
+        request = self.context.get('request')
+        if not request or not obj.credit_card_id:
+            return None
+        my_tenant = getattr(request.user, 'tenant_id', None)
+        if obj.paid_by.tenant_id == my_tenant:
+            return obj.credit_card.name if obj.credit_card else None
+        return None
 
     class Meta:
         model = SharedEntry
@@ -44,6 +55,7 @@ class SharedEntrySerializer(serializers.ModelSerializer):
             'date',
             'payment_method',
             'credit_card',
+            'credit_card_name',
             'category',
             'category_name',
             'participant_count',

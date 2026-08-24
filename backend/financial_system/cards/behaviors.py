@@ -227,6 +227,22 @@ class InvoiceExpensesBehavior:
         offset = (self.page - 1) * self.page_size
         page_qs = qs[offset: offset + self.page_size]
 
+
+        # ── Minha parte das dividas compartilhadas pagas neste cartao no periodo ──
+        from debts.models import SharedEntry as _SharedEntry
+        _shared_entries = _SharedEntry.objects.filter(
+            credit_card_id=self.card.id,
+            date__gte=period_start,
+            date__lte=period_end,
+            paid_by__tenant_id=self.card.tenant_id,
+        ).prefetch_related('participants', 'shared_debt__members')
+        _shared_my_total = 0.0
+        for _e in _shared_entries:
+            _p = _e.participants.count() or _e.shared_debt.members.count() or 1
+            _shared_my_total += abs(float(_e.amount)) / _p
+        _shared_my_total = round(_shared_my_total, 2)
+        _expenses_total = grand_total
+        _composite_total = round(_expenses_total + _shared_my_total, 2)
         return Response(
             {
                 'invoice_month': self.invoice_month,
@@ -235,7 +251,7 @@ class InvoiceExpensesBehavior:
                 'period_start': period_start.isoformat(),
                 'period_end': period_end.isoformat(),
                 'due_date': due.isoformat(),
-                'summary': {'total': grand_total, 'count': agg['count'] or 0},
+                'summary': {'total': _composite_total, 'expenses_total': _expenses_total, 'shared_total': _shared_my_total, 'count': agg['count'] or 0},
                 'by_category': by_category,
                 'pagination': {
                     'page': self.page,

@@ -32,6 +32,7 @@ export interface SharedDebtEntry {
   date: string;
   payment_method: 'dinheiro' | 'cartao';
   credit_card: number | null;
+  credit_card_name: string | null;
   category: number | null;
   category_name: string | null;
   participant_count: number;
