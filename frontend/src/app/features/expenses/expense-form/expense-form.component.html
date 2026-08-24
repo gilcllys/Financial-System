@@ -1,496 +1,299 @@
-<div class="page-header">
-  <div class="page-header__left">
-    <h1 class="page-header__title">{{ isEdit() ? 'Editar Gasto' : 'Novo Gasto' }}</h1>
-    <p class="page-header__subtitle">{{ isEdit() ? 'Atualize as informações do gasto' : 'Registre uma nova despesa ou receita' }}</p>
+﻿<!-- Page header -->
+<div class="page-top">
+  <div>
+    <h1 class="page-top__title">{{ isEdit() ? "Editar Gasto" : "Novo Gasto" }}</h1>
+    <p class="page-top__sub">Cadastre uma nova saida ou entrada</p>
   </div>
-  <a routerLink="/home" class="btn btn--secondary btn--sm">← Voltar</a>
+  <button class="btn-save" type="button" (click)="isEdit() ? submit() : null">Salvar</button>
 </div>
 
 @if (!isEdit()) {
-  <div class="mode-toggle" role="group" aria-label="Tipo de gasto">
-    <button type="button" class="mode-toggle__btn" [class.mode-toggle__btn--active]="mode() === 'individual'"
-      (click)="setMode('individual')">Individual</button>
-    <button type="button" class="mode-toggle__btn" [class.mode-toggle__btn--active]="mode() === 'shared'"
-      (click)="setMode('shared')">Compartilhado</button>
-    <button type="button" class="mode-toggle__btn" [class.mode-toggle__btn--active]="mode() === 'recurring'"
-      (click)="setMode('recurring')">🔁 Gastos Fixos</button>
+  <!-- Mode toggle -->
+  <div class="mode-row">
+    <div class="mode-toggle" role="group" aria-label="Modo">
+      <button type="button" class="mode-toggle__btn"
+        [class.mode-toggle__btn--active]="mode() === 'individual'"
+        (click)="setMode('individual')">Individual</button>
+      <button type="button" class="mode-toggle__btn"
+        [class.mode-toggle__btn--active]="mode() === 'shared'"
+        (click)="setMode('shared')">Compartilhado</button>
+      <button type="button" class="mode-toggle__btn"
+        [class.mode-toggle__btn--active]="mode() === 'recurring'"
+        (click)="setMode('recurring')">Gastos Fixos</button>
+    </div>
+    <a routerLink="/home" class="link-manage">Gerenciar gastos fixos &rarr;</a>
   </div>
 }
 
+<!-- ══ INDIVIDUAL / EDIT ══ -->
+@if (mode() === 'individual' || isEdit()) {
+  @if (loading()) {
+    <div class="loading-wrapper"><span class="spinner"></span> Carregando...</div>
+  } @else {
+    <div class="form-card">
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
 
-@if (mode() === 'shared') {
-  <div class="card">
-    <!-- Seleção de grupo -->
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label" for="group_select">Grupo de Dívida *</label>
-        <select id="group_select" class="form-select"
-          [ngModel]="selectedGroupId()"
-          (ngModelChange)="onGroupSelect($event)">
-          <option [ngValue]="null" disabled>Selecione o grupo</option>
-          @for (g of sharedGroups(); track g.id) {
-            <option [ngValue]="g.id">{{ g.name }}</option>
+        <!-- Descricao -->
+        <div class="form-group">
+          <label class="form-label" for="f-desc">Descricao</label>
+          <input id="f-desc" class="form-input" type="text" formControlName="description"
+            placeholder="Ex: Compra de Moveis para Sala" autocomplete="off"/>
+          @if (hasError('description')) {
+            <span class="form-error">Descricao e obrigatoria.</span>
           }
-        </select>
-        @if (sharedGroups().length === 0) {
-          <span class="form-hint">Você não tem grupos compartilhados. <a routerLink="/shared-debts">Criar um grupo →</a></span>
-        }
-      </div>
-    </div>
+        </div>
 
-    @if (selectedGroupId() && sharedMembers().length > 0) {
-      <form [formGroup]="sharedForm" (ngSubmit)="submitShared()" novalidate>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label" for="s-description">Descrição *</label>
-            <input id="s-description" class="form-input" type="text"
-              formControlName="description" placeholder="Ex: Jantar" autocomplete="off" />
-            @if (sharedForm.get('description')?.invalid && sharedForm.get('description')?.touched) {
-              <span class="form-error">Descrição é obrigatória.</span>
+        <!-- Categoria -->
+        <div class="form-group">
+          <label class="form-label" for="f-cat">Categoria</label>
+          <select id="f-cat" class="form-select" formControlName="category_id">
+            <option [ngValue]="null">Selecione a categoria...</option>
+            @for (c of categories(); track c.id) {
+              <option [value]="c.id">{{ c.name }}</option>
             }
+          </select>
+          @if (hasError('category_id')) {
+            <span class="form-error">Selecione uma categoria.</span>
+          }
+        </div>
+
+        <!-- Metodo de pagamento -->
+        <div class="form-group">
+          <label class="form-label">Metodo de pagamento</label>
+          <div class="payment-toggle">
+            <button type="button" class="payment-toggle__btn"
+              [class.payment-toggle__btn--active]="form.value.payment_method === 'dinheiro'"
+              (click)="form.patchValue({payment_method:'dinheiro', credit_card_id:null})">
+              Dinheiro
+            </button>
+            <button type="button" class="payment-toggle__btn"
+              [class.payment-toggle__btn--active]="form.value.payment_method === 'cartao'"
+              (click)="form.patchValue({payment_method:'cartao'})">
+              Cartao de Credito
+            </button>
           </div>
         </div>
 
-        <div class="form-row form-row--2col">
+        @if (isCartao) {
           <div class="form-group">
-            <label class="form-label" for="s-amount">Valor *</label>
-            <input id="s-amount" class="form-input mono" type="number" step="0.01" min="0.01"
-              formControlName="amount" placeholder="250.00" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="s-date">Data *</label>
-            <input id="s-date" class="form-input" type="date" formControlName="date" />
-          </div>
-        </div>
-
-        <div class="form-row form-row--2col">
-          <div class="form-group">
-            <label class="form-label" for="s-paid_by">Pago por *</label>
-            <select id="s-paid_by" class="form-select" formControlName="paid_by">
-              <option [ngValue]="null" disabled>Selecione quem pagou</option>
-              @for (m of sharedMembers(); track m.id) {
-                <option [ngValue]="m.id">{{ m.display_name }}</option>
+            <select class="form-select" formControlName="credit_card_id">
+              <option [ngValue]="null">Selecione o cartao...</option>
+              @for (c of cards(); track c.id) {
+                <option [value]="c.id">{{ c.name }} (****{{ c.last_four_digits }} | Fecha dia {{ c.closing_day }})</option>
               }
             </select>
           </div>
+        }
+
+        <!-- Valor + Data -->
+        <div class="form-row">
           <div class="form-group">
-            <label class="form-label" for="s-category">Categoria</label>
-            <select id="s-category" class="form-select" formControlName="category_id">
-              <option [ngValue]="null">Sem categoria</option>
-              @for (cat of categories(); track cat.id) {
-                <option [ngValue]="cat.id">{{ cat.name }}</option>
-              }
-            </select>
+            <label class="form-label" for="f-amount">Valor</label>
+            <input id="f-amount" class="form-input mono" type="number" step="0.01" min="0.01"
+              formControlName="amount" placeholder="R$ 0,00"/>
+            @if (hasError('amount')) { <span class="form-error">Valor invalido.</span> }
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="f-date">Data</label>
+            <input id="f-date" class="form-input" type="date" formControlName="date"/>
           </div>
         </div>
 
-        <div class="form-row">
-          <fieldset class="form-group">
-            <legend class="form-label">Participantes (quem divide) *</legend>
-            <div class="participants">
-              @for (m of sharedMembers(); track m.id) {
-                <label class="participant-chip" [class.participant-chip--on]="isSharedParticipant(m.id)">
-                  <input type="checkbox" [checked]="isSharedParticipant(m.id)" (change)="toggleSharedParticipant(m.id)" />
-                  <span>{{ m.display_name }}</span>
-                </label>
-              }
-            </div>
-          </fieldset>
+        <!-- Toggles: receita + parcelado -->
+        <div class="toggles-row">
+          <div class="toggle-item">
+            <span class="form-label" style="margin-bottom:0">E uma receita?</span>
+            <label class="toggle-switch" aria-label="E uma receita">
+              <input type="checkbox" [checked]="isIncome()" (change)="toggleType(!isIncome())"/>
+              <span class="toggle-switch__track"></span>
+            </label>
+          </div>
+          <div class="toggle-item">
+            <span class="form-label" style="margin-bottom:0">Parcelado?</span>
+            <label class="toggle-switch" aria-label="Parcelado">
+              <input type="checkbox" formControlName="is_installment"/>
+              <span class="toggle-switch__track"></span>
+            </label>
+          </div>
         </div>
 
-        <div class="form-row">
-          <fieldset class="form-group">
-            <legend class="form-label">Método de Pagamento</legend>
-            <div class="radio-group">
-              <label class="radio-option">
-                <input type="radio" formControlName="payment_method" value="dinheiro" />
-                <span class="radio-btn">💵 Dinheiro</span>
-              </label>
-              <label class="radio-option">
-                <input type="radio" formControlName="payment_method" value="cartao" />
-                <span class="radio-btn">💳 Cartão</span>
-              </label>
-            </div>
-          </fieldset>
-        </div>
+        <!-- Numero de parcelas (condicional) -->
+        @if (isInstallment) {
+          <div class="form-group">
+            <label class="form-label" for="f-inst">Numero de parcelas</label>
+            <input id="f-inst" class="form-input" type="number" min="2" max="60"
+              formControlName="installments" style="max-width:140px"/>
+          </div>
+        }
 
-        @if (sharedIsCartao && cards().length) {
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" for="s-card">Cartão</label>
-              <select id="s-card" class="form-select" formControlName="credit_card_id">
-                <option [ngValue]="null">Nenhum</option>
-                @for (card of cards(); track card.id) {
-                  <option [ngValue]="card.id">{{ card.name }} •••• {{ card.last_four_digits }}</option>
-                }
-              </select>
-            </div>
+        <!-- Preview de parcelamento -->
+        @if (installmentPreview(); as prev) {
+          <div class="installment-preview">
+            <span class="installment-preview__icon">&#9432;</span>
+            <span>
+              {{ prev.count }}x de R$ {{ prev.perInstallment | number:'1.2-2' }} =
+              R$ {{ prev.total | number:'1.2-2' }} total
+              &mdash; de {{ prev.firstMonth }} a {{ prev.lastMonth }}
+            </span>
           </div>
         }
 
         @if (errorMessage()) {
-          <div class="form-error-box" role="alert">{{ errorMessage() }}</div>
+          <div class="error-box" role="alert">{{ errorMessage() }}</div>
         }
 
-        <div class="form-actions">
-          <a routerLink="/home" class="btn btn--secondary">Cancelar</a>
-          <button type="submit" class="btn btn--primary" [disabled]="savingShared()">
-            @if (savingShared()) { <span class="spinner"></span> } Salvar compartilhado
-          </button>
+        <button type="submit" class="btn-criar" [disabled]="saving()">
+          @if (saving()) { <span class="spinner"></span> }
+          {{ isEdit() ? "Salvar alteracoes" : "Criar Gasto" }}
+        </button>
+      </form>
+    </div>
+  }
+}
+
+<!-- ══ COMPARTILHADO ══ -->
+@if (mode() === 'shared' && !isEdit()) {
+  <div class="form-card">
+    <div class="form-group">
+      <label class="form-label" for="sg-group">Grupo de Divida *</label>
+      <select id="sg-group" class="form-select"
+        [ngModel]="selectedGroupId()"
+        (ngModelChange)="onGroupSelect($event)">
+        <option [ngValue]="null" disabled>Selecione o grupo</option>
+        @for (g of sharedGroups(); track g.id) {
+          <option [ngValue]="g.id">{{ g.name }}</option>
+        }
+      </select>
+      @if (sharedGroups().length === 0) {
+        <span class="form-hint">Voce nao tem grupos. <a routerLink="/shared-debts">Criar um grupo &rarr;</a></span>
+      }
+    </div>
+
+    @if (selectedGroupId() && sharedMembers().length > 0) {
+      <form [formGroup]="sharedForm" (ngSubmit)="submitShared()" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="sg-desc">Descricao *</label>
+          <input id="sg-desc" class="form-input" type="text" formControlName="description" placeholder="Ex: Jantar"/>
         </div>
+
+        <div class="form-group">
+          <label class="form-label" for="sg-cat">Categoria</label>
+          <select id="sg-cat" class="form-select" formControlName="category_id">
+            <option [ngValue]="null">Sem categoria</option>
+            @for (c of categories(); track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Metodo de pagamento</label>
+          <div class="payment-toggle">
+            <button type="button" class="payment-toggle__btn"
+              [class.payment-toggle__btn--active]="sharedForm.value.payment_method === 'dinheiro'"
+              (click)="sharedForm.patchValue({payment_method:'dinheiro', credit_card_id:null})">Dinheiro</button>
+            <button type="button" class="payment-toggle__btn"
+              [class.payment-toggle__btn--active]="sharedForm.value.payment_method === 'cartao'"
+              (click)="sharedForm.patchValue({payment_method:'cartao'})">Cartao de Credito</button>
+          </div>
+        </div>
+
+        @if (sharedIsCartao) {
+          <div class="form-group">
+            <select class="form-select" formControlName="credit_card_id">
+              <option [ngValue]="null">Selecione o cartao...</option>
+              @for (c of cards(); track c.id) {
+                <option [value]="c.id">{{ c.name }} (****{{ c.last_four_digits }} | Fecha dia {{ c.closing_day }})</option>
+              }
+            </select>
+          </div>
+        }
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="sg-amount">Valor *</label>
+            <input id="sg-amount" class="form-input mono" type="number" step="0.01" min="0.01"
+              formControlName="amount" placeholder="R$ 0,00"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="sg-date">Data *</label>
+            <input id="sg-date" class="form-input" type="date" formControlName="date"/>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="sg-paid">Pago por *</label>
+          <select id="sg-paid" class="form-select" formControlName="paid_by">
+            <option [ngValue]="null" disabled>Selecione quem pagou</option>
+            @for (m of sharedMembers(); track m.id) {
+              <option [ngValue]="m.id">{{ m.display_name }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Participantes *</label>
+          <div class="participants-wrap">
+            @for (m of sharedMembers(); track m.id) {
+              <label class="participant-chip" [class.participant-chip--on]="isSharedParticipant(m.id)">
+                <input type="checkbox" [checked]="isSharedParticipant(m.id)" (change)="toggleSharedParticipant(m.id)"/>
+                <span>{{ m.display_name }}</span>
+              </label>
+            }
+          </div>
+        </div>
+
+        @if (errorMessage()) { <div class="error-box">{{ errorMessage() }}</div> }
+        <button type="submit" class="btn-criar" [disabled]="savingShared()">
+          @if (savingShared()) { <span class="spinner"></span> }
+          Criar Gasto Compartilhado
+        </button>
       </form>
     }
   </div>
 }
 
-@if (mode() === 'individual') {
-@if (loading()) {
-  <div class="loading-wrapper" aria-live="polite">
-    <span class="spinner"></span> Carregando...
-  </div>
-} @else {
-  <div class="card">
-    <form [formGroup]="form" (ngSubmit)="submit()" novalidate aria-label="Formulário de gasto">
-
-      <!-- Description -->
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label" for="description">Descrição *</label>
-          <input
-            id="description"
-            class="form-input"
-            [class.error]="hasError('description')"
-            type="text"
-            formControlName="description"
-            placeholder="Ex: Compra no supermercado"
-            autocomplete="off"
-          />
-          @if (hasError('description')) {
-            <span class="form-error" role="alert">Descrição é obrigatória (mín. 2 caracteres).</span>
-          }
-        </div>
-      </div>
-
-      <!-- Tipo: Receita ou Despesa -->
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Tipo *</label>
-          <div class="type-toggle" role="group" aria-label="Tipo de lançamento">
-            <button
-              type="button"
-              class="type-toggle__btn"
-              [class.type-toggle__btn--expense]="!isIncome()"
-              [class.active]="!isIncome()"
-              (click)="toggleType(false)"
-            >
-              📤 Despesa (saída)
-            </button>
-            <button
-              type="button"
-              class="type-toggle__btn"
-              [class.type-toggle__btn--income]="isIncome()"
-              [class.active]="isIncome()"
-              (click)="toggleType(true)"
-            >
-              📥 Receita (entrada)
-            </button>
+<!-- ══ GASTOS FIXOS ══ -->
+@if (mode() === 'recurring' && !isEdit()) {
+  <div class="form-card">
+    <div class="section-subtitle">Gastos Fixos Recorrentes</div>
+    @if (recurringTemplates().length > 0) {
+      <div class="recurring-list">
+        @for (t of recurringTemplates(); track t.id) {
+          <div class="recurring-item">
+            <div class="recurring-item__info">
+              <span class="recurring-item__name">{{ t.description }}</span>
+              <span class="text-muted" style="font-size:13px">Todo dia {{ t.day_of_month }} &middot; {{ t.payment_method }}</span>
+            </div>
+            <span class="recurring-item__amount mono">R$ {{ t.amount | number:'1.2-2' }}</span>
+            <button type="button" class="btn-icon-danger" (click)="deleteRecurring(t.id)">x</button>
           </div>
-        </div>
+        }
       </div>
-
-      <!-- Amount + Date -->
-      <div class="form-row form-row--2col">
-        <div class="form-group">
-          <label class="form-label" for="amount">
-            Valor *
-            <span class="form-hint type-hint" [class.type-hint--income]="isIncome()" [class.type-hint--expense]="!isIncome()">
-              {{ isIncome() ? '+ Receita' : '- Despesa' }}
-            </span>
-          </label>
-          <input
-            id="amount"
-            class="form-input mono"
-            [class.error]="hasError('amount')"
-            [class.input--income]="isIncome()"
-            [class.input--expense]="!isIncome()"
-            type="number"
-            step="0.01"
-            min="0.01"
-            formControlName="amount"
-            placeholder="250.00"
-          />
-          @if (hasError('amount')) {
-            <span class="form-error" role="alert">Valor é obrigatório (maior que zero).</span>
-          }
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="date">Data *</label>
-          <input
-            id="date"
-            class="form-input"
-            type="date"
-            formControlName="date"
-            [class.error]="hasError('date')"
-          />
-        </div>
-      </div>
-
-      <!-- Category -->
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label" for="category_id">Categoria *</label>
-          <select
-            id="category_id"
-            class="form-select"
-            [class.error]="hasError('category_id')"
-            formControlName="category_id"
-          >
-            <option [value]="null" disabled>Selecione uma categoria</option>
-            @for (cat of categories(); track cat.id) {
-              <option [value]="cat.id">{{ cat.name }}</option>
-            }
-          </select>
-          @if (hasError('category_id')) {
-            <span class="form-error" role="alert">Categoria é obrigatória.</span>
-          }
-        </div>
-      </div>
-
-      <!-- Payment Method -->
-      <div class="form-row">
-        <fieldset class="form-group">
-          <legend class="form-label">Método de Pagamento *</legend>
-          <div class="radio-group" role="radiogroup">
-            <label class="radio-option">
-              <input type="radio" formControlName="payment_method" value="dinheiro" />
-              <span class="radio-btn">💵 Dinheiro</span>
-            </label>
-            <label class="radio-option">
-              <input type="radio" formControlName="payment_method" value="cartao" />
-              <span class="radio-btn">💳 Cartão</span>
-            </label>
-          </div>
-        </fieldset>
-      </div>
-
-      <!-- Credit Card (conditional) -->
-      @if (isCartao) {
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label" for="credit_card_id">Cartão de Crédito *</label>
-            <select
-              id="credit_card_id"
-              class="form-select"
-              [class.error]="hasError('credit_card_id')"
-              formControlName="credit_card_id"
-            >
-              <option [value]="null" disabled>Selecione o cartão</option>
-              @for (card of cards(); track card.id) {
-                <option [value]="card.id">{{ card.name }} •••• {{ card.last_four_digits }}</option>
-              }
-            </select>
-            @if (hasError('credit_card_id')) {
-              <span class="form-error" role="alert">Selecione o cartão.</span>
-            }
-          </div>
-        </div>
-      }
-
-      <!-- Installment toggle -->
-      <div class="form-row">
-        <label class="toggle-label" for="is_installment">
-          <span class="toggle-text">É parcelado?</span>
-          <span class="toggle-switch" role="switch" [attr.aria-checked]="isInstallment">
-            <input type="checkbox" id="is_installment" formControlName="is_installment" />
-            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-          </span>
-        </label>
-      </div>
-
-      <!-- Number of installments (conditional) -->
-      @if (isInstallment) {
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label" for="installments">Número de Parcelas *</label>
-            <input
-              id="installments"
-              class="form-input mono"
-              type="number"
-              min="2"
-              max="60"
-              formControlName="installments"
-              placeholder="Ex: 12"
-            />
-            <span class="form-hint">Entre 2 e 60 parcelas</span>
-          </div>
-        </div>
-      }
-
-      <!-- Quantity -->
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label" for="quantity">
-            Quantidade
-            @if (isInstallment) {
-              <span class="form-hint"> — fixo em 1 quando parcelado</span>
-            } @else {
-              <span class="form-hint"> — cria N registros independentes</span>
-            }
-          </label>
-          <input
-            id="quantity"
-            class="form-input mono"
-            type="number"
-            min="1"
-            formControlName="quantity"
-          />
-        </div>
-      </div>
-
-      <!-- Error message -->
-      @if (errorMessage()) {
-        <div class="form-error-box" role="alert">{{ errorMessage() }}</div>
-      }
-
-      <!-- Actions -->
-      <div class="form-actions">
-        <a routerLink="/expenses" class="btn btn--secondary">Cancelar</a>
-        <button type="submit" class="btn btn--primary" [disabled]="saving()">
-          @if (saving()) { <span class="spinner"></span> } Salvar
-        </button>
-      </div>
-
-    </form>
-  </div>
-}
-}
-
-@if (mode() === 'recurring') {
-  <div class="card">
-    <div class="recurring-header">
-      <div>
-        <h2 class="section-title">🔁 Gastos Fixos</h2>
-        <p class="section-sub">Despesas que se repetem todo mês em um dia fixo</p>
-      </div>
-      <div class="recurring-actions">
-        <button type="button" class="btn btn--secondary btn--sm" (click)="generateCurrentMonth()">
-          ⚡ Gerar mês atual
-        </button>
-        <button type="button" class="btn btn--primary btn--sm" (click)="showRecurringForm.set(true)">
-          + Novo
-        </button>
-      </div>
-    </div>
-
-    @if (generateResult()) {
-      <div class="alert alert--success">
-        ✅ {{ generateResult()!.created }} despesas geradas · {{ generateResult()!.skipped }} já existiam
-      </div>
+    } @else {
+      <p class="text-muted" style="font-size:13px;margin-bottom:16px">Nenhum gasto fixo cadastrado.</p>
     }
+
+    <button type="button" class="btn-secondary" (click)="showRecurringForm.set(!showRecurringForm())">
+      {{ showRecurringForm() ? "Cancelar" : "+ Novo Gasto Fixo" }}
+    </button>
 
     @if (showRecurringForm()) {
-      <div class="card card--inner">
-        <h3 class="form-section-title">Novo Gasto Fixo</h3>
-        <form [formGroup]="recurringForm" (ngSubmit)="saveRecurring()" novalidate>
-          <div class="form-row form-row--2col">
-            <div class="form-group">
-              <label class="form-label">Descrição *</label>
-              <input class="form-input" type="text" formControlName="description" placeholder="Ex: Netflix" />
-              @if (recurringForm.get('description')?.invalid && recurringForm.get('description')?.touched) {
-                <span class="form-error">Obrigatório</span>
-              }
-            </div>
-            <div class="form-group">
-              <label class="form-label">Valor (R$) *</label>
-              <input class="form-input mono" type="number" step="0.01" min="0.01" formControlName="amount" placeholder="49.90" />
-            </div>
+      <form [formGroup]="recurringForm" (ngSubmit)="saveRecurring()" style="margin-top:16px" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="r-desc">Descricao *</label>
+          <input id="r-desc" class="form-input" type="text" formControlName="description"/>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="r-amount">Valor *</label>
+            <input id="r-amount" class="form-input mono" type="number" step="0.01" formControlName="amount"/>
           </div>
-          <div class="form-row form-row--2col">
-            <div class="form-group">
-              <label class="form-label">Dia do mês *</label>
-              <input class="form-input mono" type="number" min="1" max="28" formControlName="day_of_month" placeholder="1-28" />
-              <span class="form-hint">Todo mês o gasto será lançado nesse dia</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Categoria</label>
-              <select class="form-select" formControlName="category_id">
-                <option [ngValue]="null">Sem categoria</option>
-                @for (cat of categories(); track cat.id) {
-                  <option [ngValue]="cat.id">{{ cat.name }}</option>
-                }
-              </select>
-            </div>
+          <div class="form-group">
+            <label class="form-label" for="r-day">Dia do mes</label>
+            <input id="r-day" class="form-input" type="number" min="1" max="28" formControlName="day_of_month"/>
           </div>
-          <div class="form-row">
-            <fieldset class="form-group">
-              <legend class="form-label">Método de Pagamento *</legend>
-              <div class="radio-group">
-                <label class="radio-option">
-                  <input type="radio" formControlName="payment_method" value="dinheiro" />
-                  <span class="radio-btn">💵 Dinheiro</span>
-                </label>
-                <label class="radio-option">
-                  <input type="radio" formControlName="payment_method" value="cartao" />
-                  <span class="radio-btn">💳 Cartão</span>
-                </label>
-              </div>
-            </fieldset>
-          </div>
-          <div class="form-actions">
-            <button type="button" class="btn btn--secondary" (click)="showRecurringForm.set(false)">Cancelar</button>
-            <button type="submit" class="btn btn--primary" [disabled]="savingRecurring()">
-              @if (savingRecurring()) { <span class="spinner"></span> } Salvar
-            </button>
-          </div>
-        </form>
-      </div>
-    }
-
-    @if (recurringTemplates().length === 0 && !showRecurringForm()) {
-      <div class="empty-state">
-        <p>Nenhum gasto fixo cadastrado ainda.</p>
-        <button type="button" class="btn btn--primary" (click)="showRecurringForm.set(true)">Cadastrar primeiro gasto fixo</button>
-      </div>
-    }
-
-    @if (recurringTemplates().length > 0) {
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Descrição</th>
-            <th>Valor</th>
-            <th>Dia</th>
-            <th>Pagamento</th>
-            <th>Categoria</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (t of recurringTemplates(); track t.id) {
-            <tr [class.row--inactive]="!t.is_active">
-              <td>{{ t.description }}</td>
-              <td class="mono">R$ {{ t.amount | number:'1.2-2' }}</td>
-              <td class="mono">dia {{ t.day_of_month }}</td>
-              <td>{{ t.payment_method }}</td>
-              <td>{{ t.category_name ?? '—' }}</td>
-              <td>
-                <span class="badge" [class.badge--active]="t.is_active" [class.badge--inactive]="!t.is_active">
-                  {{ t.is_active ? 'Ativo' : 'Inativo' }}
-                </span>
-              </td>
-              <td class="actions">
-                <button type="button" class="btn btn--ghost btn--sm" (click)="toggleRecurring(t.id)"
-                  [title]="t.is_active ? 'Desativar' : 'Ativar'">
-                  {{ t.is_active ? '⏸' : '▶' }}
-                </button>
-                <button type="button" class="btn btn--ghost btn--sm btn--danger" (click)="deleteRecurring(t.id)" title="Excluir">🗑</button>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
+        </div>
+        <button type="submit" class="btn-criar" style="margin-top:8px" [disabled]="savingRecurring()">Salvar</button>
+      </form>
     }
   </div>
 }

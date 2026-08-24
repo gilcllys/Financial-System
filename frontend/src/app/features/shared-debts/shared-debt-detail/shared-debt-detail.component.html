@@ -1,648 +1,461 @@
-<div class="page-header">
-  <div class="page-header__left">
-    <h1 class="page-header__title">👥 {{ group()?.name ?? 'Grupo' }}</h1>
-    <p class="page-header__subtitle">Despesas compartilhadas do grupo</p>
+﻿<!-- Page Header -->
+<div class="detail-header">
+  <div class="detail-header__left">
+    <h1 class="detail-header__title">Grupo: {{ group()?.name ?? "..." }}</h1>
+    <p class="detail-header__sub">{{ members().length }} membros &middot; {{ totalCount() }} lancamentos</p>
   </div>
-  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    <a routerLink="/shared-debts" class="btn btn--secondary btn--sm">← Grupos</a>
-    <button class="btn btn--secondary btn--sm" type="button" (click)="invite()" [disabled]="inviting()">
-      @if (inviting()) { <span class="spinner"></span> } 🔗 Convidar
-    </button>
+  <div class="detail-header__actions">
+    <a routerLink="/shared-debts" class="btn-back">&larr; Grupos</a>
     @if (isOwner) {
-      <button class="btn btn--danger btn--sm" type="button"
-        (click)="deleteGroup()" [disabled]="deletingGroup()"
-        aria-label="Excluir grupo {{ group()?.name }}">
-        @if (deletingGroup()) { <span class="spinner"></span> } 🗑️ Excluir grupo
+      <button class="btn-danger" type="button" (click)="deleteGroup()" [disabled]="deletingGroup()">
+        Excluir grupo
       </button>
     }
+    <button class="btn-primary" type="button" (click)="toggleEntryForm()">+ Novo Gasto</button>
   </div>
 </div>
 
-@if (inviteUrl(); as url) {
-  <div class="invite-box" role="status">
-    <span class="invite-box__label">Link de convite:</span>
-    <input class="invite-box__input mono" type="text" [value]="url" readonly aria-label="Link de convite" />
-    <button class="btn btn--primary btn--sm" type="button" (click)="copyInvite()">
-      {{ copied() ? '✓ Copiado' : 'Copiar' }}
-    </button>
-  </div>
-}
-
 @if (loading()) {
-  <div class="loading-wrapper" aria-live="polite"><span class="spinner"></span> Carregando...</div>
+  <div class="loading-wrapper"><span class="spinner"></span> Carregando...</div>
 } @else {
 
-  <!-- ── Acerto de contas ─────────────────────────────────────────────────── -->
+  <!-- Settlement Banner -->
   @if (balances(); as bal) {
-    <div class="card settle-card">
-      <h2 class="settle-card__title">Acerto de contas</h2>
-
-      @if (bal.settlement.length === 0) {
-        <p class="settle-card__ok">✓ Tudo quitado — ninguém deve nada.</p>
-      } @else {
-        <ul class="settle-list">
-          @for (s of bal.settlement; track s.from_member_id + '-' + s.to_member_id) {
-            <li class="settle-list__item">
-              <strong>{{ s.from_name }}</strong> paga
-              <strong class="value-down mono">{{ formatCurrency(s.amount) }}</strong>
-              para <strong>{{ s.to_name }}</strong>
-            </li>
-          }
-        </ul>
-      }
-
-      <div class="member-balances">
-        @for (m of bal.members; track m.member_id) {
-          <div class="member-balances__row">
-            <span class="member-balances__name">{{ m.display_name }}</span>
-            <span
-              class="member-balances__value mono"
-              [class.value-up]="m.balance > 0"
-              [class.value-down]="m.balance < 0"
-            >
-              @if (m.balance > 0) { +{{ formatCurrency(m.balance) }} }
-              @else if (m.balance < 0) { -{{ formatCurrency(m.balance) }} }
-              @else { {{ formatCurrency(0) }} }
-            </span>
-          </div>
+    @if (bal.settlement.length > 0) {
+      <div class="settle-banner">
+        @for (s of bal.settlement; track s.from_member_id) {
+          <span class="settle-item">
+            <strong>{{ s.from_name }}</strong>
+            <span class="settle-arrow">&rarr;</span>
+            pagar <strong class="settle-amount">{{ formatCurrency(s.amount) }}</strong>
+            para <strong>{{ s.to_name }}</strong>
+          </span>
+          @if (!$last) { <span class="settle-divider">|</span> }
         }
       </div>
-    </div>
-  }
-
-  <!-- ── Gráfico por categoria ─────────────────────────────────────────────── -->
-  @if (categoryBreakdown().length > 0) {
-    <div class="card" style="margin-bottom: var(--space-md)">
-      <div class="card__header">
-        <span class="card__title">🍕 Gastos por Categoria</span>
-        <span class="text-muted" style="font-size:0.8rem">{{ categoryBreakdown().length }} categorias</span>
-      </div>
-      <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;padding:12px 16px">
-        <div #pieChartEl></div>
-        <div style="flex:1;min-width:140px">
-          @for (item of categoryBreakdown(); track item.name; let i = $index) {
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:0.82rem">
-              <span [style.background]="pieColors[i % pieColors.length]" style="width:10px;height:10px;border-radius:50%;flex-shrink:0"></span>
-              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.name }}</span>
-              <span style="font-weight:600">{{ formatCurrencyPie(item.total) }}</span>
-            </div>
-          }
-        </div>
-      </div>
-    </div>
-  }
-
-  <!-- ── Despesas ─────────────────────────────────────────────────────────── -->
-  <div class="page-header" style="margin-top: var(--space-lg)">
-    <h2 class="section-title" style="margin:0">Despesas</h2>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn--secondary btn--sm" type="button" (click)="toggleBatchSection()">
-        {{ showBatchSection() ? '✕ Fechar lote' : '📋 Vários de uma vez' }}
-      </button>
-      <button class="btn btn--primary btn--sm" type="button"
-        (click)="editingEntryId.set(null); toggleEntryForm()">
-        {{ showEntryForm() ? '✕ Fechar' : '＋ Nova despesa' }}
-      </button>
-    </div>
-  </div>
-
-  <!-- ── Filtros ──────────────────────────────────────────────────────────── -->
-  <div class="entries-filters">
-    <select class="form-select form-select--sm" [ngModel]="filterMonth()"
-      (ngModelChange)="filterMonth.set($event); applyFilter()">
-      <option [ngValue]="null">Todos os meses</option>
-      @for (m of MONTHS; track m.value) {
-        <option [ngValue]="m.value">{{ m.label }}</option>
-      }
-    </select>
-
-    <select class="form-select form-select--sm" [ngModel]="filterCategory()"
-      (ngModelChange)="filterCategory.set($event); applyFilter()">
-      <option [ngValue]="null">Todas as categorias</option>
-      @for (cat of categories(); track cat.id) {
-        <option [ngValue]="cat.id">{{ cat.name }}</option>
-      }
-    </select>
-
-    @if (filterMonth() !== null || filterCategory() !== null) {
-      <button class="btn btn--secondary btn--sm" type="button" (click)="clearFilters()">
-        ✕ Limpar filtros
-      </button>
     }
+  }
 
-    <span class="text-muted" style="font-size:0.8rem;margin-left:auto">
-      {{ totalCount() }} despesa{{ totalCount() !== 1 ? 's' : '' }}
-    </span>
+  <!-- Tabs -->
+  <div class="tabs" role="tablist">
+    <button class="tabs__tab" role="tab"
+      [class.tabs__tab--active]="activeTab() === 'entries'"
+      (click)="activeTab.set('entries')"
+      [attr.aria-selected]="activeTab() === 'entries'">
+      Por lancamento
+    </button>
+    <button class="tabs__tab" role="tab"
+      [class.tabs__tab--active]="activeTab() === 'installments'"
+      (click)="activeTab.set('installments')"
+      [attr.aria-selected]="activeTab() === 'installments'">
+      Por parcelamento
+    </button>
+    <button class="tabs__tab" role="tab"
+      [class.tabs__tab--active]="activeTab() === 'byPerson'"
+      (click)="activeTab.set('byPerson')"
+      [attr.aria-selected]="activeTab() === 'byPerson'">
+      Por pessoa
+    </button>
   </div>
 
-  @if (showBatchSection()) {
-    <div class="card batch-card" style="margin-bottom: var(--space-lg)">
-      <div class="card__header">
-        <span class="card__title">📋 Adicionar Vários Gastos</span>
+  <!-- TAB: Por lancamento -->
+  @if (activeTab() === 'entries') {
+    <div class="section-card">
+      <div class="detail-filters">
+        <select class="form-select" style="max-width:170px"
+          [ngModel]="filterMonth()"
+          (ngModelChange)="filterMonth.set($event ? +$event : null); applyFilter()"
+          aria-label="Filtrar por mes">
+          <option [value]="null">Todos os meses</option>
+          @for (m of MONTHS; track m.value) {
+            <option [value]="m.value">{{ m.label }}</option>
+          }
+        </select>
+        <select class="form-select" style="max-width:190px"
+          [ngModel]="filterCategory()"
+          (ngModelChange)="filterCategory.set($event ? +$event : null); applyFilter()"
+          aria-label="Filtrar por categoria">
+          <option [value]="null">Todas as categorias</option>
+          @for (c of categories(); track c.id) {
+            <option [value]="c.id">{{ c.name }}</option>
+          }
+        </select>
+        @if (filterMonth() || filterCategory()) {
+          <button class="btn-ghost" type="button" (click)="clearFilters()">x Limpar</button>
+        }
       </div>
-      <div class="card__body" style="padding: var(--space-lg) var(--space-xl)">
-        <form [formGroup]="batchForm" (ngSubmit)="addToBatch()" novalidate>
-          <div class="form-row form-row--2col">
-            <div class="form-group">
-              <label class="form-label" for="b-desc">Descrição *</label>
-              <input id="b-desc" class="form-input" type="text" formControlName="description" placeholder="Ex: Mercado" />
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="b-amount">Valor *</label>
-              <input id="b-amount" class="form-input mono" type="number" step="0.01" min="0.01" formControlName="amount" />
-            </div>
-          </div>
-          <div class="form-row form-row--2col">
-            <div class="form-group">
-              <label class="form-label" for="b-date">Data *</label>
-              <input id="b-date" class="form-input" type="date" formControlName="date" />
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="b-paid_by">Pago por *</label>
-              <select id="b-paid_by" class="form-select" formControlName="paid_by">
-                <option [ngValue]="null" disabled>Selecione</option>
-                @for (m of members(); track m.id) {
-                  <option [ngValue]="m.id">{{ m.display_name }}</option>
-                }
-              </select>
-            </div>
-          </div>
-          <div class="form-row form-row--2col">
-            <div class="form-group">
-              <label class="form-label" for="b-cat">Categoria</label>
-              <select id="b-cat" class="form-select" formControlName="category_id">
-                <option [ngValue]="null">Sem categoria</option>
-                @for (cat of categories(); track cat.id) {
-                  <option [ngValue]="cat.id">{{ cat.name }}</option>
-                }
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Método</label>
-              <div class="radio-group">
-                <label class="radio-option">
-                  <input type="radio" formControlName="payment_method" value="dinheiro" />
-                  <span class="radio-btn">💵 Dinheiro</span>
-                </label>
-                <label class="radio-option">
-                  <input type="radio" formControlName="payment_method" value="cartao" />
-                  <span class="radio-btn">💳 Cartão</span>
-                </label>
-              </div>
-            </div>
-          </div>
-          <div class="form-row">
-            <fieldset class="form-group">
-              <legend class="form-label">Participantes</legend>
-              <div class="participants">
-                @for (m of members(); track m.id) {
-                  <label class="participant-chip" [class.participant-chip--on]="isBatchParticipant(m.id)">
-                    <input type="checkbox" [checked]="isBatchParticipant(m.id)" (change)="toggleBatchParticipant(m.id)" />
-                    <span>{{ m.display_name }}</span>
-                  </label>
-                }
-              </div>
-            </fieldset>
-          </div>
-          <div class="form-actions">
-            <button type="submit" class="btn btn--secondary">＋ Adicionar à lista</button>
-          </div>
-        </form>
 
-        @if (batchDrafts().length > 0) {
-          <div class="batch-list">
-            @for (d of batchDrafts(); track d.localId) {
-              <div class="batch-list__item">
-                <div class="batch-list__info">
-                  <span class="batch-list__desc">{{ d.description }}</span>
-                  <span class="batch-list__meta">{{ d.paid_by_name }} · {{ d.date | slice:8:10 }}/{{ d.date | slice:5:7 }}</span>
-                </div>
-                @if (d.category_name) {
-                  <span class="badge badge--primary" style="font-size:11px">{{ d.category_name }}</span>
-                }
-                <span class="batch-list__amount value-down mono">{{ formatCurrency(d.amount) }}</span>
-                <button class="btn btn--ghost btn--sm" type="button" (click)="removeBatchDraft(d.localId)">✕</button>
-              </div>
+      @if (entries().length === 0) {
+        <div class="empty-state">
+          <div class="empty-state__icon">🧾</div>
+          <p class="empty-state__title">Nenhum lancamento</p>
+          <p class="empty-state__text">Adicione um gasto compartilhado para comecar.</p>
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <table class="entries-table" aria-label="Lancamentos do grupo">
+            <thead>
+              <tr>
+                <th>DESCRICAO</th>
+                <th>METODO</th>
+                <th>PAGO POR</th>
+                <th>DIVIDIDO COM</th>
+                <th>DATA</th>
+                <th class="text-right">TOTAL</th>
+                <th class="text-right">MINHA PARTE</th>
+                <th>ACOES</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (e of entries(); track e.id) {
+                <tr>
+                  <td class="col-desc">
+                    <span class="entry-name">{{ e.description }}</span>
+                    @if (e.total_installments > 1) {
+                      <span class="badge-parcela">{{ e.installment_number }} de {{ e.total_installments }} parcelas</span>
+                    }
+                  </td>
+                  <td>
+                    @if (e.payment_method === 'cartao') {
+                      @if (e.credit_card_name) {
+                        <span class="chip chip--card" [title]="e.credit_card_name">
+                          💳 {{ e.credit_card_name }}
+                        </span>
+                      } @else {
+                        <span class="chip chip--card">Cartao</span>
+                      }
+                    } @else {
+                      <span class="chip chip--cash">Dinheiro</span>
+                    }
+                  </td>
+                  <td class="col-paidby">{{ e.paid_by_name }}</td>
+                  <td class="col-divided">
+                    @for (m of members(); track m.id) {
+                      @if (m.id !== e.paid_by) {
+                        <span class="member-chip">{{ m.display_name }}</span>
+                      }
+                    }
+                  </td>
+                  <td class="col-date text-muted">{{ formatDate(e.date) }}</td>
+                  <td class="col-total text-right mono">{{ formatCurrency(e.amount) }}</td>
+                  <td class="col-mine text-right">
+                    <span class="value-red mono">{{ formatCurrency(myPortion(e)) }}</span>
+                  </td>
+                  <td class="col-actions">
+                    <button class="icon-btn" type="button" (click)="editEntry(e)" aria-label="Editar">&#9998;</button>
+                    <button class="icon-btn icon-btn--danger" type="button" (click)="deleteEntry(e)" aria-label="Excluir">&#128465;</button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        @if (totalPages() > 1) {
+          <div class="pagination">
+            <button class="page-btn" [disabled]="currentPage()===1" (click)="goToPage(currentPage()-1)">&#8249;</button>
+            @for (p of pageNumbers(); track p) {
+              <button class="page-btn" [class.page-btn--active]="p===currentPage()" (click)="goToPage(p)">{{ p }}</button>
             }
-            <div class="batch-list__footer">
-              <span>{{ batchDrafts().length }} gasto(s) · Total: <strong class="value-down mono">{{ formatCurrency(batchTotal) }}</strong></span>
-              <button class="btn btn--primary btn--sm" type="button"
-                (click)="saveAllBatch()" [disabled]="savingBatch()">
-                @if (savingBatch()) { <span class="spinner"></span> } 💾 Salvar todos ({{ batchDrafts().length }})
-              </button>
-            </div>
+            <button class="page-btn" [disabled]="currentPage()===totalPages()" (click)="goToPage(currentPage()+1)">&#8250;</button>
+            <span class="text-muted" style="font-size:13px">{{ totalCount() }} lancamentos</span>
           </div>
         }
-
-        @if (batchError()) {
-          <div class="form-error-box" role="alert">{{ batchError() }}</div>
-        }
-      </div>
+      }
     </div>
   }
 
-  @if (showEntryForm()) {
-    <div class="card" style="margin-bottom: var(--space-lg)">
-      <form [formGroup]="form" (ngSubmit)="saveEntry()" novalidate
-        [attr.aria-label]="editingEntryId() ? 'Editar despesa compartilhada' : 'Nova despesa compartilhada'">
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label" for="description">Descrição *</label>
-            <input id="description" class="form-input" [class.error]="hasError('description')"
-              type="text" formControlName="description" placeholder="Ex: Jantar" autocomplete="off" />
-            @if (hasError('description')) {
-              <span class="form-error" role="alert">Descrição é obrigatória.</span>
-            }
-          </div>
-        </div>
-
-        <div class="form-row form-row--2col">
-          <div class="form-group">
-            <label class="form-label" for="amount">Valor *</label>
-            <input id="amount" class="form-input mono" [class.error]="hasError('amount')"
-              type="number" step="0.01" min="0.01" formControlName="amount" placeholder="120.00" />
-            @if (hasError('amount')) {
-              <span class="form-error" role="alert">Valor é obrigatório.</span>
-            }
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="date">Data *</label>
-            <input id="date" class="form-input" type="date" formControlName="date" [class.error]="hasError('date')" />
-          </div>
-        </div>
-
-        <!-- Categoria -->
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label" for="category_id">Categoria</label>
-            <select id="category_id" class="form-select" formControlName="category_id">
-              <option [ngValue]="null">Sem categoria</option>
-              @for (cat of categories(); track cat.id) {
-                <option [ngValue]="cat.id">{{ cat.name }}</option>
-              }
-            </select>
-            <span class="form-hint">Opcional. Ajuda a analisar onde o grupo mais gasta.</span>
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label" for="paid_by">Pago por *</label>
-            <select id="paid_by" class="form-select" [class.error]="hasError('paid_by')" formControlName="paid_by">
-              <option [ngValue]="null" disabled>Selecione quem pagou</option>
-              @for (m of members(); track m.id) {
-                <option [ngValue]="m.id">{{ m.display_name }}</option>
-              }
-            </select>
-            @if (hasError('paid_by')) {
-              <span class="form-error" role="alert">Selecione quem pagou.</span>
-            }
-          </div>
-        </div>
-
-        <div class="form-row">
-          <fieldset class="form-group">
-            <legend class="form-label">Participantes (quem divide) *</legend>
-            <div class="participants">
-              @for (m of members(); track m.id) {
-                <label class="participant-chip" [class.participant-chip--on]="isParticipant(m.id)">
-                  <input type="checkbox" [checked]="isParticipant(m.id)" (change)="toggleParticipant(m.id)" />
-                  <span>{{ m.display_name }}</span>
-                </label>
+  <!-- TAB: Por parcelamento -->
+  @if (activeTab() === 'installments') {
+    @if (installmentGroups().length === 0) {
+      <div class="empty-state">
+        <div class="empty-state__icon">📦</div>
+        <p class="empty-state__title">Nenhum parcelamento</p>
+        <p class="empty-state__text">Lancamentos parcelados aparecem aqui agrupados.</p>
+      </div>
+    } @else {
+      <div class="section-card">
+        <div class="installment-groups">
+          @for (grp of installmentGroups(); track grp.groupId) {
+            <div class="inst-card">
+              <div class="inst-card__header">
+                <div class="inst-card__name-row">
+                  <h3 class="inst-card__name">{{ grp.description }}</h3>
+                  <span class="inst-badge"
+                    [class.inst-badge--ok]="grp.status === 'Em andamento'"
+                    [class.inst-badge--done]="grp.status === 'Concluido'"
+                    [class.inst-badge--late]="grp.status === 'Atrasada'">
+                    {{ grp.status }}
+                  </span>
+                </div>
+                <p class="inst-card__meta text-muted">
+                  {{ grp.startMonth }} &rarr; {{ grp.endMonth }} &middot;
+                  Pago por {{ grp.paidByName }} &middot; {{ grp.participantCount }} participantes
+                </p>
+              </div>
+              <div class="inst-progress-row">
+                <div class="inst-progress-bar-wrap">
+                  <div class="inst-progress-bar" [style.width.%]="grp.progressPct"
+                    [class.inst-progress-bar--late]="grp.status === 'Atrasada'"></div>
+                </div>
+                <span class="inst-pct">{{ grp.progressPct }}%</span>
+              </div>
+              <div class="inst-card__summary-row">
+                <span>{{ grp.paid }}/{{ grp.total }} parcelas pagas</span>
+                <span>{{ formatCurrency(grp.myPortionPerInstallment) }}/mes minha parte</span>
+                <strong class="value-red">Restante: {{ formatCurrency(grp.remaining) }}</strong>
+              </div>
+              @if (grp.expanded) {
+                <div class="table-wrap" style="margin-top:12px">
+                  <table class="entries-table" aria-label="Parcelas">
+                    <thead>
+                      <tr>
+                        <th>PARCELA</th><th>DATA</th>
+                        <th class="text-right">VALOR</th>
+                        <th class="text-right">MINHA PARTE</th>
+                        <th>STATUS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (e of grp.entries; track e.id) {
+                        <tr>
+                          <td class="mono">{{ e.installment_number }}/{{ e.total_installments }}</td>
+                          <td class="text-muted" style="font-size:13px">{{ formatMonthYear(e.date) }}</td>
+                          <td class="text-right mono">{{ formatCurrency(e.amount) }}</td>
+                          <td class="text-right value-red mono">{{ formatCurrency(myPortion(e)) }}</td>
+                          <td>
+                            @if (isPaid(e)) {
+                              <span class="status-paid">Paga</span>
+                            } @else {
+                              <span class="status-pending">Pendente</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                <button class="btn-ghost" style="margin-top:8px" type="button" (click)="grp.expanded = false">&#9650; Ocultar parcelas</button>
+              } @else {
+                <button class="btn-ghost" style="margin-top:8px" type="button" (click)="grp.expanded = true">+ Ver parcelas</button>
               }
             </div>
-            <span class="form-hint">Todos marcados por padrão. Desmarque quem não participa.</span>
-          </fieldset>
+          }
         </div>
+      </div>
+    }
+  }
 
-        <div class="form-row">
-          <fieldset class="form-group">
-            <legend class="form-label">Método de Pagamento *</legend>
-            <div class="radio-group" role="radiogroup">
-              <label class="radio-option">
-                <input type="radio" formControlName="payment_method" value="dinheiro" />
-                <span class="radio-btn">💵 Dinheiro</span>
-              </label>
-              <label class="radio-option">
-                <input type="radio" formControlName="payment_method" value="cartao" />
-                <span class="radio-btn">💳 Cartão</span>
-              </label>
+  <!-- TAB: Por pessoa -->
+  @if (activeTab() === 'byPerson') {
+    <div class="by-person">
+      @for (person of perPerson(); track person.member.id) {
+        <div class="person-section">
+          <!-- Person header -->
+          <div class="person-header">
+            <div class="person-avatar" [style.background]="catColor($index)">
+              {{ initials(person.member.display_name) }}
             </div>
-          </fieldset>
-        </div>
-
-        @if (isCartao && payerIsMe && cards().length) {
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" for="credit_card_id">Cartão de Crédito (opcional)</label>
-              <select id="credit_card_id" class="form-select" formControlName="credit_card_id">
-                <option [ngValue]="null">Nenhum / não vincular</option>
-                @for (card of cards(); track card.id) {
-                  <option [ngValue]="card.id">{{ card.name }} •••• {{ card.last_four_digits }}</option>
-                }
-              </select>
+            <div class="person-header__info">
+              <span class="person-header__name">{{ person.member.display_name }}</span>
+            </div>
+            <div class="person-header__stats">
+              <span>Total gasto: <strong>{{ formatCurrency(person.totalSpent) }}</strong></span>
+              <span class="separator">&middot;</span>
+              <span>Minha parte: <strong class="value-red">{{ formatCurrency(person.myPortion) }}</strong></span>
+              @if (person.owes > 0 && !person.isMe) {
+                <span class="separator">&middot;</span>
+                <span>Deve: <strong class="value-red">{{ formatCurrency(person.owes) }}</strong></span>
+              }
             </div>
           </div>
-        }
 
-        @if (!editingEntryId()) {
-          <div class="form-row">
-            <div class="form-group">
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-                <label class="form-label" style="margin:0">Parcelado?</label>
-                <label class="toggle-switch" aria-label="Ativar parcelamento">
-                  <input type="checkbox" [checked]="isParcelado()" (change)="isParcelado.set(!isParcelado())"/>
-                  <span class="toggle-slider"></span>
-                </label>
-                @if (isParcelado()) {
-                  <span class="text-muted" style="font-size:0.8rem">Será criada 1 entrada por parcela</span>
+          <!-- Entries by this person -->
+          @if (person.entries.length === 0) {
+            <div class="person-empty">
+              <p>Nenhum gasto registrado por este membro</p>
+              <p class="text-muted" style="font-size:13px">Os gastos do grupo divididos com ele aparecerao listados aqui.</p>
+            </div>
+          } @else {
+            <div class="table-wrap">
+              <table class="entries-table" aria-label="Gastos de {{ person.member.display_name }}">
+                <thead>
+                  <tr>
+                    <th>DIVIDIDO COM</th>
+                    <th>DESCRICAO</th>
+                    <th>METODO</th>
+                    <th>CATEGORIA</th>
+                    <th class="text-right">TOTAL</th>
+                    <th class="text-right">MINHA PARTE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (e of person.entries; track e.id) {
+                    <tr>
+                      <td class="col-divided">
+                        @for (m of members(); track m.id) {
+                          @if (m.id !== e.paid_by) {
+                            <span class="member-chip member-chip--sm">{{ m.display_name }}</span>
+                          }
+                        }
+                      </td>
+                      <td class="col-desc">
+                        <span class="entry-name">{{ e.description }}</span>
+                        @if (e.total_installments > 1) {
+                          <span class="badge-parcela">{{ e.installment_number }}/{{ e.total_installments }}</span>
+                        }
+                      </td>
+                      <td>
+                        @if (e.payment_method === 'cartao') {
+                          <span class="chip chip--card">Cartao</span>
+                        } @else {
+                          <span class="chip chip--cash">Dinheiro</span>
+                        }
+                      </td>
+                      <td>
+                        @if (e.category_name) {
+                          <span class="cat-chip">{{ e.category_name }}</span>
+                        } @else {
+                          <span class="text-muted">-</span>
+                        }
+                      </td>
+                      <td class="text-right mono">{{ formatCurrency(e.amount) }}</td>
+                      <td class="text-right value-red mono">{{ formatCurrency(myPortion(e)) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Category summary chips -->
+            @if (person.categorySummary.length > 0) {
+              <div class="cat-summary-row">
+                <span class="text-muted" style="font-size:13px">Resumo por categoria:</span>
+                @for (cat of person.categorySummary; track cat.name) {
+                  <span class="cat-summary-chip" [style.background]="cat.color + '20'" [style.color]="cat.color">
+                    {{ cat.name }}: {{ formatCurrency(cat.total) }}
+                  </span>
                 }
               </div>
-              @if (isParcelado()) {
-                <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
-                  <label class="form-label" for="total_installments_input" style="margin:0;white-space:nowrap">Nº de parcelas</label>
-                  <input id="total_installments_input" type="number" class="form-input"
-                    style="width:80px" min="2" max="120"
-                    formControlName="total_installments_input"/>
-                </div>
-              }
-            </div>
+            }
+          }
+        </div>
+      }
+
+      <!-- Saldo total footer -->
+      @if (balances(); as bal) {
+        @if (bal.settlement.length > 0) {
+          <div class="person-footer">
+            @for (s of bal.settlement; track s.from_member_id) {
+              <span>Saldo devedor: <strong class="value-red">{{ formatCurrency(s.amount) }}</strong> para {{ s.to_name }}</span>
+            }
           </div>
         }
+      }
+    </div>
+  }
+}
 
+<!-- MODAL: Novo Gasto Compartilhado -->
+@if (showEntryForm()) {
+  <div class="modal-backdrop" (click)="toggleEntryForm()" aria-hidden="true"></div>
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Novo Gasto Compartilhado">
+    <div class="modal__header">
+      <h2 class="modal__title">{{ editingEntryId() ? "Editar Gasto" : "Novo Gasto Compartilhado" }}</h2>
+      <button class="modal__close" type="button" (click)="toggleEntryForm()" aria-label="Fechar">x</button>
+    </div>
+    <div class="modal__body">
+      <form [formGroup]="form" (ngSubmit)="saveEntry()" novalidate>
+        <p class="modal__section-title">1. Identificacao</p>
+        <div class="form-group">
+          <label class="form-label" for="eg-desc">Descricao *</label>
+          <input id="eg-desc" class="form-input" type="text" formControlName="description" placeholder="Ex: Geladeira, Viagem..."/>
+          @if (form.get('description')?.invalid && form.get('description')?.touched) {
+            <span class="form-error">Descricao e obrigatoria.</span>
+          }
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="eg-cat">Categoria</label>
+          <select id="eg-cat" class="form-select" formControlName="category_id">
+            <option [ngValue]="null">Selecione a categoria...</option>
+            @for (c of categories(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
+          </select>
+        </div>
+        <p class="modal__section-title">2. Valor e Pagamento</p>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="eg-amount">Valor total *</label>
+            <input id="eg-amount" class="form-input" type="number" step="0.01" min="0.01" formControlName="amount" placeholder="R$ 0,00"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="eg-date">Data *</label>
+            <input id="eg-date" class="form-input" type="date" formControlName="date"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="eg-paidby">Quem pagou *</label>
+          <select id="eg-paidby" class="form-select" formControlName="paid_by">
+            <option [ngValue]="null">Selecione...</option>
+            @for (m of members(); track m.id) {
+              <option [value]="m.id">{{ isMe(m.tenant_id) ? "Voce" : m.display_name }}</option>
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Forma de pagamento</label>
+          <div class="payment-toggle">
+            <button type="button" class="payment-toggle__btn"
+              [class.payment-toggle__btn--active]="form.value.payment_method === 'dinheiro'"
+              (click)="form.patchValue({payment_method:'dinheiro', credit_card_id:null})">Dinheiro</button>
+            <button type="button" class="payment-toggle__btn"
+              [class.payment-toggle__btn--active]="form.value.payment_method === 'cartao'"
+              (click)="form.patchValue({payment_method:'cartao'})">Cartao de Credito</button>
+          </div>
+        </div>
+        @if (form.value.payment_method === 'cartao' && payerIsMe) {
+          <div class="form-group">
+            <label class="form-label" for="eg-card">Cartao</label>
+            <select id="eg-card" class="form-select" formControlName="credit_card_id">
+              <option [ngValue]="null">Selecione o cartao...</option>
+              @for (c of cards(); track c.id) {
+                <option [value]="c.id">{{ c.name }} (****{{ c.last_four_digits }} | Fecha dia {{ c.closing_day }})</option>
+              }
+            </select>
+          </div>
+        }
+        <p class="modal__section-title">3. Parcelamento (opcional)</p>
+        <div class="form-group">
+          <label class="form-check">
+            <input type="checkbox" [checked]="isParcelado()" (change)="isParcelado.set(!isParcelado())"/>
+            <span>E parcelado?</span>
+          </label>
+        </div>
+        @if (isParcelado()) {
+          <div class="form-group">
+            <label class="form-label" for="eg-inst">Numero de parcelas</label>
+            <input id="eg-inst" class="form-input" type="number" min="2" max="120" formControlName="total_installments_input" style="max-width:120px"/>
+          </div>
+        }
+        <p class="modal__section-title">4. Participantes</p>
+        <div class="participants-check">
+          @for (m of members(); track m.id) {
+            <label class="participants-check__item">
+              <input type="checkbox" [checked]="isParticipant(m.id)" (change)="toggleParticipant(m.id)"/>
+              <span>{{ isMe(m.tenant_id) ? "Voce" : m.display_name }}</span>
+            </label>
+          }
+        </div>
         @if (entryError()) {
           <div class="form-error-box" role="alert">{{ entryError() }}</div>
         }
-
         <div class="form-actions">
+          <button type="button" class="btn btn--secondary" (click)="toggleEntryForm()">Cancelar</button>
           <button type="submit" class="btn btn--primary" [disabled]="savingEntry()">
             @if (savingEntry()) { <span class="spinner"></span> }
-            {{ editingEntryId() ? 'Salvar alterações' : (isParcelado() ? 'Salvar ' + (form.value.total_installments_input || 2) + ' parcelas' : 'Salvar despesa') }}
+            {{ editingEntryId() ? "Salvar alteracoes" : "Adicionar gasto" }}
           </button>
         </div>
       </form>
-    </div>
-  }
-
-  @if (entries().length === 0) {
-    <div class="empty-state">
-      <div class="empty-state__icon">🧾</div>
-      <p class="empty-state__title">Nenhuma despesa</p>
-      <p class="empty-state__text">Adicione a primeira despesa compartilhada do grupo.</p>
-    </div>
-  } @else {
-    <div class="data-table-wrapper">
-      <table class="data-table" role="table" aria-label="Despesas do grupo">
-        <thead>
-          <tr>
-            <th scope="col">Descrição</th>
-            <th scope="col">Categoria</th>
-            <th scope="col">Pago por</th>
-            <th scope="col">Data</th>
-            <th scope="col" class="text-right">Valor</th>
-            <th scope="col" class="text-right">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (e of entries(); track e.id) {
-            <tr>
-              <td style="font-weight:500">
-                {{ e.description }}
-                <span class="badge--shared">{{ e.payment_method === 'cartao' ? '💳' : '💵' }} 👥</span>
-                @if (e.total_installments > 1) {
-                  <span class="badge--installment">{{ e.installment_number }}/{{ e.total_installments }}</span>
-                }
-              </td>
-              <td>
-                @if (e.category_name) {
-                  <span class="badge badge--primary">{{ e.category_name }}</span>
-                } @else {
-                  <span class="text-muted" style="font-size:12px">—</span>
-                }
-              </td>
-              <td>{{ e.paid_by_name }}</td>
-              <td class="mono text-muted" style="font-size:13px;white-space:nowrap">{{ formatDate(e.date) }}</td>
-              <td class="text-right"><span class="value-down mono">{{ formatCurrency(e.amount) }}</span></td>
-              <td class="text-right">
-                <button class="btn btn--secondary btn--sm" type="button"
-                  (click)="editEntry(e)" aria-label="Editar {{ e.description }}"
-                  style="margin-right:4px">✏️</button>
-                <button class="btn btn--danger btn--sm" type="button"
-                  (click)="deleteEntry(e)" aria-label="Excluir {{ e.description }}">🗑️</button>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-
-    @if (totalPages() > 1) {
-      <div class="pagination">
-        <button class="pagination__btn" type="button"
-          [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)">
-          ‹
-        </button>
-        @for (p of pageNumbers(); track p) {
-          <button class="pagination__btn" type="button"
-            [class.pagination__btn--active]="p === currentPage()"
-            (click)="goToPage(p)">
-            {{ p }}
-          </button>
-        }
-        <button class="pagination__btn" type="button"
-          [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)">
-          ›
-        </button>
-      </div>
-    }
-  }
-}
-
-<!-- ── Gastos Recorrentes ────────────────────────────────────────────────── -->
-  <div class="page-header" style="margin-top: var(--space-xl)">
-    <h2 class="section-title" style="margin:0">🔁 Gastos Fixos Mensais</h2>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button class="btn btn--secondary btn--sm" type="button"
-        (click)="generateMonth()" [disabled]="generatingMonth()">
-        @if (generatingMonth()) { <span class="spinner"></span> } ⚡ Gerar mês atual
-      </button>
-      <button class="btn btn--primary btn--sm" type="button" (click)="toggleRecurringForm()">
-        {{ showRecurringForm() ? '✕ Fechar' : '＋ Novo fixo' }}
-      </button>
-    </div>
-  </div>
-
-  @if (generateResult(); as result) {
-    <div class="generate-result" role="status">
-      @if (result.created.length) {
-        <p class="generate-result__ok">✓ Criados: {{ result.created.join(', ') }}</p>
-      }
-      @if (result.skipped.length) {
-        <p class="generate-result__skip">⏭ Já existiam: {{ result.skipped.join(', ') }}</p>
-      }
-    </div>
-  }
-
-  @if (showRecurringForm()) {
-    <div class="card" style="margin-bottom: var(--space-lg)">
-      <form [formGroup]="recurringForm" (ngSubmit)="saveRecurring()" novalidate>
-        <div class="form-row form-row--2col">
-          <div class="form-group">
-            <label class="form-label" for="r-description">Descrição *</label>
-            <input id="r-description" class="form-input" type="text"
-              formControlName="description" placeholder="Ex: Aluguel" />
-            @if (recurringForm.get('description')?.invalid && recurringForm.get('description')?.touched) {
-              <span class="form-error">Obrigatório.</span>
-            }
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="r-amount">Valor *</label>
-            <input id="r-amount" class="form-input mono" type="number" step="0.01" min="0.01"
-              formControlName="amount" placeholder="1200.00" />
-          </div>
-        </div>
-        <div class="form-row form-row--2col">
-          <div class="form-group">
-            <label class="form-label" for="r-paid_by">Pago por *</label>
-            <select id="r-paid_by" class="form-select" formControlName="paid_by">
-              <option [ngValue]="null" disabled>Selecione</option>
-              @for (m of members(); track m.id) {
-                <option [ngValue]="m.id">{{ m.display_name }}</option>
-              }
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="r-day">Dia do mês (1–28)</label>
-            <input id="r-day" class="form-input mono" type="number" min="1" max="28"
-              formControlName="day_of_month" />
-          </div>
-        </div>
-        <div class="form-row form-row--2col">
-          <div class="form-group">
-            <label class="form-label" for="r-category">Categoria</label>
-            <select id="r-category" class="form-select" formControlName="category_id">
-              <option [ngValue]="null">Sem categoria</option>
-              @for (cat of categories(); track cat.id) {
-                <option [ngValue]="cat.id">{{ cat.name }}</option>
-              }
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Método</label>
-            <div class="radio-group">
-              <label class="radio-option">
-                <input type="radio" formControlName="payment_method" value="dinheiro" />
-                <span class="radio-btn">💵 Dinheiro</span>
-              </label>
-              <label class="radio-option">
-                <input type="radio" formControlName="payment_method" value="cartao" />
-                <span class="radio-btn">💳 Cartão</span>
-              </label>
-            </div>
-          </div>
-        </div>
-        @if (recurringError()) {
-          <div class="form-error-box" role="alert">{{ recurringError() }}</div>
-        }
-        <div class="form-actions">
-          <button type="submit" class="btn btn--primary" [disabled]="savingRecurring()">
-            @if (savingRecurring()) { <span class="spinner"></span> } Salvar gasto fixo
-          </button>
-        </div>
-      </form>
-    </div>
-  }
-
-  @if (recurringTemplates().length === 0 && !showRecurringForm()) {
-    <p class="empty-msg" style="padding: var(--space-base)">Nenhum gasto fixo configurado.</p>
-  }
-  @if (recurringTemplates().length > 0) {
-    <div class="data-table-wrapper" style="margin-bottom: var(--space-xl)">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Descrição</th>
-            <th>Categoria</th>
-            <th>Pago por</th>
-            <th>Dia</th>
-            <th class="text-right">Valor/mês</th>
-            <th>Status</th>
-            <th class="text-right">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (t of recurringTemplates(); track t.id) {
-            <tr>
-              <td style="font-weight:500">{{ t.description }}</td>
-              <td>
-                @if (t.category_name) {
-                  <span class="badge badge--primary">{{ t.category_name }}</span>
-                } @else { <span class="text-muted" style="font-size:12px">—</span> }
-              </td>
-              <td>{{ t.paid_by_name }}</td>
-              <td class="mono">todo dia {{ t.day_of_month }}</td>
-              <td class="text-right mono value-down">{{ formatCurrency(t.amount) }}</td>
-              <td>
-                <span class="badge" [class]="t.is_active ? 'badge--success' : 'badge--system'">
-                  {{ t.is_active ? 'Ativo' : 'Pausado' }}
-                </span>
-              </td>
-              <td class="text-right">
-                <button class="btn btn--secondary btn--sm" type="button"
-                  (click)="toggleRecurring(t.id)" title="{{ t.is_active ? 'Pausar' : 'Ativar' }}">
-                  {{ t.is_active ? '⏸' : '▶' }}
-                </button>
-                <button class="btn btn--danger btn--sm" type="button"
-                  (click)="deleteRecurring(t.id)">🗑️</button>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-  }
-
-  <!-- ── Histórico Mensal ──────────────────────────────────────────────────── -->
-  @if (monthlyHistory().length > 0) {
-    <div class="page-header" style="margin-top: var(--space-base)">
-      <h2 class="section-title" style="margin:0">📅 Histórico por Mês</h2>
-    </div>
-    <div class="data-table-wrapper" style="margin-bottom: var(--space-xl)">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Mês</th>
-            <th class="text-right">Total do grupo</th>
-            <th class="text-right">Sua parte</th>
-            <th class="text-right">Lançamentos</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (row of monthlyHistory(); track row.year + '-' + row.month) {
-            <tr>
-              <td style="font-weight:500">{{ row.month_name }} {{ row.year }}</td>
-              <td class="text-right mono value-down">{{ formatCurrency(row.total) }}</td>
-              <td class="text-right mono" style="color: var(--color-primary)">{{ formatCurrency(row.my_portion) }}</td>
-              <td class="text-right text-muted">{{ row.entry_count }}</td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-}
-
-@if (pieTooltip()) {
-  <div class="chart-tooltip"
-    [style.left.px]="pieTooltip()!.cx"
-    [style.top.px]="pieTooltip()!.cy">
-    <div class="chart-tooltip__title">{{ pieTooltip()!.name }}</div>
-    <div class="chart-tooltip__row">
-      <span>Valor</span>
-      <span class="chart-tooltip__val">{{ formatCurrencyPie(pieTooltip()!.total) }}</span>
-    </div>
-    <div class="chart-tooltip__row">
-      <span>Percentual</span>
-      <span class="chart-tooltip__val">{{ pieTooltip()!.pct }}%</span>
     </div>
   </div>
 }

@@ -1,4 +1,4 @@
-import { Routes } from '@angular/router';
+﻿import { Routes } from '@angular/router';
 import { LayoutComponent } from './layout/layout.component';
 import { authGuard } from './core/auth/auth.guard';
 
@@ -115,10 +115,18 @@ export const routes: Routes = [
       },
 
       // Histórico
-      { path: 'history', redirectTo: 'home', pathMatch: 'full' },
+      {
+        path: 'history',
+        loadComponent: () =>
+          import('./features/history/history.component').then(m => m.HistoryComponent),
+      },
 
       // Sem categoria
-      { path: 'uncategorized', redirectTo: 'home', pathMatch: 'full' },
+      {
+        path: 'uncategorized',
+        loadComponent: () =>
+          import('./features/uncategorized/uncategorized.component').then(m => m.UncategorizedComponent),
+      },
 
       // Analytics
       {
@@ -158,3 +166,4 @@ export const routes: Routes = [
   // Wildcard
   { path: '**', redirectTo: '' },
 ];
+

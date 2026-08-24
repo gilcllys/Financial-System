@@ -1,13 +1,12 @@
-<div class="page-header">
+﻿<div class="page-header">
   <div class="page-header__left">
-    <h1 class="page-header__title">Análises</h1>
-    <p class="page-header__subtitle">Visualize seus gastos em gráficos</p>
+    <h1 class="page-header__title">Analises</h1>
+    <p class="page-header__subtitle">Visualize seus gastos em graficos</p>
   </div>
 </div>
 
-<!-- Filtros -->
 <div class="filter-bar">
-  <select class="form-select" [ngModel]="selectedMonth()" (ngModelChange)="selectedMonth.set(+$event); onFilterChange()" aria-label="Mês">
+  <select class="form-select" [ngModel]="selectedMonth()" (ngModelChange)="selectedMonth.set(+$event); onFilterChange()" aria-label="Mes">
     @for (m of months; track m.value) {
       <option [value]="m.value">{{ m.label }}</option>
     }
@@ -20,34 +19,33 @@
 </div>
 
 @if (loading()) {
-  <div class="loading-wrapper"><span class="spinner"></span> Carregando análises...</div>
+  <div class="loading-wrapper"><span class="spinner"></span> Carregando analises...</div>
 } @else {
-  <!-- Gráfico 1: Receitas x Despesas por Mês -->
+  <!-- Grafico 1: Grouped Bar + linha de saldo -->
   <div class="chart-card">
     <div class="chart-card__header">
-      <h2 class="chart-card__title">📊 Receitas × Despesas — {{ selectedYear() }}</h2>
-      <p class="chart-card__subtitle">Comparativo mensal de entradas e saídas</p>
+      <h2 class="chart-card__title">Receitas x Despesas &mdash; {{ selectedYear() }}</h2>
+      <p class="chart-card__subtitle">Barras agrupadas + linha de saldo (amarelo)</p>
     </div>
     <div class="chart-card__body">
-      <canvas #monthlyChart></canvas>
+      <div #monthlyChart class="d3-chart"></div>
     </div>
   </div>
 
   <div class="charts-grid">
-    <!-- Gráfico 2: Por Categoria (Donut) -->
+    <!-- Grafico 2: Treemap de categorias (cartao) -->
     <div class="chart-card">
       <div class="chart-card__header">
-        <h2 class="chart-card__title">🏷️ Por Categoria — {{ currentMonthName() }}</h2>
-        <p class="chart-card__subtitle">Distribuição das despesas por categoria</p>
+        <h2 class="chart-card__title">Por Categoria &mdash; {{ currentMonthName() }}</h2>
+        <p class="chart-card__subtitle">Treemap de distribuicao por categoria</p>
       </div>
-      <div class="chart-card__body chart-card__body--donut">
+      <div class="chart-card__body chart-card__body--treemap">
         @if (categoryData().length === 0) {
-          <div class="empty-chart">Sem despesas neste período</div>
+          <div class="empty-chart">Sem despesas neste periodo</div>
         } @else {
-          <canvas #categoryChart></canvas>
+          <div #categoryChart class="d3-chart"></div>
         }
       </div>
-      <!-- Top categorias -->
       @if (categoryData().length > 0) {
         <div class="category-list">
           @for (cat of categoryData().slice(0, 5); track cat.category_id) {
@@ -61,47 +59,47 @@
       }
     </div>
 
-    <!-- Gráfico 3: Por Cartão -->
+    <!-- Grafico 3: Horizontal Bar por cartao -->
     <div class="chart-card">
       <div class="chart-card__header">
-        <h2 class="chart-card__title">💳 Por Cartão — {{ currentMonthName() }}</h2>
-        <p class="chart-card__subtitle">Gasto total em cada cartão</p>
+        <h2 class="chart-card__title">Por Cartao &mdash; {{ currentMonthName() }}</h2>
+        <p class="chart-card__subtitle">Ranking de gastos por cartao</p>
       </div>
-      <div class="chart-card__body">
+      <div class="chart-card__body chart-card__body--hbar">
         @if (cardData().length === 0) {
-          <div class="empty-chart">Sem gastos em cartão neste período</div>
+          <div class="empty-chart">Sem gastos em cartao neste periodo</div>
         } @else {
-          <canvas #cardChart></canvas>
+          <div #cardChart class="d3-chart d3-chart--hbar"></div>
         }
       </div>
     </div>
 
+    <!-- Grafico 4: Donut dinheiro com centro label -->
     <div class="chart-card">
       <div class="chart-card__header">
-        <h2 class="chart-card__title">💵 Gastos em Dinheiro — Por Categoria</h2>
-        <p class="chart-card__subtitle">Distribuição dos gastos em dinheiro</p>
+        <h2 class="chart-card__title">Gastos em Dinheiro &mdash; Categorias</h2>
+        <p class="chart-card__subtitle">Donut com total no centro</p>
       </div>
       <div class="chart-card__body chart-card__body--donut">
         @if (cashCategoryData().length === 0) {
-          <div class="empty-chart">Sem gastos em dinheiro neste período</div>
+          <div class="empty-chart">Sem gastos em dinheiro neste periodo</div>
         } @else {
-          <canvas #cashCategoryChart></canvas>
+          <div #cashCategoryChart class="d3-chart d3-chart--donut"></div>
         }
       </div>
     </div>
   </div>
 
-  <!-- Gráfico 4: Gasto Diário -->
+  <!-- Grafico 5: Area Chart diario -->
   <div class="chart-card">
     <div class="chart-card__header">
-      <h2 class="chart-card__title">📅 Gasto Diário — {{ currentMonthName() }} {{ selectedYear() }}</h2>
-      <p class="chart-card__subtitle">Movimentação dia a dia no mês</p>
+      <h2 class="chart-card__title">Gasto Diario &mdash; {{ currentMonthName() }} {{ selectedYear() }}</h2>
+      <p class="chart-card__subtitle">Area chart com gradiente de volume</p>
     </div>
-    <!-- KPIs diários -->
     @if (dailyData().length > 0) {
       <div class="daily-kpis">
         <div class="kpi-card">
-          <span class="kpi-card__label">Média diária</span>
+          <span class="kpi-card__label">Media diaria</span>
           <span class="kpi-card__value value-down">{{ formatCurrency(avgDaily()) }}</span>
         </div>
         <div class="kpi-card">
@@ -115,7 +113,7 @@
       </div>
     }
     <div class="chart-card__body chart-card__body--wide">
-      <canvas #dailyChart></canvas>
+      <div #dailyChart class="d3-chart d3-chart--area"></div>
     </div>
   </div>
 }

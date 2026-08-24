@@ -1,223 +1,223 @@
-<!-- ── Mobile header (hamburger + brand, hidden on desktop) ── -->
-<header class="mobile-header" role="banner">
-  <button
-    class="mobile-header__hamburger"
-    (click)="toggleDrawer()"
-    [attr.aria-expanded]="drawerOpen()"
-    aria-controls="sidebar"
-    aria-label="Abrir menu de navegação"
-  >
-    <span class="hamburger-bar"></span>
-    <span class="hamburger-bar"></span>
-    <span class="hamburger-bar"></span>
-  </button>
-
-  <a routerLink="/home" class="mobile-header__brand" aria-label="Controle financeiro home">
-    <img src="assets/atm-icon.svg" alt="" class="mobile-header__logo" aria-hidden="true" width="28" height="28">
-    <span class="mobile-header__name">Controle financeiro</span>
-  </a>
-</header>
-
-<!-- ── Sidebar backdrop (mobile only, closes drawer on click) ── -->
-@if (drawerOpen()) {
-  <div
-    class="sidebar-overlay"
-    (click)="closeDrawer()"
-    aria-hidden="true"
-    role="presentation"
-  ></div>
-}
-
-<!-- ── Sidebar ── -->
-<aside
-  id="sidebar"
-  class="sidebar"
-  [class.sidebar--open]="drawerOpen()"
-  role="navigation"
-  aria-label="Navegação principal"
->
-  <!-- Brand / Logo -->
-  <div class="sidebar__header">
-    <a routerLink="/home" class="sidebar__brand" (click)="closeDrawer()" aria-label="Controle financeiro home">
-      <img src="assets/atm-icon.svg" alt="" class="sidebar__logo-icon" aria-hidden="true" width="28" height="28">
-      <span class="sidebar__logo-name">Controle financeiro</span>
-    </a>
-    <button
-      class="sidebar__close"
-      (click)="closeDrawer()"
-      aria-label="Fechar menu"
-    >✕</button>
-  </div>
-
-  <!-- Navigation links -->
-  <nav class="sidebar__nav" aria-label="Menu principal">
-    <a
-      routerLink="/home"
-      routerLinkActive="sidebar__link--active"
-      [routerLinkActiveOptions]="{exact: true}"
-      class="sidebar__link"
-      (click)="closeDrawer()"
-    >
-      <span class="sidebar__link-icon" aria-hidden="true">🏠</span>
-      <span class="sidebar__link-label">Início</span>
-    </a>
-
-    
-
-    <a
-      routerLink="/history"
-      routerLinkActive="sidebar__link--active"
-      class="sidebar__link"
-      (click)="closeDrawer()"
-    >
-      <span class="sidebar__link-icon" aria-hidden="true">🗂️</span>
-      <span class="sidebar__link-label">Histórico</span>
-    </a>
-
-    <a
-      routerLink="/cards"
-      routerLinkActive="sidebar__link--active"
-      class="sidebar__link"
-      (click)="closeDrawer()"
-    >
-      <span class="sidebar__link-icon" aria-hidden="true">💳</span>
-      <span class="sidebar__link-label">Cartões</span>
-    </a>
-
-    <a
-      routerLink="/installments"
-      routerLinkActive="sidebar__link--active"
-      class="sidebar__link"
-      (click)="closeDrawer()"
-    >
-      <span class="sidebar__link-icon" aria-hidden="true">📋</span>
-      <span class="sidebar__link-label">Parcelamentos</span>
-    </a>
-
-    <a
-      routerLink="/supermarket"
-      routerLinkActive="sidebar__link--active"
-      class="sidebar__link"
-      (click)="closeDrawer()"
-    >
-      <span class="sidebar__link-icon" aria-hidden="true">🛒</span>
-      <span class="sidebar__link-label">Supermercado</span>
-    </a>
-
-    <a
-      routerLink="/reports"
-      routerLinkActive="sidebar__link--active"
-      class="sidebar__link"
-      (click)="closeDrawer()"
-    >
-      <span class="sidebar__link-icon" aria-hidden="true">📊</span>
-      <span class="sidebar__link-label">Relatórios</span>
-    </a>
-
-    <a
-      routerLink="/analytics"
-      routerLinkActive="sidebar__link--active"
-      class="sidebar__link"
-      (click)="closeDrawer()"
-    >
-      <span class="sidebar__link-icon" aria-hidden="true">📈</span>
-      <span class="sidebar__link-label">Análises</span>
-    </a>
-
-    <a
-      routerLink="/shared-debts"
-      routerLinkActive="sidebar__link--active"
-      class="sidebar__link"
-      (click)="closeDrawer()"
-    >
-      <span class="sidebar__link-icon" aria-hidden="true">👥</span>
-      <span class="sidebar__link-label">Dívida Compartilhada</span>
-    </a>
-
-    <a
-      routerLink="/savings"
-      routerLinkActive="sidebar__link--active"
-      class="sidebar__link"
-      (click)="closeDrawer()"
-    >
-      <span class="sidebar__link-icon" aria-hidden="true">🐷</span>
-      <span class="sidebar__link-label">Investimentos</span>
-    </a>
-
-    <a
-      routerLink="/categories"
-      routerLinkActive="sidebar__link--active"
-      class="sidebar__link"
-      (click)="closeDrawer()"
-    >
-      <span class="sidebar__link-icon" aria-hidden="true">🏷️</span>
-      <span class="sidebar__link-label">Categorias</span>
-    </a>
-
-    <div class="sidebar__divider" role="separator"></div>
-
-    <!-- Uncategorized — with badge -->
-    <a
-      routerLink="/uncategorized"
-      routerLinkActive="sidebar__link--active"
-      class="sidebar__link sidebar__link--warning"
-      (click)="closeDrawer()"
-      [attr.aria-label]="'Sem Categoria' + (uncategorizedCount() > 0 ? ' — ' + uncategorizedCount() + ' gastos' : '')"
-    >
-      <span class="sidebar__link-icon" aria-hidden="true">⚠️</span>
-      <span class="sidebar__link-label">Sem Categoria</span>
-      @if (uncategorizedCount() > 0) {
-        <span class="sidebar__badge" aria-hidden="true">{{ uncategorizedCount() }}</span>
-      }
-    </a>
-  </nav>
-
-  <!-- User footer -->
-  <div class="sidebar__footer">
-    <div class="sidebar__avatar" aria-hidden="true">{{ userInitials() }}</div>
-    <div class="sidebar__user-info">
-      <span class="sidebar__user-name" [title]="userEmail()">{{ userName() }}</span>
-      <span class="sidebar__user-email">{{ userEmail() }}</span>
-    </div>
-    <button
-      class="sidebar__logout"
-      (click)="logout()"
-      title="Sair da conta"
-      aria-label="Sair da conta"
-    >↩</button>
-  </div>
-</aside>
-
-<!-- ── Main content ── -->
-<main class="page-content" id="main-content">
-  <div class="container">
-    <router-outlet />
-  </div>
-</main>
-
-<!-- ── Bottom navigation (mobile only) ── -->
-<nav class="bottom-nav" aria-label="Navegação rápida" role="navigation">
-  <a routerLink="/home" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
-    <span class="bottom-nav__icon" aria-hidden="true">💰</span>
-    <span class="bottom-nav__label">Início</span>
-  </a>
-  <a routerLink="/cards" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
-    <span class="bottom-nav__icon" aria-hidden="true">💳</span>
-    <span class="bottom-nav__label">Cartões</span>
-  </a>
-  <a routerLink="/supermarket" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
-    <span class="bottom-nav__icon" aria-hidden="true">🛒</span>
-    <span class="bottom-nav__label">Mercado</span>
-  </a>
-  <a routerLink="/analytics" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
-    <span class="bottom-nav__icon" aria-hidden="true">📈</span>
-    <span class="bottom-nav__label">Análises</span>
-  </a>
-  <a routerLink="/shared-debts" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
-    <span class="bottom-nav__icon" aria-hidden="true">👥</span>
-    <span class="bottom-nav__label">Dívidas</span>
-  </a>
-</nav>
-
-<!-- ── FAB (new expense shortcut) ── -->
-<button class="fab" (click)="goToNewExpense()" aria-label="Novo gasto">+</button>
+﻿<!-- ── Mobile header (hamburger + brand, hidden on desktop) ── -->
+<header class="mobile-header" role="banner">
+  <button
+    class="mobile-header__hamburger"
+    (click)="toggleDrawer()"
+    [attr.aria-expanded]="drawerOpen()"
+    aria-controls="sidebar"
+    aria-label="Abrir menu de navegação"
+  >
+    <span class="hamburger-bar"></span>
+    <span class="hamburger-bar"></span>
+    <span class="hamburger-bar"></span>
+  </button>
+
+  <a routerLink="/home" class="mobile-header__brand" aria-label="Controle financeiro home">
+    <img src="assets/atm-icon.svg" alt="" class="mobile-header__logo" aria-hidden="true" width="28" height="28">
+    <span class="mobile-header__name">Controle financeiro</span>
+  </a>
+</header>
+
+<!-- ── Sidebar backdrop (mobile only, closes drawer on click) ── -->
+@if (drawerOpen()) {
+  <div
+    class="sidebar-overlay"
+    (click)="closeDrawer()"
+    aria-hidden="true"
+    role="presentation"
+  ></div>
+}
+
+<!-- ── Sidebar ── -->
+<aside
+  id="sidebar"
+  class="sidebar"
+  [class.sidebar--open]="drawerOpen()"
+  role="navigation"
+  aria-label="Navegação principal"
+>
+  <!-- Brand / Logo -->
+  <div class="sidebar__header">
+    <a routerLink="/home" class="sidebar__brand" (click)="closeDrawer()" aria-label="Controle financeiro home">
+      <span class="sidebar__logo-box" aria-hidden="true"><img src="assets/home-icon.svg" alt="" width="18" height="18"></span>
+      <span class="sidebar__logo-name">Controle financeiro</span>
+    </a>
+    <button
+      class="sidebar__close"
+      (click)="closeDrawer()"
+      aria-label="Fechar menu"
+    >✕</button>
+  </div>
+
+  <!-- Navigation links -->
+  <nav class="sidebar__nav" aria-label="Menu principal">
+    <a
+      routerLink="/home"
+      routerLinkActive="sidebar__link--active"
+      [routerLinkActiveOptions]="{exact: true}"
+      class="sidebar__link"
+      (click)="closeDrawer()"
+    >
+      <span class="sidebar__link-icon" aria-hidden="true">🏠</span>
+      <span class="sidebar__link-label">Início</span>
+    </a>
+
+    
+
+    <a
+      routerLink="/history"
+      routerLinkActive="sidebar__link--active"
+      class="sidebar__link"
+      (click)="closeDrawer()"
+    >
+      <span class="sidebar__link-icon" aria-hidden="true">🗂️</span>
+      <span class="sidebar__link-label">Histórico</span>
+    </a>
+
+    <a
+      routerLink="/cards"
+      routerLinkActive="sidebar__link--active"
+      class="sidebar__link"
+      (click)="closeDrawer()"
+    >
+      <span class="sidebar__link-icon" aria-hidden="true">💳</span>
+      <span class="sidebar__link-label">Cartões</span>
+    </a>
+
+    <a
+      routerLink="/installments"
+      routerLinkActive="sidebar__link--active"
+      class="sidebar__link"
+      (click)="closeDrawer()"
+    >
+      <span class="sidebar__link-icon" aria-hidden="true">📋</span>
+      <span class="sidebar__link-label">Parcelamentos</span>
+    </a>
+
+    <a
+      routerLink="/supermarket"
+      routerLinkActive="sidebar__link--active"
+      class="sidebar__link"
+      (click)="closeDrawer()"
+    >
+      <span class="sidebar__link-icon" aria-hidden="true">🛒</span>
+      <span class="sidebar__link-label">Supermercado</span>
+    </a>
+
+    <a
+      routerLink="/reports"
+      routerLinkActive="sidebar__link--active"
+      class="sidebar__link"
+      (click)="closeDrawer()"
+    >
+      <span class="sidebar__link-icon" aria-hidden="true">📊</span>
+      <span class="sidebar__link-label">Relatórios</span>
+    </a>
+
+    <a
+      routerLink="/analytics"
+      routerLinkActive="sidebar__link--active"
+      class="sidebar__link"
+      (click)="closeDrawer()"
+    >
+      <span class="sidebar__link-icon" aria-hidden="true">📈</span>
+      <span class="sidebar__link-label">Análises</span>
+    </a>
+
+    <a
+      routerLink="/shared-debts"
+      routerLinkActive="sidebar__link--active"
+      class="sidebar__link"
+      (click)="closeDrawer()"
+    >
+      <span class="sidebar__link-icon" aria-hidden="true">👥</span>
+      <span class="sidebar__link-label">Dívida Compartilhada</span>
+    </a>
+
+    <a
+      routerLink="/savings"
+      routerLinkActive="sidebar__link--active"
+      class="sidebar__link"
+      (click)="closeDrawer()"
+    >
+      <span class="sidebar__link-icon" aria-hidden="true">🐷</span>
+      <span class="sidebar__link-label">Investimentos</span>
+    </a>
+
+    <a
+      routerLink="/categories"
+      routerLinkActive="sidebar__link--active"
+      class="sidebar__link"
+      (click)="closeDrawer()"
+    >
+      <span class="sidebar__link-icon" aria-hidden="true">🏷️</span>
+      <span class="sidebar__link-label">Categorias</span>
+    </a>
+
+    <div class="sidebar__divider" role="separator"></div>
+
+    <!-- Uncategorized — with badge -->
+    <a
+      routerLink="/uncategorized"
+      routerLinkActive="sidebar__link--active"
+      class="sidebar__link sidebar__link--warning"
+      (click)="closeDrawer()"
+      [attr.aria-label]="'Sem Categoria' + (uncategorizedCount() > 0 ? ' — ' + uncategorizedCount() + ' gastos' : '')"
+    >
+      <span class="sidebar__link-icon" aria-hidden="true">⚠️</span>
+      <span class="sidebar__link-label">Sem Categoria</span>
+      @if (uncategorizedCount() > 0) {
+        <span class="sidebar__badge" aria-hidden="true">{{ uncategorizedCount() }}</span>
+      }
+    </a>
+  </nav>
+
+  <!-- User footer -->
+  <div class="sidebar__footer">
+    <div class="sidebar__avatar" aria-hidden="true">{{ userInitials() }}</div>
+    <div class="sidebar__user-info">
+      <span class="sidebar__user-name" [title]="userEmail()">{{ userName() }}</span>
+      <span class="sidebar__user-email">{{ userEmail() }}</span>
+    </div>
+    <button
+      class="sidebar__logout"
+      (click)="logout()"
+      title="Sair da conta"
+      aria-label="Sair da conta"
+    >↩</button>
+  </div>
+</aside>
+
+<!-- ── Main content ── -->
+<main class="page-content" id="main-content">
+  <div class="container">
+    <router-outlet />
+  </div>
+</main>
+
+<!-- ── Bottom navigation (mobile only) ── -->
+<nav class="bottom-nav" aria-label="Navegação rápida" role="navigation">
+  <a routerLink="/home" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
+    <span class="bottom-nav__icon" aria-hidden="true">💰</span>
+    <span class="bottom-nav__label">Início</span>
+  </a>
+  <a routerLink="/cards" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
+    <span class="bottom-nav__icon" aria-hidden="true">💳</span>
+    <span class="bottom-nav__label">Cartões</span>
+  </a>
+  <a routerLink="/supermarket" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
+    <span class="bottom-nav__icon" aria-hidden="true">🛒</span>
+    <span class="bottom-nav__label">Mercado</span>
+  </a>
+  <a routerLink="/analytics" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
+    <span class="bottom-nav__icon" aria-hidden="true">📈</span>
+    <span class="bottom-nav__label">Análises</span>
+  </a>
+  <a routerLink="/shared-debts" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
+    <span class="bottom-nav__icon" aria-hidden="true">👥</span>
+    <span class="bottom-nav__label">Dívidas</span>
+  </a>
+</nav>
+
+<!-- ── FAB (new expense shortcut) ── -->
+<button class="fab" (click)="goToNewExpense()" aria-label="Novo gasto">+</button>

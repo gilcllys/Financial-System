@@ -1,99 +1,257 @@
-.cards-grid {
+﻿// ── Cards Grid ──────────────────────────────────────────────────────────────
+.cc-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--space-base);
+  margin-bottom: var(--space-xl);
 
   @media (min-width: 640px) {
     grid-template-columns: repeat(2, 1fr);
   }
-
-  @media (min-width: 1024px) {
-    grid-template-columns: repeat(3, 1fr);
-  }
 }
 
-.credit-card-item {
-  background: var(--color-canvas);
+// ── Credit Card Visual ───────────────────────────────────────────────────────
+.cc-card {
+  border: none;
   border-radius: var(--rounded-xl);
-  border: 1px solid var(--color-hairline);
   padding: var(--space-lg);
   display: flex;
   flex-direction: column;
-  gap: var(--space-base);
-  transition: box-shadow 0.15s ease;
+  gap: var(--space-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, outline 0.1s ease;
+  outline: 3px solid transparent;
+  outline-offset: 2px;
+  min-height: 160px;
+  position: relative;
 
   &:hover {
-    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
   }
 
-  &__header {
+  &:focus-visible {
+    outline-color: #fff;
+  }
+
+  &--selected {
+    outline: 3px solid rgba(255, 255, 255, 0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+
+  &__top {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
+    justify-content: space-between;
   }
 
-  &__icon {
-    font-size: 32px;
-    width: 52px;
-    height: 52px;
+  &__status {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.75);
+    background: rgba(255,255,255,0.15);
+    padding: 3px 8px;
+    border-radius: var(--rounded-pill);
+  }
+
+  &__menu {
+    width: 28px;
+    height: 28px;
     border-radius: var(--rounded-full);
-    background: var(--color-surface-strong);
+    background: rgba(255,255,255,0.15);
+    border: none;
+    cursor: pointer;
+    color: #fff;
+    font-size: 18px;
+    line-height: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
+    transition: background 0.12s;
+
+    &:hover { background: rgba(255,255,255,0.25); }
   }
 
-  &__info {
+  &__body {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
   }
 
   &__name {
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--color-ink);
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
   }
 
   &__digits {
-    font-size: 14px;
-    color: var(--color-muted);
+    font-size: 13px;
+    color: rgba(255,255,255,0.7);
     letter-spacing: 2px;
+    font-family: var(--font-mono);
   }
 
-  &__details {
+  &__footer {
     display: flex;
-    gap: var(--space-base);
-    padding: var(--space-sm) 0;
-    border-top: 1px solid var(--color-hairline-soft);
-    border-bottom: 1px solid var(--color-hairline-soft);
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  &__dates {
+    font-size: 12px;
+    color: rgba(255,255,255,0.65);
+  }
+
+  &__total {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    font-family: var(--font-mono);
   }
 
   &__actions {
     display: flex;
     gap: var(--space-xs);
-    flex-wrap: wrap;
+    margin-top: var(--space-xs);
+  }
+
+  &__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 14px;
+    border-radius: var(--rounded-sm);
+    background: rgba(255,255,255,0.2);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: background 0.12s;
+
+    &:hover {
+      background: rgba(255,255,255,0.3);
+      text-decoration: none;
+      color: #fff;
+    }
   }
 }
 
-.detail-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
+// ── Invoice Section ──────────────────────────────────────────────────────────
+.invoice-section {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-xl);
+  padding: var(--space-lg);
 
-  &__label {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--color-muted);
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-lg);
+    flex-wrap: wrap;
+    gap: var(--space-sm);
   }
 
-  &__value {
+  &__title {
     font-size: 16px;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--color-ink);
+    margin: 0;
+  }
+
+  &__nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  &__month {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-ink);
+    min-width: 130px;
+    text-align: center;
+  }
+
+  &__total {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+    padding-top: var(--space-base);
+    border-top: 1px solid var(--color-hairline);
+    margin-top: var(--space-sm);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-body);
+
+    .mono { font-size: 16px; }
+  }
+}
+
+.invoice-nav-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--rounded-full);
+  border: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+
+  &:hover { background: var(--color-surface-soft); }
+}
+
+// ── Context Menu ─────────────────────────────────────────────────────────────
+.cc-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+}
+
+.cc-menu {
+  position: fixed;
+  z-index: 600;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-md);
+  box-shadow: var(--shadow-lg);
+  min-width: 140px;
+  overflow: hidden;
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: 10px var(--space-base);
+    font-size: 14px;
+    color: var(--color-ink);
+    text-decoration: none;
+    background: none;
+    border: none;
+    width: 100%;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.1s;
+
+    &:hover { background: var(--color-surface-soft); }
+
+    &--danger {
+      color: var(--color-semantic-down);
+      &:hover { background: #fff0f0; }
+    }
   }
 }

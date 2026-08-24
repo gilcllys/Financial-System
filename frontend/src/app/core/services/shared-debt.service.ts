@@ -1,9 +1,9 @@
-import { Injectable, inject } from '@angular/core';
+﻿import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
-// ─── Response shapes ──────────────────────────────────────────────────────────
+// ââ€â‚¬ââ€â‚¬ââ€â‚¬ Response shapes ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬
 
 export interface SharedDebtGroup {
   id: number;
@@ -26,11 +26,13 @@ export interface SharedDebtEntry {
   shared_debt_name: string;
   paid_by: number;
   paid_by_name: string;
+  paid_by_tenant_id: string | null;
   description: string;
   amount: number;
   date: string;
   payment_method: 'dinheiro' | 'cartao';
   credit_card: number | null;
+  credit_card_name: string | null;
   category: number | null;
   category_name: string | null;
   participant_count: number;
@@ -117,6 +119,7 @@ export interface RecurringTemplate {
   amount: number;
   paid_by: number;
   paid_by_name: string;
+  paid_by_tenant_id: string | null;
   participant_ids: number[];
   payment_method: 'dinheiro' | 'cartao';
   category: number | null;
@@ -148,7 +151,7 @@ export class SharedDebtService {
   private http = inject(HttpClient);
   private base = `${environment.apiBaseUrl}/api/debts`;
 
-  // ─── Groups ─────────────────────────────────────────────────────────────
+  // ââ€â‚¬ââ€â‚¬ââ€â‚¬ Groups ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬
   listGroups(): Observable<SharedDebtGroup[]> {
     return this.http.get<SharedDebtGroup[]>(`${this.base}/shared-debts/`);
   }
@@ -186,7 +189,7 @@ export class SharedDebtService {
     return this.http.get<BalancesResponse>(`${this.base}/shared-debts/${id}/balances/`);
   }
 
-  // ─── Entries ────────────────────────────────────────────────────────────
+  // ââ€â‚¬ââ€â‚¬ââ€â‚¬ Entries ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬
   listEntries(params: {
     shared_debt?: number;
     credit_card?: number;
@@ -194,6 +197,7 @@ export class SharedDebtService {
     year?: number;
     category?: number | null;
     page?: number;
+    page_size?: number;
   }): Observable<PaginatedResponse<SharedDebtEntry>> {
     let httpParams = new HttpParams();
     if (params.shared_debt != null) httpParams = httpParams.set('shared_debt', params.shared_debt);
@@ -202,6 +206,7 @@ export class SharedDebtService {
     if (params.year   != null)      httpParams = httpParams.set('year',  params.year);
     if (params.category != null)    httpParams = httpParams.set('category', params.category);
     if (params.page   != null)      httpParams = httpParams.set('page', params.page);
+    if (params.page_size != null)   httpParams = httpParams.set('page_size', params.page_size);
     return this.http.get<PaginatedResponse<SharedDebtEntry>>(`${this.base}/shared-entries/`, { params: httpParams });
   }
 
@@ -217,7 +222,7 @@ export class SharedDebtService {
     return this.http.delete<void>(`${this.base}/shared-entries/${id}/`);
   }
 
-  // ─── Personal debts summary ─────────────────────────────────────────────
+  // ââ€â‚¬ââ€â‚¬ââ€â‚¬ Personal debts summary ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬
   personalSummary(): Observable<PersonalSummary> {
     return this.http.get<PersonalSummary>(`${this.base}/personal-summary/`);
   }
@@ -252,3 +257,4 @@ export class SharedDebtService {
     );
   }
 }
+
