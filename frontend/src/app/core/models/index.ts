@@ -1,4 +1,4 @@
-// ─── TypeScript Models ────────────────────────────────────────────────────────
+﻿// ─── TypeScript Models ────────────────────────────────────────────────────────
 
 export interface ExpenseCategory {
   id: number;
@@ -151,7 +151,9 @@ export interface InvoiceExpensesResponse {
   period_end: string;
   due_date: string;
   summary: {
-    total: number;
+    total: number;           // total composto: individuais + minha parte compartilhada
+    expenses_total: number;  // só despesas individuais
+    shared_total: number;    // só minha parte nas dívidas compartilhadas
     count: number;
   };
   by_category: InvoiceCategoryBreakdown[];
@@ -173,5 +175,7 @@ export interface OpenInvoice {
   due_date: string;
   days_to_close: number;
   total: number;
+  expenses_total: number;
+  shared_total: number;
   count: number;
 }

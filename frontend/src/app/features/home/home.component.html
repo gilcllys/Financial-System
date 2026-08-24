@@ -1,4 +1,4 @@
-<!-- ── Page header ── -->
+﻿<!-- ── Page header ── -->
 <div class="page-header">
   <div>
     <p class="page-header__label">📅 Mês Atual</p>
@@ -83,7 +83,45 @@
     <p class="kpi-card__label">Total Registros</p>
     <p class="kpi-card__value">{{ totalCount() }}</p>
     <p class="kpi-card__sub">lançamentos</p>
-  
+  </div>
+</div>
+
+
+<!-- ── Posição nos Grupos ─────────────────────────────────────────────────── -->
+@if (sharedDebts().length > 0) {
+  <details class="groups-position" [attr.open]="true">
+    <summary class="groups-position__header" aria-label="Posição nos grupos compartilhados">
+      <span class="groups-position__title">🤝 Posição nos Grupos</span>
+      <span class="groups-position__net"
+        [class.value-up]="groupsNetBalance() >= 0"
+        [class.value-down]="groupsNetBalance() < 0">
+        {{ groupsNetBalance() >= 0 ? '+' : '' }}{{ formatCurrency(groupsNetBalance()) }}
+      </span>
+    </summary>
+    <div class="groups-position__body">
+      @for (g of sharedDebts(); track g.id) {
+        @let balance = g.my_portion > 0 ? -(g.my_portion) : 0;
+        <div class="group-pos-card">
+          <div class="group-pos-card__top">
+            <span class="group-pos-card__name">{{ g.name }}</span>
+            <div class="group-pos-card__members">
+              @for (m of g.members.slice(0, 3); track m) {
+                <span class="avatar-chip" [title]="m">{{ m.substring(0,2).toUpperCase() }}</span>
+              }
+            </div>
+          </div>
+          <div class="group-pos-card__stats">
+            <span>Total: <strong>{{ formatCurrency(g.total_amount) }}</strong></span>
+            <span>Minha parte: <strong class="value-down">{{ formatCurrency(g.my_portion) }}</strong></span>
+          </div>
+          <a [routerLink]="['/shared-debts', g.id]" class="btn btn--ghost btn--sm group-pos-card__link">
+            Ver grupo →
+          </a>
+        </div>
+      }
+    </div>
+  </details>
+}
 <!-- ── Gastos Fixos Individuais ─────────────────────────────────────────── -->
 <div class="section-block">
   <div class="page-header" style="margin-top:var(--space-xl)">
@@ -109,7 +147,7 @@
   @if (showRecurringForm()) {
     <div class="card" style="margin-bottom:var(--space-md)">
       <form [formGroup]="recurringForm" (ngSubmit)="saveRecurring()" novalidate
-        style="padding:16px;display:flex;flex-direction:column;gap:10px">
+        class="form-body">
         <div class="form-row">
           <div class="form-group" style="flex:2">
             <label class="form-label">Descrição</label>
@@ -127,7 +165,7 @@
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Forma de pagamento</label>
-            <div style="display:flex;gap:12px;align-items:center;padding:6px 0">
+            <div class="radio-group">
               <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
                 <input type="radio" formControlName="payment_method" value="dinheiro"/> Dinheiro
               </label>
@@ -202,8 +240,6 @@
   }
 </div>
 
-</div>
-</div>
 
 <!-- ── Dashboard cards grid ── -->
 @if (!dashLoading()) {
@@ -572,3 +608,5 @@
     </div>
   </div>
 }
+
+

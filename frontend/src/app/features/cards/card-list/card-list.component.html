@@ -1,7 +1,8 @@
+﻿<!-- ── Page Header ── -->
 <div class="page-header">
   <div class="page-header__left">
-    <h1 class="page-header__title">Cartões de Crédito</h1>
-    <p class="page-header__subtitle">Gerencie seus cartões</p>
+    <h1 class="page-header__title">Cartões</h1>
+    <p class="page-header__subtitle">Gerencie seus cartões e limites</p>
   </div>
   <a routerLink="/cards/new" class="btn btn--primary">+ Novo Cartão</a>
 </div>
@@ -15,48 +16,142 @@
     <div class="empty-state__icon">💳</div>
     <p class="empty-state__title">Nenhum cartão cadastrado</p>
     <p class="empty-state__text">Adicione um cartão para registrar compras parceladas.</p>
-    <a routerLink="/cards/new" class="btn btn--primary" style="margin-top: 16px">+ Novo Cartão</a>
+    <a routerLink="/cards/new" class="btn btn--primary" style="margin-top:16px">+ Novo Cartão</a>
   </div>
 } @else {
-  <div class="cards-grid" role="list" aria-label="Lista de cartões">
-    @for (card of cards(); track card.id) {
-      <div class="credit-card-item" role="listitem">
-        <div class="credit-card-item__header">
-          <div class="credit-card-item__icon" aria-hidden="true">💳</div>
-          <div class="credit-card-item__info">
-            <h3 class="credit-card-item__name">{{ card.name }}</h3>
-            <span class="credit-card-item__digits mono">•••• {{ card.last_four_digits }}</span>
-          </div>
-        </div>
 
-        <div class="credit-card-item__details">
-          <div class="detail-item">
-            <span class="detail-item__label">Vencimento</span>
-            <span class="detail-item__value mono">Dia {{ card.due_day }}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-item__label">Fechamento</span>
-            <span class="detail-item__value mono">Dia {{ card.closing_day }}</span>
-          </div>
-        </div>
-
-        <div class="credit-card-item__actions">
-          <a [routerLink]="['/cards', card.id, 'expenses']" class="btn btn--secondary btn--sm">
-            Ver Gastos
-          </a>
-          <a [routerLink]="['/cards', card.id, 'edit']" class="btn btn--ghost btn--sm" [attr.aria-label]="'Editar ' + card.name">
-            ✏️ Editar
-          </a>
+  <!-- ── Cards Grid ── -->
+  <div class="cc-grid" role="list" aria-label="Lista de cartões">
+    @for (card of cards(); track card.id; let i = $index) {
+      <button
+        class="cc-card"
+        [class.cc-card--selected]="selectedCardId() === card.id"
+        [style]="cardGradient(i)"
+        role="listitem"
+        type="button"
+        (click)="selectCard(card)"
+        [attr.aria-pressed]="selectedCardId() === card.id"
+        [attr.aria-label]="'Selecionar cartão ' + card.name"
+      >
+        <!-- Status badge -->
+        <div class="cc-card__top">
+          <span class="cc-card__status">ATIVA</span>
           <button
-            class="btn btn--ghost btn--sm"
-            (click)="delete(card)"
-            [disabled]="deletingId() === card.id"
-            [attr.aria-label]="'Excluir ' + card.name"
-          >
-            @if (deletingId() === card.id) { <span class="spinner"></span> } @else { 🗑️ Excluir }
-          </button>
+            class="cc-card__menu"
+            type="button"
+            [attr.aria-label]="'Menu do cartão ' + card.name"
+            (click)="openMenu($event, card)"
+          >⋯</button>
+        </div>
+
+        <!-- Name + digits -->
+        <div class="cc-card__body">
+          <h3 class="cc-card__name">{{ card.name }}</h3>
+          <span class="cc-card__digits">•••• •••• •••• {{ card.last_four_digits }}</span>
+        </div>
+
+        <!-- Footer: dates + total -->
+        <div class="cc-card__footer">
+          <span class="cc-card__dates">
+            Fecha dia {{ card.closing_day }} | Vence dia {{ card.due_day }}
+          </span>
+          @if (invoiceTotals()[card.id] !== undefined) {
+            <span class="cc-card__total">
+              Fatura: {{ formatAmount(invoiceTotals()[card.id]) }}
+            </span>
+          }
+        </div>
+
+        <!-- Action button -->
+        <div class="cc-card__actions">
+          <a
+            [routerLink]="['/cards', card.id, 'expenses']"
+            class="cc-card__btn"
+            (click)="$event.stopPropagation()"
+            [attr.aria-label]="'Ver fatura de ' + card.name"
+          >Ver Fatura →</a>
+        </div>
+      </button>
+    }
+  </div>
+
+  <!-- ── Inline Invoice Section ── -->
+  @if (selectedCard()) {
+    <section class="invoice-section" aria-label="Fatura do cartão selecionado">
+      <!-- Section header with month nav -->
+      <div class="invoice-section__header">
+        <h2 class="invoice-section__title">Fatura do Cartão Selecionado</h2>
+        <div class="invoice-section__nav" role="group" aria-label="Navegar meses">
+          <button class="invoice-nav-btn" type="button" (click)="prevMonth()" aria-label="Mês anterior">‹</button>
+          <span class="invoice-section__month">{{ currentMonthLabel() }}</span>
+          <button class="invoice-nav-btn" type="button" (click)="nextMonth()" aria-label="Próximo mês">›</button>
         </div>
       </div>
-    }
+
+      @if (loadingInvoice()) {
+        <div class="loading-wrapper"><span class="spinner"></span> Carregando fatura...</div>
+      } @else if (invoiceExpenses().length === 0) {
+        <div class="empty-state" style="padding: var(--space-xl) 0">
+          <div class="empty-state__icon">🧾</div>
+          <p class="empty-state__title">Sem gastos neste mês</p>
+          <p class="empty-state__text">Nenhuma despesa registrada para {{ currentMonthLabel() }}.</p>
+        </div>
+      } @else {
+        <div class="data-table-wrapper">
+          <table class="data-table" role="table" aria-label="Gastos da fatura">
+            <thead>
+              <tr>
+                <th scope="col">Descrição</th>
+                <th scope="col">Data</th>
+                <th scope="col">Parcela</th>
+                <th scope="col" class="text-right">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (e of invoiceExpenses(); track e.id) {
+                <tr>
+                  <td style="font-weight:500">{{ e.description }}</td>
+                  <td class="mono text-muted" style="font-size:13px;white-space:nowrap">
+                    {{ formatDate(e.date) }}
+                  </td>
+                  <td>
+                    @if (installmentBadge(e); as badge) {
+                      <span class="badge--installment">{{ badge }}</span>
+                    } @else {
+                      <span class="text-muted">-</span>
+                    }
+                  </td>
+                  <td class="text-right">
+                    <span class="value-down mono">{{ formatAmount(e.amount) }}</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Total -->
+        <div class="invoice-section__total">
+          <span>Total da fatura:</span>
+          <span class="value-down mono">{{ formatAmount(invoiceTotal()) }}</span>
+        </div>
+      }
+
+      <!-- Link to full invoice -->
+      <div style="margin-top: var(--space-base); text-align:right">
+        <a [routerLink]="['/cards', selectedCard()!.id, 'expenses']" class="btn btn--secondary btn--sm">
+          Ver fatura completa →
+        </a>
+      </div>
+    </section>
+  }
+}
+
+<!-- ── Context Menu ── -->
+@if (menuCard()) {
+  <div class="cc-menu-backdrop" (click)="closeMenu()" aria-hidden="true"></div>
+  <div class="cc-menu" role="menu" [style.top.px]="menuY()" [style.left.px]="menuX()">
+    <a [routerLink]="['/cards', menuCard()!.id, 'edit']" class="cc-menu__item" role="menuitem" (click)="closeMenu()">✏️ Editar</a>
+    <button class="cc-menu__item cc-menu__item--danger" role="menuitem" type="button" (click)="deleteFromMenu()">🗑️ Excluir</button>
   </div>
 }

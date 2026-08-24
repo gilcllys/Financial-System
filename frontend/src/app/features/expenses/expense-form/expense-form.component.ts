@@ -1,7 +1,8 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+﻿import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
+import { Location } from '@angular/common';
 import { ExpenseService, RecurringExpenseTemplate, GenerateMonthResult } from '../../../core/services/expense.service';
 import { SharedDebtService, SharedDebtGroup, SharedDebtMember } from '../../../core/services/shared-debt.service';
 import { CardService } from '../../../core/services/card.service';
@@ -22,6 +23,7 @@ export class ExpenseFormComponent implements OnInit {
   private categoryService = inject(CategoryService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private location = inject(Location);
   private sharedDebtSvc = inject(SharedDebtService);
 
   // ── Modo Individual / Compartilhado ──────────────────────────────────────
@@ -291,7 +293,7 @@ export class ExpenseFormComponent implements OnInit {
       this.expenseService.delete(this.editId()!).subscribe({
         next: () => {
           this.expenseService.create(payload).subscribe({
-            next: () => this.router.navigate(['/expenses']),
+            next: () => this.location.back(),
             error: err => {
               this.saving.set(false);
               this.errorMessage.set(err?.error?.detail ?? 'Erro ao criar parcelas. Tente novamente.');
@@ -311,13 +313,25 @@ export class ExpenseFormComponent implements OnInit {
       : this.expenseService.create(payload);
 
     req$.subscribe({
-      next: () => this.router.navigate(['/expenses']),
+      next: () => this.location.back(),
       error: err => {
         this.saving.set(false);
         this.errorMessage.set(err?.error?.detail ?? 'Erro ao salvar gasto. Tente novamente.');
       },
     });
   }
+  installmentPreview = computed(() => {
+    const v = this.form.getRawValue();
+    if (!v.is_installment || !v.amount || (v.installments ?? 1) < 2) return null;
+    const count = v.installments ?? 2;
+    const perInstallment = v.amount / count;
+    const start = v.date ? new Date(v.date + 'T12:00:00') : new Date();
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + count - 1);
+    const fmt = (d: Date) => `${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    return { count, perInstallment, total: v.amount, firstMonth: fmt(start), lastMonth: fmt(end) };
+  });
+
 
   private todayStr(): string {
     return new Date().toISOString().split('T')[0];
@@ -328,3 +342,6 @@ export class ExpenseFormComponent implements OnInit {
     return !!(c?.invalid && c?.touched);
   }
 }
+
+
+

@@ -1,4 +1,4 @@
-<!-- ── Page Header ──────────────────────────────────────────────────────────── -->
+﻿<!-- ── Page Header ──────────────────────────────────────────────────────────── -->
 <div class="page-header">
   <div class="page-header__left">
     @if (card()) {
@@ -86,21 +86,21 @@
     <div class="chart-card">
       <h2 class="chart-card__title">Gastos por Dia</h2>
       <div class="chart-card__body">
-        <canvas #dailyChartCanvas aria-label="Gráfico de gastos diários" role="img"></canvas>
+        <div #dailyChartEl class="d3-chart-container" aria-label="Grafico de gastos diarios" role="img"></div>
       </div>
     </div>
 
     <div class="chart-card">
       <h2 class="chart-card__title">Gastos por Semana</h2>
       <div class="chart-card__body">
-        <canvas #weeklyChartCanvas aria-label="Gráfico de gastos semanais" role="img"></canvas>
+        <div #weeklyChartEl class="d3-chart-container" aria-label="Grafico de gastos semanais" role="img"></div>
       </div>
     </div>
 
     <div class="chart-card chart-card--donut">
       <h2 class="chart-card__title">Top 5 Categorias</h2>
       <div class="chart-card__body">
-        <canvas #donutChartCanvas aria-label="Gráfico de categorias por valor" role="img"></canvas>
+        <div #donutChartEl class="d3-chart-container" aria-label="Grafico de categorias" role="img"></div>
       </div>
     </div>
 
@@ -108,7 +108,7 @@
       <h2 class="chart-card__title">Gasto Mensal — {{ selectedInvoice()?.invoice_year }}</h2>
       <div class="chart-card__body">
         @if (monthlyChartDataSig()) {
-          <canvas #monthlyChartCanvas aria-label="Gráfico de gastos mensais" role="img"></canvas>
+          <div #monthlyChartEl class="d3-chart-container" aria-label="Grafico de gastos mensais" role="img"></div>
         } @else {
           <div class="empty-state" style="height:100%;display:flex;align-items:center;justify-content:center">
             Sem dados mensais
@@ -359,14 +359,30 @@
 
 <!-- ── Compartilhado — filtrado pelo periodo da fatura selecionada ── -->
 @if (filteredSharedEntries().length) {
-  <div class="data-table-wrapper" style="margin-top: var(--space-lg)">
+  <!-- Banner resumo compartilhado -->
+  <div class="shared-invoice-summary" style="margin-top:var(--space-lg);display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-base);padding:var(--space-base);background:#f8faff;border:1px solid #dce8ff;border-radius:10px">
+    <div>
+      <p class="kpi-card__label" style="font-size:12px">Minha parte compartilhada</p>
+      <p class="value-down mono" style="font-size:1.1rem;font-weight:600">{{ formatAmount(sharedSummary().mySpend) }}</p>
+    </div>
+    <div>
+      <p class="kpi-card__label" style="font-size:12px">A receber de outros</p>
+      <p class="value-up mono" style="font-size:1.1rem;font-weight:600">{{ formatAmount(sharedSummary().toReceive) }}</p>
+    </div>
+    <div>
+      <p class="kpi-card__label" style="font-size:12px">Custo líquido</p>
+      <p class="mono" style="font-size:1.1rem;font-weight:600">{{ formatAmount(sharedSummary().mySpend - sharedSummary().toReceive) }}</p>
+    </div>
+  </div>
+
+  <div class="data-table-wrapper" style="margin-top:var(--space-base)">
     <table class="data-table" role="table" aria-label="Gastos compartilhados da fatura">
       <thead>
         <tr>
           <th scope="col">Descrição</th>
           <th scope="col">Categoria</th>
           <th scope="col">Data</th>
-          <th scope="col" class="text-right">Valor</th>
+          <th scope="col" class="text-right">Minha parte</th>
           <th scope="col" class="text-right">Ações</th>
         </tr>
       </thead>
@@ -374,23 +390,43 @@
         @if (sharedInstallments().length) {
           <tr><td colspan="5" class="table-subheader">🔁 Parcelados Compartilhados · {{ sharedInstallments().length }}</td></tr>
           @for (s of sharedInstallments(); track s.id) {
-            <tr>
-              <td style="font-weight: 500">{{ s.description }} <span class="badge--shared">👥 {{ s.paid_by_name }}</span></td>
+            <tr [class.shared-row--i-paid]="iPaid(s)">
+              <td style="font-weight:500">
+                {{ s.description }}
+                <span class="badge--shared">👤 {{ s.paid_by_name }}</span>
+                @if (iPaid(s)) { <span class="badge badge--success" style="font-size:11px">você pagou</span> }
+              </td>
               <td><span class="text-muted" style="font-size:13px">Compartilhado</span></td>
-              <td class="mono text-muted" style="font-size: 13px; white-space: nowrap">{{ formatDateFull(s.date) }}</td>
-              <td class="text-right"><span class="value-down mono">{{ formatAmount(s.amount) }}</span></td>
+              <td class="mono text-muted" style="font-size:13px;white-space:nowrap">{{ formatDateFull(s.date) }}</td>
+              <td class="text-right">
+                <span class="value-down mono">{{ formatAmount(myPortion(s)) }}</span>
+                <br><span class="text-muted" style="font-size:11px">de {{ formatAmount(s.amount) }} total ({{ s.participant_count }}px)</span>
+                @if (iPaid(s)) {
+                  <br><span class="value-up" style="font-size:11px">+{{ formatAmount(othersOwe(s)) }} a receber</span>
+                }
+              </td>
               <td class="text-right"><a [routerLink]="['/shared-debts', s.shared_debt]" class="btn btn--secondary btn--sm">Ver grupo</a></td>
             </tr>
           }
         }
         @if (sharedNormal().length) {
-          <tr><td colspan="5" class="table-subheader">👥 Compartilhado · {{ sharedNormal().length }}</td></tr>
+          <tr><td colspan="5" class="table-subheader">🤝 Compartilhado · {{ sharedNormal().length }}</td></tr>
           @for (s of sharedNormal(); track s.id) {
-            <tr>
-              <td style="font-weight: 500">{{ s.description }} <span class="badge--shared">👥 {{ s.paid_by_name }}</span></td>
+            <tr [class.shared-row--i-paid]="iPaid(s)">
+              <td style="font-weight:500">
+                {{ s.description }}
+                <span class="badge--shared">👤 {{ s.paid_by_name }}</span>
+                @if (iPaid(s)) { <span class="badge badge--success" style="font-size:11px">você pagou</span> }
+              </td>
               <td><span class="text-muted" style="font-size:13px">Compartilhado</span></td>
-              <td class="mono text-muted" style="font-size: 13px; white-space: nowrap">{{ formatDateFull(s.date) }}</td>
-              <td class="text-right"><span class="value-down mono">{{ formatAmount(s.amount) }}</span></td>
+              <td class="mono text-muted" style="font-size:13px;white-space:nowrap">{{ formatDateFull(s.date) }}</td>
+              <td class="text-right">
+                <span class="value-down mono">{{ formatAmount(myPortion(s)) }}</span>
+                <br><span class="text-muted" style="font-size:11px">de {{ formatAmount(s.amount) }} total ({{ s.participant_count }}px)</span>
+                @if (iPaid(s)) {
+                  <br><span class="value-up" style="font-size:11px">+{{ formatAmount(othersOwe(s)) }} a receber</span>
+                }
+              </td>
               <td class="text-right"><a [routerLink]="['/shared-debts', s.shared_debt]" class="btn btn--secondary btn--sm">Ver grupo</a></td>
             </tr>
           }
@@ -399,3 +435,4 @@
     </table>
   </div>
 }
+

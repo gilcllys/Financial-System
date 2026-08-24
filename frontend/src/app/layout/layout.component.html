@@ -1,4 +1,4 @@
-<!-- ── Mobile header (hamburger + brand, hidden on desktop) ── -->
+﻿<!-- ── Mobile header (hamburger + brand, hidden on desktop) ── -->
 <header class="mobile-header" role="banner">
   <button
     class="mobile-header__hamburger"
@@ -39,7 +39,7 @@
   <!-- Brand / Logo -->
   <div class="sidebar__header">
     <a routerLink="/home" class="sidebar__brand" (click)="closeDrawer()" aria-label="Controle financeiro home">
-      <img src="assets/atm-icon.svg" alt="" class="sidebar__logo-icon" aria-hidden="true" width="28" height="28">
+      <span class="sidebar__logo-box" aria-hidden="true"><img src="assets/home-icon.svg" alt="" width="18" height="18"></span>
       <span class="sidebar__logo-name">Controle financeiro</span>
     </a>
     <button

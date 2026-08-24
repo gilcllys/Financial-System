@@ -76,3 +76,20 @@
   &__label { font-size: 11px; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.5px; }
   &__value { font-size: 16px; font-weight: 600; font-family: var(--font-mono); color: var(--color-ink); }
 }
+
+/* -- D3 chart containers -- */
+.d3-chart {
+  width: 100%;
+  height: 100%;
+
+  svg { display: block; width: 100%; }
+
+  &--hbar { height: auto; min-height: 120px; }
+  &--donut { height: 260px; }
+  &--area { height: 220px; }
+}
+
+.chart-card__body {
+  &--treemap { height: 220px; }
+  &--hbar { height: auto; min-height: 120px; overflow: visible; }
+}

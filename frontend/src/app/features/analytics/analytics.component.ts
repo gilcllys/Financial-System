@@ -1,9 +1,9 @@
-import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+﻿import { Component, OnInit, inject, signal, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AnalyticsService, MonthlyAnalytics, CategoryAnalytics, CardAnalytics, DailyAnalytics } from '../../core/services/analytics.service';
-import { Chart, registerables } from 'chart.js';
+import { D3ChartService, DonutData, BarData, GroupedBarData, AreaData } from '../../core/services/d3-chart.service';
 
-Chart.register(...registerables);
+const CAT_COLORS = ['#0052ff','#05b169','#cf202f','#f4b000','#7c828a','#16181c','#a8acb3','#30b0c7','#ff6b35','#af52de'];
 
 @Component({
   selector: 'app-analytics',
@@ -12,16 +12,15 @@ Chart.register(...registerables);
   templateUrl: './analytics.component.html',
   styleUrls: ['./analytics.component.scss'],
 })
-export class AnalyticsComponent implements OnInit, OnDestroy, AfterViewInit {
+export class AnalyticsComponent implements OnInit, AfterViewInit {
   private analyticsService = inject(AnalyticsService);
+  private d3 = inject(D3ChartService);
 
-  @ViewChild('monthlyChart') monthlyChartRef!: ElementRef<HTMLCanvasElement>;
-  @ViewChild('categoryChart') categoryChartRef!: ElementRef<HTMLCanvasElement>;
-  @ViewChild('cardChart') cardChartRef!: ElementRef<HTMLCanvasElement>;
-  @ViewChild('cashCategoryChart') cashCategoryChartRef!: ElementRef<HTMLCanvasElement>;
-  @ViewChild('dailyChart') dailyChartRef!: ElementRef<HTMLCanvasElement>;
-
-  private charts: Chart[] = [];
+  @ViewChild('monthlyChart') monthlyRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('categoryChart') categoryRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('cardChart') cardRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('cashCategoryChart') cashCategoryRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('dailyChart') dailyRef!: ElementRef<HTMLDivElement>;
 
   selectedYear = signal(new Date().getFullYear());
   selectedMonth = signal(new Date().getMonth() + 1);
@@ -31,20 +30,18 @@ export class AnalyticsComponent implements OnInit, OnDestroy, AfterViewInit {
   categoryData = signal<CategoryAnalytics[]>([]);
   cardData = signal<CardAnalytics[]>([]);
   cashCategoryData = signal<CategoryAnalytics[]>([]);
-  cashDailyData = signal<DailyAnalytics[]>([]);
   dailyData = signal<DailyAnalytics[]>([]);
 
   years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
   months = [
     { value: 1, label: 'Janeiro' }, { value: 2, label: 'Fevereiro' },
-    { value: 3, label: 'Março' }, { value: 4, label: 'Abril' },
+    { value: 3, label: 'Marco' }, { value: 4, label: 'Abril' },
     { value: 5, label: 'Maio' }, { value: 6, label: 'Junho' },
     { value: 7, label: 'Julho' }, { value: 8, label: 'Agosto' },
     { value: 9, label: 'Setembro' }, { value: 10, label: 'Outubro' },
     { value: 11, label: 'Novembro' }, { value: 12, label: 'Dezembro' },
   ];
 
-  // KPIs calculados no TS (não no template — Arrow functions não são suportadas em templates Angular)
   avgDaily = () => {
     const data = this.dailyData();
     const active = data.filter(d => d.total > 0);
@@ -58,151 +55,76 @@ export class AnalyticsComponent implements OnInit, OnDestroy, AfterViewInit {
   private dataReady = false;
 
   ngOnInit(): void { this.loadAll(); }
-
-  ngAfterViewInit(): void {
-    this.viewReady = true;
-    if (this.dataReady) this.renderCharts();
-  }
-
-  ngOnDestroy(): void { this.charts.forEach(c => c.destroy()); }
+  ngAfterViewInit(): void { this.viewReady = true; if (this.dataReady) this.renderCharts(); }
 
   loadAll(): void {
     this.loading.set(true);
     this.dataReady = false;
-    let pending = 6;
+    let pending = 5;
     const done = () => { if (--pending === 0) { this.dataReady = true; this.loading.set(false); if (this.viewReady) this.renderCharts(); } };
-
     this.analyticsService.monthly(this.selectedYear()).subscribe({ next: d => { this.monthlyData.set(d); done(); }, error: () => done() });
     this.analyticsService.byCategory(this.selectedMonth(), this.selectedYear()).subscribe({ next: d => { this.categoryData.set(d); done(); }, error: () => done() });
     this.analyticsService.byCard(this.selectedMonth(), this.selectedYear()).subscribe({ next: d => { this.cardData.set(d); done(); }, error: () => done() });
     this.analyticsService.byCategory(this.selectedMonth(), this.selectedYear(), 'dinheiro').subscribe({ next: d => { this.cashCategoryData.set(d); done(); }, error: () => done() });
-    this.analyticsService.daily(this.selectedMonth(), this.selectedYear(), 'dinheiro').subscribe({ next: d => { this.cashDailyData.set(d); done(); }, error: () => done() });
     this.analyticsService.daily(this.selectedMonth(), this.selectedYear()).subscribe({ next: d => { this.dailyData.set(d); done(); }, error: () => done() });
   }
 
-  onFilterChange(): void {
-    this.charts.forEach(c => c.destroy());
-    this.charts = [];
-    this.loadAll();
-  }
+  onFilterChange(): void { this.loadAll(); }
 
   private renderCharts(): void {
-    this.charts.forEach(c => c.destroy());
-    this.charts = [];
     setTimeout(() => {
       this.renderMonthly();
       this.renderCategory();
       this.renderCard();
       this.renderCashCategory();
       this.renderDaily();
-    }, 50);
+    }, 80);
   }
 
   private renderMonthly(): void {
-    const ctx = this.monthlyChartRef?.nativeElement;
-    if (!ctx) return;
-    const data = this.monthlyData();
-    this.charts.push(new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: data.map(d => d.month_name.substring(0, 3)),
-        datasets: [
-          { label: 'Receitas', data: data.map(d => d.income), backgroundColor: 'rgba(5,177,105,0.7)', borderColor: '#05b169', borderWidth: 1, borderRadius: 4 },
-          { label: 'Despesas', data: data.map(d => d.expenses), backgroundColor: 'rgba(207,32,47,0.7)', borderColor: '#cf202f', borderWidth: 1, borderRadius: 4 },
-        ],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: ctx => `R$ ${(ctx.parsed.y ?? 0).toFixed(2)}` } } },
-        scales: { y: { ticks: { callback: v => `R$ ${v}` } } },
-      },
+    const el = this.monthlyRef?.nativeElement;
+    if (!el) return;
+    const data: GroupedBarData[] = this.monthlyData().map(d => ({
+      label: d.month_name.substring(0, 3),
+      income: d.income,
+      expenses: d.expenses,
     }));
+    this.d3.renderGroupedBar(el, data);
   }
 
   private renderCategory(): void {
-    const ctx = this.categoryChartRef?.nativeElement;
-    if (!ctx) return;
-    const data = this.categoryData();
-    if (!data.length) return;
-    const colors = ['#0052ff','#05b169','#cf202f','#f4b000','#7c828a','#16181c','#a8acb3','#dee1e6','#eef0f3','#5b616e'];
-    this.charts.push(new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: data.map(d => d.category_name),
-        datasets: [{ data: data.map(d => d.total), backgroundColor: colors.slice(0, data.length), borderWidth: 2, borderColor: '#fff' }],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'right' },
-          tooltip: { callbacks: { label: ctx => `${ctx.label}: R$ ${(ctx.parsed as number).toFixed(2)} (${data[ctx.dataIndex].percentage.toFixed(1)}%)` } },
-        },
-      },
+    const el = this.categoryRef?.nativeElement;
+    if (!el) return;
+    const data: DonutData[] = this.categoryData().map((d, i) => ({
+      label: d.category_name, value: d.total, color: CAT_COLORS[i % CAT_COLORS.length],
     }));
+    this.d3.renderTreemap(el, data);
   }
 
   private renderCard(): void {
-    const ctx = this.cardChartRef?.nativeElement;
-    if (!ctx) return;
-    const data = this.cardData();
-    if (!data.length) return;
-    this.charts.push(new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: data.map(d => `${d.card_name} ****${d.last_four_digits}`),
-        datasets: [{ label: 'Gasto no cartão', data: data.map(d => d.total), backgroundColor: 'rgba(0,82,255,0.7)', borderColor: '#0052ff', borderWidth: 1, borderRadius: 4 }],
-      },
-      options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `R$ ${(ctx.parsed.x ?? 0).toFixed(2)}` } } },
-        scales: { x: { ticks: { callback: v => `R$ ${v}` } } },
-      },
+    const el = this.cardRef?.nativeElement;
+    if (!el) return;
+    const data: BarData[] = this.cardData().map(d => ({
+      label: `${d.card_name} ****${d.last_four_digits}`, value: d.total,
     }));
+    this.d3.renderHorizontalBar(el, data);
   }
 
   private renderCashCategory(): void {
-    const ctx = this.cashCategoryChartRef?.nativeElement;
-    if (!ctx) return;
-    const data = this.cashCategoryData();
-    if (!data.length) return;
-    const colors = ['#05b169','#0052ff','#cf202f','#f4b000','#7c828a','#16181c','#a8acb3','#dee1e6','#eef0f3','#5b616e'];
-    this.charts.push(new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: data.map(d => d.category_name),
-        datasets: [{ data: data.map(d => d.total), backgroundColor: colors.slice(0, data.length), borderWidth: 2, borderColor: '#fff' }],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'right' },
-          tooltip: { callbacks: { label: ctx => `${ctx.label}: R$ ${(ctx.parsed as number).toFixed(2)} (${data[ctx.dataIndex].percentage.toFixed(1)}%)` } },
-        },
-      },
+    const el = this.cashCategoryRef?.nativeElement;
+    if (!el) return;
+    const total = this.cashCategoryData().reduce((s, d) => s + d.total, 0);
+    const data: DonutData[] = this.cashCategoryData().map((d, i) => ({
+      label: d.category_name, value: d.total, color: CAT_COLORS[i % CAT_COLORS.length],
     }));
+    this.d3.renderDonut(el, data, new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(total));
   }
 
   private renderDaily(): void {
-    const ctx = this.dailyChartRef?.nativeElement;
-    if (!ctx) return;
-    const data = this.dailyData();
-    this.charts.push(new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: data.map(d => `Dia ${d.day}`),
-        datasets: [{
-          label: 'Gasto diário',
-          data: data.map(d => d.total),
-          borderColor: '#0052ff', backgroundColor: 'rgba(0,82,255,0.08)',
-          borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3,
-        }],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `R$ ${(ctx.parsed.y ?? 0).toFixed(2)}` } } },
-        scales: { y: { ticks: { callback: v => `R$ ${v}` }, beginAtZero: true } },
-      },
-    }));
+    const el = this.dailyRef?.nativeElement;
+    if (!el) return;
+    const data: AreaData[] = this.dailyData().map(d => ({ day: d.day, value: d.total }));
+    this.d3.renderArea(el, data);
   }
 
   formatCurrency(v: number): string {

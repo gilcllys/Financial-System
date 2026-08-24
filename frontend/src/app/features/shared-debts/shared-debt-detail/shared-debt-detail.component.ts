@@ -1,4 +1,4 @@
-import * as d3 from 'd3';
+﻿import * as d3 from 'd3';
 import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild, effect } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -205,6 +205,11 @@ export class SharedDebtDetailComponent implements OnInit {
     if (paidBy == null) return false;
     const member = this.members().find(m => m.id === paidBy);
     return !!member && !!member.tenant_id && member.tenant_id === this.myTenantId;
+  }
+
+  /** True when tenantId belongs to the authenticated user. */
+  isMe(tenantId: string | null): boolean {
+    return !!tenantId && tenantId === this.myTenantId;
   }
 
   constructor() {
@@ -573,6 +578,89 @@ export class SharedDebtDetailComponent implements OnInit {
       },
     });
   }
+  // ── Tab & Installment view ──────────────────────────────────────────────
+  activeTab = signal<'entries' | 'installments' | 'byPerson'>('entries');
+
+  installmentGroups = computed(() => {
+    const all = this.entries();
+    const myId = this.myTenantId;
+    // Group by installment_group_id (non-null) or by description for same total_installments
+    const map = new Map<string, SharedDebtEntry[]>();
+    for (const e of all) {
+      if (e.total_installments <= 1) continue;
+      const key = e.installment_group_id ?? `${e.description}__${e.total_installments}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(e);
+    }
+
+    const MONTH_NAMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const now = new Date();
+
+    return [...map.entries()].map(([groupId, entries]) => {
+      entries.sort((a, b) => a.installment_number - b.installment_number);
+      const first = entries[0];
+      const last = entries[entries.length - 1];
+      const total = first.total_installments;
+      const paid = entries.filter(e => new Date(e.date) <= now).length;
+      const progressPct = Math.round((paid / total) * 100);
+      const paidBy = first.paid_by_name;
+      const participantCount = first.participant_count;
+      const installmentAmount = first.amount;
+      const myPortionPerInstallment = installmentAmount / (participantCount || 1);
+      const totalAmount = installmentAmount * total;
+      const myTotalPortion = myPortionPerInstallment * total;
+      const myPaidPortion = myPortionPerInstallment * paid;
+      const remaining = myTotalPortion - myPaidPortion;
+
+      // Status
+      const lastEntry = entries[entries.length - 1];
+      const lastDate = new Date(lastEntry.date);
+      let status = 'Em andamento';
+      if (paid >= total) status = 'Concluído';
+      else if (lastDate < now && paid < total) status = 'Atrasada';
+
+      const startD = new Date(first.date);
+      const endD = new Date(last.date);
+      const startMonth = `${MONTH_NAMES[startD.getMonth()]}/${startD.getFullYear()}`;
+      const endMonth = `${MONTH_NAMES[endD.getMonth()]}/${endD.getFullYear()}`;
+
+      return {
+        groupId,
+        description: first.description,
+        total,
+        paid,
+        progressPct,
+        status,
+        paidByName: paidBy,
+        participantCount,
+        installmentAmount,
+        myPortionPerInstallment,
+        totalAmount,
+        myTotalPortion,
+        remaining,
+        startMonth,
+        endMonth,
+        entries,
+        expanded: false,
+      };
+    });
+  });
+
+  myPortion(e: SharedDebtEntry): number {
+    return e.amount / (e.participant_count || 1);
+  }
+
+  isPaid(e: SharedDebtEntry): boolean {
+    return new Date(e.date) <= new Date();
+  }
+
+  formatMonthYear(d: string): string {
+    if (!d) return '';
+    const MONTH_NAMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const dt = new Date(d + 'T00:00:00');
+    return `${MONTH_NAMES[dt.getMonth()]}/${dt.getFullYear()}`;
+  }
+
 
   // ── Formatters ──────────────────────────────────────────────────────────
   formatCurrency(v: number): string {
@@ -587,4 +675,46 @@ export class SharedDebtDetailComponent implements OnInit {
     const c = this.form.get(field);
     return !!(c?.invalid && c?.touched);
   }
+
+  // ── Per-person view ─────────────────────────────────────────────────────
+  perPerson = computed(() => {
+    const members = this.members();
+    const allEntries = this.entries();
+    const catColors = ['#0052ff','#05b169','#cf202f','#f4b000','#7c828a','#30b0c7','#ff6b35'];
+
+    return members.map(member => {
+      const paidEntries = allEntries.filter(e => e.paid_by === member.id);
+      const totalSpent = paidEntries.reduce((s, e) => s + e.amount, 0);
+
+      let catIdx = 0;
+      const catMap = new Map<string, { name: string; total: number; color: string }>();
+      for (const e of paidEntries) {
+        const key = e.category_name ?? 'Sem categoria';
+        if (!catMap.has(key)) catMap.set(key, { name: key, total: 0, color: catColors[catIdx++ % catColors.length] });
+        catMap.get(key)!.total += e.amount / (e.participant_count || 1);
+      }
+
+      const myPortion = paidEntries.reduce((s, e) => s + (e.amount / (e.participant_count || 1)), 0);
+      const bal = this.balances();
+      const settlement = bal?.settlement.find(s => s.from_member_id === member.id);
+      const owes = settlement?.amount ?? 0;
+
+      return {
+        member,
+        isMe: member.tenant_id === this.myTenantId,
+        totalSpent,
+        myPortion,
+        owes,
+        entries: paidEntries,
+        categorySummary: Array.from(catMap.values()),
+      };
+    });
+  });
+
+  initials(name: string): string {
+    return (name ?? '?').split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase();
+  }
+
+  catColors = ['#0052ff','#05b169','#cf202f','#f4b000','#7c828a','#30b0c7','#ff6b35'];
+  catColor(i: number): string { return this.catColors[i % this.catColors.length]; }
 }

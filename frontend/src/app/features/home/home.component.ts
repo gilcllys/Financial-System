@@ -1,4 +1,4 @@
-import {
+﻿import {
   Component, OnInit, OnDestroy, AfterViewInit,
   ElementRef, ViewChild, inject, signal, computed, effect
 } from '@angular/core';
@@ -55,7 +55,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     description: ['', Validators.required],
     amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
     day_of_month: [1, [Validators.required, Validators.min(1), Validators.max(28)]],
-    payment_method: ['dinheiro', Validators.required],
+    payment_method: ['dinheiro' as 'dinheiro' | 'cartao', Validators.required],
     category_id: [null as number | null],
   });
   private destroy$         = new Subject<void>();
@@ -110,6 +110,11 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   totalRemainingInstallments = computed(() =>
     this.installmentGroups().reduce((s, g) => s + g.remainingAmount, 0)
   );
+  // ponytail: this exists — soma my_portion de todos os grupos para o chip de resumo
+  groupsNetBalance = computed(() =>
+    this.sharedDebts().reduce((s, g) => s - g.my_portion, 0)
+  );
+
 
   // ────────────────────────────────────────────────────────────────────────
   ngOnInit(): void {
@@ -461,7 +466,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
       description: v.description!,
       amount: v.amount!,
       day_of_month: v.day_of_month ?? 1,
-      payment_method: v.payment_method!,
+      payment_method: v.payment_method! as 'dinheiro' | 'cartao',
       category_id: v.category_id,
     }).subscribe({
       next: () => {
@@ -490,3 +495,5 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
 }
+
+
