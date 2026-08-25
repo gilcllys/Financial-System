@@ -1,5 +1,5 @@
 ﻿import calendar
-from datetime import date
+from datetime import date, timedelta
 
 from django.db.models import Count, Sum
 from django.db.models.functions import Abs
@@ -13,81 +13,78 @@ _MONTH_NAMES = [
 ]
 
 
-def _current_invoice_month(card):
-    """
-    Determina (invoice_month, invoice_year) da fatura corrente (aberta hoje).
-
-    Lógica verificada contra 2 faturas reais Itaú:
-      closing_day = card.closing_day  (dia real de fechamento)
-
-      Se hoje.dia <= closing_day  → estamos no período de fechamento do mês
-          atual (M = today.month)
-      Caso contrário              → o período já fechou; a próxima fatura é
-          do mês seguinte (M = today.month + 1, com wraparound)
-
-      O mês da fatura é sempre M + 1 (leva o nome do mês de vencimento,
-      que é um mês após o fechamento).
-    """
-    today = date.today()
-    closing_day = card.closing_day
-
-    if today.day <= closing_day:
-        closing_month = today.month
-        closing_year = today.year
-    else:
-        if today.month < 12:
-            closing_month = today.month + 1
-            closing_year = today.year
-        else:
-            closing_month = 1
-            closing_year = today.year + 1
-
-    if closing_month < 12:
-        return closing_month + 1, closing_year
-    return 1, closing_year + 1
-
-
-def _compute_invoice_period(card, invoice_month, invoice_year):
-    """
-    Calcula (period_start, period_end, due_date) para a fatura identificada
-    por (invoice_month, invoice_year).
-
-    Contrato (verificado contra faturas reais Itaú):
-      closing_day   = card.closing_day  (dia real de fechamento)
-      closing_month = invoice_month - 1   (com wraparound de ano)
-
-      period_end   = date(closing_year, closing_month, closing_day)
-      period_start = date(start_year,   start_month,   closing_day)
-                     onde start_month = closing_month - 1 (com wraparound)
-      due_date     = date(invoice_year, invoice_month, card.due_day)
-
-    Dias são limitados (clamped) ao número real de dias do mês para evitar
-    datas inválidas (ex.: 31 de fevereiro).
-    """
-    closing_day = card.closing_day
-
-    if invoice_month == 1:
-        closing_month, closing_year = 12, invoice_year - 1
-    else:
-        closing_month, closing_year = invoice_month - 1, invoice_year
-
-    _, days_in_closing = calendar.monthrange(closing_year, closing_month)
-    period_end = date(closing_year, closing_month, min(closing_day, days_in_closing))
-
-    if closing_month == 1:
-        start_month, start_year = 12, closing_year - 1
-    else:
-        start_month, start_year = closing_month - 1, closing_year
-
-    _, days_in_start = calendar.monthrange(start_year, start_month)
-    period_start = date(start_year, start_month, min(closing_day, days_in_start))
-
-    _, days_in_due = calendar.monthrange(invoice_year, invoice_month)
-    due = date(invoice_year, invoice_month, min(card.due_day, days_in_due))
-
-    return period_start, period_end, due
-
-
+def _effective_closing_date(year, month, closing_day):
+    """Return the effective closing date, moving weekends back to Friday."""
+    _, days_in_month = calendar.monthrange(year, month)
+    closing = date(year, month, min(closing_day, days_in_month))
+
+    if closing.weekday() == 5:
+        return closing - timedelta(days=1)
+    if closing.weekday() == 6:
+        return closing - timedelta(days=2)
+    return closing
+
+
+def _current_invoice_month(card):
+    """
+    Determina (invoice_month, invoice_year) da fatura corrente (aberta hoje).
+
+    Usa o fechamento efetivo do mes atual: quando o dia cadastrado cai no
+    fim de semana, a fatura fecha na sexta-feira anterior.
+    """
+    today = date.today()
+    effective_closing = _effective_closing_date(
+        today.year, today.month, card.closing_day
+    )
+
+    if today <= effective_closing:
+        closing_month = today.month
+        closing_year = today.year
+    else:
+        if today.month < 12:
+            closing_month = today.month + 1
+            closing_year = today.year
+        else:
+            closing_month = 1
+            closing_year = today.year + 1
+
+    if closing_month < 12:
+        return closing_month + 1, closing_year
+    return 1, closing_year + 1
+
+
+def _compute_invoice_period(card, invoice_month, invoice_year):
+    """
+    Calcula (period_start, period_end, due_date) para a fatura identificada
+    por (invoice_month, invoice_year).
+
+    O fechamento nominal vem de card.closing_day, mas o fechamento efetivo
+    do mes antecipa sabado/domingo para a sexta-feira anterior. O inicio da
+    fatura e o dia seguinte ao fechamento efetivo anterior.
+    """
+    closing_day = card.closing_day
+
+    if invoice_month == 1:
+        closing_month, closing_year = 12, invoice_year - 1
+    else:
+        closing_month, closing_year = invoice_month - 1, invoice_year
+
+    period_end = _effective_closing_date(closing_year, closing_month, closing_day)
+
+    if closing_month == 1:
+        start_month, start_year = 12, closing_year - 1
+    else:
+        start_month, start_year = closing_month - 1, closing_year
+
+    previous_closing = _effective_closing_date(start_year, start_month, closing_day)
+    period_start = previous_closing + timedelta(days=1)
+
+    _, days_in_due = calendar.monthrange(invoice_year, invoice_month)
+    due = date(invoice_year, invoice_month, min(card.due_day, days_in_due))
+
+    return period_start, period_end, due
+
+
 class InvoicesBehavior:
     """
     Lista as faturas de um cartão de crédito.
