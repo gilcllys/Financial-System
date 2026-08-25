@@ -9,6 +9,7 @@ function normalize(raw: any): Expense {
   return {
     ...raw,
     category_id: raw.category_id ?? raw.category,
+    credit_card_id: raw.credit_card_id ?? raw.credit_card ?? null,
     amount: parseFloat(raw.amount),
   };
 }

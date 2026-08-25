@@ -1,11 +1,81 @@
 ﻿import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ExpenseService } from '../../core/services/expense.service';
+import { CardService } from '../../core/services/card.service';
 import { SharedDebtService, SharedDebtEntry } from '../../core/services/shared-debt.service';
-import { Expense } from '../../core/models';
+import { CreditCard, Expense } from '../../core/models';
+
+interface InvoiceRef {
+  year: number;
+  month: number;
+  displayDate: string;
+  sort: number;
+}
+
+function parseIsoDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function monthDate(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-01`;
+}
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+function nextMonth(year: number, month: number): { year: number; month: number } {
+  return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
+}
+
+function invoiceFromClosing(year: number, month: number): InvoiceRef {
+  const invoice = nextMonth(year, month);
+  return {
+    year: invoice.year,
+    month: invoice.month,
+    displayDate: monthDate(invoice.year, invoice.month),
+    sort: invoice.year * 12 + invoice.month,
+  };
+}
+
+function effectiveClosingDate(year: number, month: number, closingDay: number): Date {
+  const closing = new Date(year, month - 1, Math.min(closingDay, daysInMonth(year, month)));
+  if (closing.getDay() === 6) return new Date(year, month - 1, closing.getDate() - 1);
+  if (closing.getDay() === 0) return new Date(year, month - 1, closing.getDate() - 2);
+  return closing;
+}
+
+function invoiceForDate(dateStr: string, closingDay: number): InvoiceRef {
+  const date = parseIsoDate(dateStr);
+  let closingYear = date.getFullYear();
+  let closingMonth = date.getMonth() + 1;
+  const effectiveClosing = effectiveClosingDate(closingYear, closingMonth, closingDay);
+
+  if (date > effectiveClosing) {
+    const next = nextMonth(closingYear, closingMonth);
+    closingYear = next.year;
+    closingMonth = next.month;
+  }
+
+  return invoiceFromClosing(closingYear, closingMonth);
+}
+
+function currentInvoice(closingDay: number): InvoiceRef {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1;
+  const effectiveClosing = effectiveClosingDate(year, month, closingDay);
+
+  if (today <= effectiveClosing) return invoiceFromClosing(year, month);
+  const next = nextMonth(year, month);
+  return invoiceFromClosing(next.year, next.month);
+}
 
 interface InstallmentGroup {
   name: string;
+  cardId: number | null;
   cardName: string;
   totalInstallments: number;
   paidInstallments: number;
@@ -18,6 +88,7 @@ interface InstallmentGroup {
 interface SharedInstallmentGroup {
   installment_group_id: string;
   name: string;
+  cardId: number | null;
   cardName: string;
   shared_debt_id: number;
   shared_debt_name: string;
@@ -40,18 +111,52 @@ interface SharedInstallmentGroup {
 export class InstallmentsComponent implements OnInit {
   private expenseService = inject(ExpenseService);
   private sharedDebtService = inject(SharedDebtService);
+  private cardService = inject(CardService);
 
   expenses = signal<Expense[]>([]);
   sharedEntries = signal<SharedDebtEntry[]>([]);
+  cards = signal<CreditCard[]>([]);
   loading = signal(true);
   loadingShared = signal(true);
+  loadingCards = signal(true);
   showFinalizadas = signal(false);
   showFinalizadasShared = signal(false);
   deletingGroup = signal<string | null>(null);
 
+  private cardMap = computed(() => new Map(this.cards().map(card => [card.id, card])));
+
+  private getExpenseCardId(expense: Expense): number | null {
+    return expense.credit_card_id ?? (expense as any).credit_card ?? null;
+  }
+
+  private installmentInvoice(date: string, cardId: number | null): InvoiceRef | null {
+    const card = cardId ? this.cardMap().get(cardId) : null;
+    return card ? invoiceForDate(date, card.closing_day) : null;
+  }
+
+  private isInstallmentClosed(date: string, cardId: number | null): boolean {
+    const invoice = this.installmentInvoice(date, cardId);
+    const card = cardId ? this.cardMap().get(cardId) : null;
+    if (!invoice || !card) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return parseIsoDate(date) <= today;
+    }
+    return invoice.sort < currentInvoice(card.closing_day).sort;
+  }
+
+  private installmentDisplayDate(date: string, cardId: number | null): string {
+    return this.installmentInvoice(date, cardId)?.displayDate ?? date;
+  }
+
+  private isCurrentInvoice(group: { cardId: number | null; nextDate: string | null }): boolean {
+    if (!group.nextDate) return false;
+    const card = group.cardId ? this.cardMap().get(group.cardId) : null;
+    if (!card) return group.nextDate.slice(0, 7) === new Date().toISOString().slice(0, 7);
+    return group.nextDate === currentInvoice(card.closing_day).displayDate;
+  }
+
   installmentGroups = computed((): InstallmentGroup[] => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
     const installmentExpenses = this.expenses().filter(e => /parcela\s+\d+\/\d+/i.test(e.description));
     const groupMap = new Map<string, InstallmentGroup>();
 
@@ -61,9 +166,10 @@ export class InstallmentsComponent implements OnInit {
       const baseName = match[1].trim() || expense.description;
       const currentPart = +match[2];
       const totalParts = +match[3];
-      const key = `${baseName}-${totalParts}`;
-      const expenseDate = new Date(expense.date + 'T00:00:00');
-      const isPaid = expenseDate <= today;
+      const cardId = this.getExpenseCardId(expense);
+      const key = `${baseName}-${totalParts}-${cardId ?? 'none'}`;
+      const isPaid = this.isInstallmentClosed(expense.date, cardId);
+      const displayDate = this.installmentDisplayDate(expense.date, cardId);
 
       const existing = groupMap.get(key);
       if (existing) {
@@ -71,20 +177,21 @@ export class InstallmentsComponent implements OnInit {
         if (isPaid && currentPart > existing.paidInstallments) {
           existing.paidInstallments = currentPart;
         }
-        // Proxima parcela = menor data futura
-        if (!isPaid) {
-          if (!existing.nextDate || expense.date < existing.nextDate) existing.nextDate = expense.date;
+        if (!isPaid && (!existing.nextDate || displayDate < existing.nextDate)) {
+          existing.nextDate = displayDate;
         }
       } else {
-        const cardName = (expense as any).credit_card_name ?? (expense as any).card_name ?? '';
+        const card = cardId ? this.cardMap().get(cardId) : null;
+        const cardName = (expense as any).credit_card_name ?? (expense as any).card_name ?? card?.name ?? '';
         groupMap.set(key, {
           name: baseName,
+          cardId,
           cardName,
           totalInstallments: totalParts,
           paidInstallments: isPaid ? currentPart : 0,
           amountPerInstallment: Math.abs(expense.amount),
           totalAmount: Math.abs(expense.amount) * totalParts,
-          nextDate: !isPaid ? expense.date : null,
+          nextDate: !isPaid ? displayDate : null,
           expenses: [expense],
         });
       }
@@ -100,17 +207,17 @@ export class InstallmentsComponent implements OnInit {
   );
 
   sharedInstallmentGroups = computed((): SharedInstallmentGroup[] => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
     const parceladas = this.sharedEntries().filter(e => e.total_installments > 1 && e.installment_group_id);
     const groupMap = new Map<string, SharedInstallmentGroup>();
 
     for (const entry of parceladas) {
       const gid = entry.installment_group_id!;
       const baseName = entry.description.replace(/\s*\(\d+\/\d+\)\s*$/, '').trim();
-      const entryDate = new Date(entry.date + 'T00:00:00');
-      const isPaid = entryDate <= today;
-      const cardName = (entry as any).credit_card_name ?? '';
+      const cardId = entry.credit_card ?? null;
+      const isPaid = this.isInstallmentClosed(entry.date, cardId);
+      const displayDate = this.installmentDisplayDate(entry.date, cardId);
+      const card = cardId ? this.cardMap().get(cardId) : null;
+      const cardName = (entry as any).credit_card_name ?? card?.name ?? '';
 
       const existing = groupMap.get(gid);
       if (existing) {
@@ -118,13 +225,14 @@ export class InstallmentsComponent implements OnInit {
         if (isPaid && entry.installment_number > existing.paidInstallments) {
           existing.paidInstallments = entry.installment_number;
         }
-        if (!isPaid && (!existing.nextDate || entry.date < existing.nextDate)) {
-          existing.nextDate = entry.date;
+        if (!isPaid && (!existing.nextDate || displayDate < existing.nextDate)) {
+          existing.nextDate = displayDate;
         }
       } else {
         groupMap.set(gid, {
           installment_group_id: gid,
           name: baseName,
+          cardId,
           cardName,
           shared_debt_id: entry.shared_debt,
           shared_debt_name: entry.shared_debt_name,
@@ -133,7 +241,7 @@ export class InstallmentsComponent implements OnInit {
           amountPerInstallment: entry.amount,
           myPortion: entry.amount / (entry.participant_count ?? 1),
           totalAmount: entry.amount * entry.total_installments,
-          nextDate: !isPaid ? entry.date : null,
+          nextDate: !isPaid ? displayDate : null,
           entries: [entry],
         });
       }
@@ -153,8 +261,8 @@ export class InstallmentsComponent implements OnInit {
     this.activeGroups().reduce((s, g) => s + g.amountPerInstallment * (g.totalInstallments - g.paidInstallments), 0)
   );
   parcelaEsteMes = computed(() =>
-    this.activeGroups().reduce((s, g) => s + g.amountPerInstallment, 0) +
-    this.activeSharedGroups().reduce((s, g) => s + g.myPortion, 0)
+    this.activeGroups().filter(g => this.isCurrentInvoice(g)).reduce((s, g) => s + g.amountPerInstallment, 0) +
+    this.activeSharedGroups().filter(g => this.isCurrentInvoice(g)).reduce((s, g) => s + g.myPortion, 0)
   );
   quitamEm30Dias = computed(() => {
     const limit = new Date();
@@ -169,8 +277,17 @@ export class InstallmentsComponent implements OnInit {
   );
 
   ngOnInit(): void {
+    this.fetchCards();
     this.fetchExpenses();
     this.fetchSharedEntries();
+  }
+
+  private fetchCards(): void {
+    this.loadingCards.set(true);
+    this.cardService.list().subscribe({
+      next: cards => { this.cards.set(cards); this.loadingCards.set(false); },
+      error: () => this.loadingCards.set(false),
+    });
   }
 
   private fetchExpenses(): void {
@@ -217,7 +334,7 @@ export class InstallmentsComponent implements OnInit {
 
   formatNextDate(dateStr: string | null): string {
     if (!dateStr) return '-';
-    const [y, m, d] = dateStr.split('-');
+    const [y, m] = dateStr.split('-');
     const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
     return `${months[+m-1]}/${y}`;
   }
