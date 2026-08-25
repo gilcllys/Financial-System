@@ -114,6 +114,9 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   filteredTotal         = computed(() => this.invoiceData()?.summary.total ?? 0);
   expensesTotal         = computed(() => this.invoiceData()?.summary.expenses_total ?? this.invoiceData()?.summary.total ?? 0);
   sharedTotal           = computed(() => this.invoiceData()?.summary.shared_total ?? 0);
+  sharedBreakdown       = computed(() => this.invoiceData()?.summary.shared_breakdown ?? null);
+  sharedGrossTotal      = computed(() => this.sharedBreakdown()?.total ?? 0);
+  sharedParticipants    = computed(() => this.sharedBreakdown()?.participants ?? []);
   hasSharedInInvoice    = computed(() => (this.invoiceData()?.summary.shared_total ?? 0) > 0);
   totalTransactions     = computed(() => this.invoiceData()?.summary.count ?? 0);
 

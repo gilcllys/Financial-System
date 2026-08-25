@@ -143,6 +143,17 @@ export interface InvoicePagination {
   total_pages: number;
 }
 
+export interface InvoiceSharedParticipant {
+  member_id: number;
+  name: string;
+  amount: number;
+  is_current_user: boolean;
+}
+
+export interface InvoiceSharedBreakdown {
+  total: number;
+  participants: InvoiceSharedParticipant[];
+}
 export interface InvoiceExpensesResponse {
   invoice_month: number;
   invoice_year: number;
@@ -154,6 +165,7 @@ export interface InvoiceExpensesResponse {
     total: number;           // total composto: individuais + minha parte compartilhada
     expenses_total: number;  // só despesas individuais
     shared_total: number;    // só minha parte nas dívidas compartilhadas
+    shared_breakdown?: InvoiceSharedBreakdown;
     count: number;
   };
   by_category: InvoiceCategoryBreakdown[];

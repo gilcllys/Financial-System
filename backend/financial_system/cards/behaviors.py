@@ -225,19 +225,48 @@ class InvoiceExpensesBehavior:
         page_qs = qs[offset: offset + self.page_size]
 
 
-        # ── Minha parte das dividas compartilhadas pagas neste cartao no periodo ──
-        from debts.models import SharedEntry as _SharedEntry
-        _shared_entries = _SharedEntry.objects.filter(
-            credit_card_id=self.card.id,
-            date__gte=period_start,
-            date__lte=period_end,
-            paid_by__tenant_id=self.card.tenant_id,
-        ).prefetch_related('participants', 'shared_debt__members')
-        _shared_my_total = 0.0
-        for _e in _shared_entries:
-            _p = _e.participants.count() or _e.shared_debt.members.count() or 1
-            _shared_my_total += abs(float(_e.amount)) / _p
-        _shared_my_total = round(_shared_my_total, 2)
+        # Shared debts paid on this card in the invoice period.
+        from debts.models import SharedEntry as _SharedEntry
+        _shared_entries = _SharedEntry.objects.filter(
+            credit_card_id=self.card.id,
+            date__gte=period_start,
+            date__lte=period_end,
+            paid_by__tenant_id=self.card.tenant_id,
+        ).prefetch_related('participants__member', 'shared_debt__members')
+        _shared_my_total = 0.0
+        _shared_gross_total = 0.0
+        _shared_participants = {}
+        for _e in _shared_entries:
+            _amount = abs(float(_e.amount))
+            _members = [p.member for p in _e.participants.all()]
+            if not _members:
+                _members = list(_e.shared_debt.members.all())
+            _p = len(_members) or 1
+            _portion = _amount / _p
+            _shared_gross_total += _amount
+            _shared_my_total += _portion
+            for _member in _members:
+                _row = _shared_participants.setdefault(
+                    _member.id,
+                    {
+                        'member_id': _member.id,
+                        'name': _member.display_name,
+                        'amount': 0.0,
+                        'is_current_user': _member.tenant_id == self.card.tenant_id,
+                    },
+                )
+                _row['amount'] += _portion
+        _shared_my_total = round(_shared_my_total, 2)
+        _shared_breakdown = {
+            'total': round(_shared_gross_total, 2),
+            'participants': [
+                {**row, 'amount': round(row['amount'], 2)}
+                for row in sorted(
+                    _shared_participants.values(),
+                    key=lambda item: (not item['is_current_user'], item['name'].lower()),
+                )
+            ],
+        }
         _expenses_total = grand_total
         _composite_total = round(_expenses_total + _shared_my_total, 2)
         return Response(
@@ -248,7 +277,13 @@ class InvoiceExpensesBehavior:
                 'period_start': period_start.isoformat(),
                 'period_end': period_end.isoformat(),
                 'due_date': due.isoformat(),
-                'summary': {'total': _composite_total, 'expenses_total': _expenses_total, 'shared_total': _shared_my_total, 'count': agg['count'] or 0},
+                'summary': {
+                    'total': _composite_total,
+                    'expenses_total': _expenses_total,
+                    'shared_total': _shared_my_total,
+                    'shared_breakdown': _shared_breakdown,
+                    'count': agg['count'] or 0,
+                },
                 'by_category': by_category,
                 'pagination': {
                     'page': self.page,
