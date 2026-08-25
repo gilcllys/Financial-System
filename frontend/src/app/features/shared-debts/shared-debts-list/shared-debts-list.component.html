@@ -47,27 +47,6 @@
   <div class="loading-wrapper" aria-live="polite"><span class="spinner"></span> Carregando...</div>
 } @else {
 
-  <!-- ── KPI Cards ── -->
-  <div class="sd-kpis">
-    <div class="sd-kpi">
-      <p class="sd-kpi__label">Total a receber</p>
-      <p class="sd-kpi__value value-up">{{ formatCurrency(totalToReceive()) }}</p>
-      <p class="sd-kpi__sub">De outros membros</p>
-    </div>
-    <div class="sd-kpi">
-      <p class="sd-kpi__label">Total a pagar</p>
-      <p class="sd-kpi__value value-down">{{ formatCurrency(totalToPay()) }}</p>
-      <p class="sd-kpi__sub">Para outros membros</p>
-    </div>
-    <div class="sd-kpi">
-      <p class="sd-kpi__label">Saldo líquido</p>
-      <p class="sd-kpi__value" [class.value-up]="netBalance() >= 0" [class.value-down]="netBalance() < 0">
-        {{ netBalance() >= 0 ? '+' : '' }}{{ formatCurrency(netBalance()) }}
-      </p>
-      <p class="sd-kpi__sub">{{ netBalance() >= 0 ? 'a seu favor' : 'a pagar' }}</p>
-    </div>
-  </div>
-
   <!-- ── Groups ── -->
   @if (groups().length === 0) {
     <div class="empty-state">

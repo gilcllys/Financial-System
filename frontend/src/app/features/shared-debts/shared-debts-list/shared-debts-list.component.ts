@@ -1,4 +1,4 @@
-﻿import { Component, OnInit, inject, signal, computed } from '@angular/core';
+﻿import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { forkJoin, of } from 'rxjs';
@@ -38,14 +38,6 @@ export class SharedDebtsListComponent implements OnInit {
     name: ['', [Validators.required, Validators.minLength(2)]],
     memberNames: [''],
   });
-
-  totalToReceive = computed(() =>
-    this.groups().reduce((s, g) => { const h = this.groupHint(g); return h && h > 0 ? s + h : s; }, 0)
-  );
-  totalToPay = computed(() =>
-    this.groups().reduce((s, g) => { const h = this.groupHint(g); return h && h < 0 ? s + Math.abs(h) : s; }, 0)
-  );
-  netBalance = computed(() => this.totalToReceive() - this.totalToPay());
 
   ngOnInit(): void { this.load(); }
 

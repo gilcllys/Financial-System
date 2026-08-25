@@ -503,6 +503,27 @@
     }
   }
 
+  &__details {
+    margin-left: 16px;
+    padding: 6px 0 2px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__detail-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--color-muted);
+
+    &--total {
+      color: var(--color-body);
+      font-weight: 600;
+    }
+  }
+
   &__total {
     display: flex;
     align-items: center;

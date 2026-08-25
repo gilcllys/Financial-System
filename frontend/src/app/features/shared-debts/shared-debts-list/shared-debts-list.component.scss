@@ -1,43 +1,4 @@
-﻿// ── KPI Cards ─────────────────────────────────────────────────────────────────
-.sd-kpis {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-base);
-  margin-bottom: var(--space-xl);
-
-  @media (max-width: 640px) { grid-template-columns: 1fr; }
-}
-
-.sd-kpi {
-  background: var(--color-surface-soft);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--rounded-lg);
-  padding: var(--space-lg);
-
-  &__label {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--color-muted);
-    margin: 0 0 6px;
-  }
-
-  &__value {
-    font-size: 24px;
-    font-weight: 700;
-    font-family: var(--font-mono);
-    margin: 0 0 4px;
-  }
-
-  &__sub {
-    font-size: 12px;
-    color: var(--color-muted);
-    margin: 0;
-  }
-}
-
-// ── Groups ────────────────────────────────────────────────────────────────────
+﻿// ── Groups ────────────────────────────────────────────────────────────────────
 .sd-groups {
   display: flex;
   flex-direction: column;

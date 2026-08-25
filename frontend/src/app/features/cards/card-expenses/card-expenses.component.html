@@ -71,6 +71,20 @@
           <span class="invoice-composition__label">Minha parte (compartilhado)</span>
           <span class="invoice-composition__value mono">{{ formatAmount(sharedTotal()) }}</span>
         </div>
+        @if (sharedGrossTotal() > 0) {
+          <div class="invoice-composition__details" aria-label="Composicao dos gastos compartilhados">
+            <div class="invoice-composition__detail-row invoice-composition__detail-row--total">
+              <span>Total compartilhado</span>
+              <span class="mono">{{ formatAmount(sharedGrossTotal()) }}</span>
+            </div>
+            @for (participant of sharedParticipants(); track participant.member_id) {
+              <div class="invoice-composition__detail-row">
+                <span>{{ participant.is_current_user ? 'Voce' : participant.name }}</span>
+                <span class="mono">{{ formatAmount(participant.amount) }}</span>
+              </div>
+            }
+          </div>
+        }
         <div class="invoice-composition__total">
           <span class="invoice-composition__label invoice-composition__label--strong">Total a pagar</span>
           <span class="invoice-composition__value invoice-composition__value--strong mono">{{ formatAmount(filteredTotal()) }}</span>
