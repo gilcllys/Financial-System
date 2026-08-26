@@ -78,13 +78,6 @@ export const routes: Routes = [
           import('./features/categories/category-form/category-form.component').then(m => m.CategoryFormComponent),
       },
 
-      // Reports
-      {
-        path: 'reports',
-        loadComponent: () =>
-          import('./features/reports/reports.component').then(m => m.ReportsComponent),
-      },
-
       // Installments
       {
         path: 'installments',
@@ -112,13 +105,6 @@ export const routes: Routes = [
         path: 'supermarket/:id',
         loadComponent: () =>
           import('./features/supermarket/supermarket-detail/supermarket-detail.component').then(m => m.SupermarketDetailComponent),
-      },
-
-      // Histórico
-      {
-        path: 'history',
-        loadComponent: () =>
-          import('./features/history/history.component').then(m => m.HistoryComponent),
       },
 
       // Sem categoria
