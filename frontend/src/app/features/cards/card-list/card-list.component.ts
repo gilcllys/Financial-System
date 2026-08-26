@@ -64,8 +64,7 @@ export class CardListComponent implements OnInit {
         this.cards.set(cards);
         this.loading.set(false);
         if (cards.length > 0) {
-          this.selectCard(cards[0]);
-          this.loadAllTotals(cards);
+          this.selectCard(cards[0], true);
         }
       },
       error: () => this.loading.set(false),
@@ -83,9 +82,25 @@ export class CardListComponent implements OnInit {
     });
   }
 
-  selectCard(card: CreditCard): void {
+  selectCard(card: CreditCard, useCurrentInvoice = false): void {
     this.selectedCardId.set(card.id);
-    this.loadInvoice();
+    if (!useCurrentInvoice) {
+      this.loadInvoice();
+      return;
+    }
+
+    this.cardSvc.getInvoices(card.id).subscribe({
+      next: invoices => {
+        const current = invoices.find(invoice => invoice.is_current) ?? invoices[0];
+        if (current) {
+          this.invoiceMonth.set(current.invoice_month);
+          this.invoiceYear.set(current.invoice_year);
+        }
+        this.loadInvoice();
+        this.loadAllTotals(this.cards());
+      },
+      error: () => this.loadInvoice(),
+    });
   }
 
   private loadInvoice(): void {
@@ -95,6 +110,7 @@ export class CardListComponent implements OnInit {
     this.cardSvc.getInvoiceExpenses(id, this.invoiceMonth(), this.invoiceYear(), undefined, 1, 50).subscribe({
       next: res => {
         this.invoiceExpenses.set(res.expenses);
+        this.invoiceTotals.update(t => ({ ...t, [id]: res.summary.total }));
         this.loadingInvoice.set(false);
       },
       error: () => this.loadingInvoice.set(false),
@@ -106,6 +122,7 @@ export class CardListComponent implements OnInit {
     if (m < 1) { m = 12; y--; }
     this.invoiceMonth.set(m); this.invoiceYear.set(y);
     this.loadInvoice();
+    this.loadAllTotals(this.cards());
   }
 
   nextMonth(): void {
@@ -113,6 +130,7 @@ export class CardListComponent implements OnInit {
     if (m > 12) { m = 1; y++; }
     this.invoiceMonth.set(m); this.invoiceYear.set(y);
     this.loadInvoice();
+    this.loadAllTotals(this.cards());
   }
 
   cardGradient(index: number): string {
