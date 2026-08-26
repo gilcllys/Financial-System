@@ -279,20 +279,19 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   chartTooltip = signal<{cx:number; cy:number; month:string; income:number; expense:number} | null>(null);
   barTooltip = signal<{cx:number; cy:number; month:string; cash:number; card:number; shared:number; total:number} | null>(null);
 
-  constructor() {
-    // Renderiza os gráficos assim que dashLoading vira false e o DOM é atualizado
-    effect(() => {
-      if (!this.dashLoading()) {
-        const data = this.evolution();
-        // Promise.resolve garante execução após o Angular atualizar o DOM (ViewChild disponível)
-        Promise.resolve().then(() => {
-          if (data.length > 0) this.renderCharts(data);
-        });
-      }
-    });
-  }
-
-  // ── SVG Chart rendering (D3) ─────────────────────────────────────────
+  constructor() {
+    effect(() => {
+      const data = this.evolution();
+      const loading = this.dashLoading();
+      if (!loading && data && data.length > 0) {
+        setTimeout(() => {
+          this.renderCharts(data);
+        }, 50);
+      }
+    });
+  }
+
+  // ?? SVG Chart rendering (D3) ??
   renderCharts(data: MonthlyAnalytics[]): void {
     if (!this.lineChartEl || !this.compChartEl) return;
     this.buildLineChartD3(data);
