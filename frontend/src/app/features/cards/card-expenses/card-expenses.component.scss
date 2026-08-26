@@ -1,4 +1,4 @@
-﻿// ── Preserved utilities ────────────────────────────────────────────────────────
+// ── Preserved utilities ────────────────────────────────────────────────────────
 .text-right { text-align: right; }
 .text-muted  { color: var(--color-muted); }
 
@@ -29,6 +29,99 @@
   padding: 1px 6px;
   font-size: 11px;
   margin-left: 6px;
+}
+
+.table-total-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--surface-2, #f5f6f8);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.table-total-header__label {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-muted, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.table-total-header__value {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.shared-group-block {
+  border: 1px solid #dce8ff;
+  border-radius: 12px;
+  padding: var(--space-base);
+  background: #fbfcff;
+}
+
+.shared-group-block__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.shared-group-block__title {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.shared-group-block__list {
+  border: 1px solid #dce8ff;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.shared-group-block__row {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+
+  & + & { border-top: 1px solid #eef2ff; }
+}
+
+.shared-group-block__index {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-muted, #6b7280);
+  border-right: 1px solid #dce8ff;
+}
+
+.shared-group-block__name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.shared-group-block__amount {
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.shared-group-block__total-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink, #111827);
 }
 
 // ── Invoice Selector ──────────────────────────────────────────────────────────
