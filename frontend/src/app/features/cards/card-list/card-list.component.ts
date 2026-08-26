@@ -133,9 +133,43 @@ export class CardListComponent implements OnInit {
     this.loadAllTotals(this.cards());
   }
 
-  cardGradient(index: number): string {
+  
+  getCardGradient(card: CreditCard, index: number): string {
+    const name = card.name.toLowerCase();
+    if (name.includes('ita?') || name.includes('itau')) {
+      return 'background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%)';
+    }
+    if (name.includes('nubank') || name.includes('nu ')) {
+      return 'background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)';
+    }
+    if (name.includes('bradesco')) {
+      return 'background: linear-gradient(135deg, #450A0A 0%, #18181B 100%)';
+    }
+    if (name.includes('inter')) {
+      return 'background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%)';
+    }
     return CARD_GRADIENTS[index % CARD_GRADIENTS.length];
   }
+
+  getInstallmentBadge(e: Expense): { text: string; isBadge: boolean } {
+    const m = /\b(\d+)\/(\d+)\b/i.exec(e.description) || /parcela\s+(\d+)\/(\d+)/i.exec(e.description);
+    if (m) {
+      if (m[1] === '1' && m[2] === '1') return { text: 'Parcela ?nica', isBadge: true };
+      return { text: `${m[1]}/${m[2]}`, isBadge: true };
+    }
+    const desc = e.description.toLowerCase();
+    if (desc.includes('fixa') || desc.includes('assinatura') || (e as any).is_recurring) {
+      return { text: 'Fixa', isBadge: true };
+    }
+    if (desc.includes('?nica') || desc.includes('unica')) {
+      return { text: 'Parcela ?nica', isBadge: true };
+    }
+    if (e.quantity === 1 && !(e as any).is_installment) {
+      return { text: 'Parcela ?nica', isBadge: true };
+    }
+    return { text: '-', isBadge: false };
+  }
+
 
   openMenu(event: MouseEvent, card: CreditCard): void {
     event.stopPropagation();
