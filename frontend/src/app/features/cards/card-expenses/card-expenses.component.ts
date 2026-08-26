@@ -41,32 +41,12 @@ const CAT_COLORS = [
   '#af52de', '#5ac8fa', '#ff6b35', '#30b0c7',
 ];
 
+const GROUP_COLORS = ['#05b169', '#ff9f0a', '#af52de', '#0052ff', '#ff3b30', '#5ac8fa'];
+
 const MONTH_ABBR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
-}
-
-function nextMonth(year: number, month: number): { year: number; month: number } {
-  return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
-}
-
-function effectiveClosingDate(year: number, month: number, closingDay: number): Date {
-  const closing = new Date(year, month - 1, Math.min(closingDay, daysInMonth(year, month)));
-  if (closing.getDay() === 6) return new Date(year, month - 1, closing.getDate() - 1);
-  if (closing.getDay() === 0) return new Date(year, month - 1, closing.getDate() - 2);
-  return closing;
-}
-
-function invoiceFromClosing(closing: { year: number; month: number }): { year: number; month: number } {
-  return nextMonth(closing.year, closing.month);
-}
-
-function invoiceMonthForDate(dateStr: string, closingDay: number): { year: number; month: number } {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const expenseDate = new Date(year, month - 1, day);
-  const closing = effectiveClosingDate(year, month, closingDay);
-  return invoiceFromClosing(expenseDate > closing ? nextMonth(year, month) : { year, month });
 }
 
 @Component({
@@ -225,15 +205,21 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     };
   });
 
+  /**
+   * Yearly chart. Expenses are bucketed using the invoice periods returned by
+   * the API, which already apply the business-day closing rule (a closing day
+   * falling on Sat/Sun is anticipated to the previous Friday). Never recompute
+   * that rule here: the backend is the single source of truth.
+   */
   monthlyChartDataSig = computed(() => {
-    const card = this.card();
+    const periods = this.invoices();
     const year = this.selectedInvoice()?.invoice_year ?? new Date().getFullYear();
-    const totals = Array.from({ length: 12 }, () => 0);
-    if (!card) return null;
+    if (!periods.length) return null;
 
+    const totals = Array.from({ length: 12 }, () => 0);
     for (const e of this.allCardExpenses()) {
-      const invoice = invoiceMonthForDate(e.date, card.closing_day);
-      if (invoice.year === year) totals[invoice.month - 1] += Math.abs(e.amount);
+      const inv = periods.find(p => e.date >= p.period_start && e.date <= p.period_end);
+      if (inv && inv.invoice_year === year) totals[inv.invoice_month - 1] += Math.abs(e.amount);
     }
     if (!totals.some(t => t > 0)) return null;
     return { labels: MONTH_ABBR, values: totals.map(t => +t.toFixed(2)) };
@@ -388,6 +374,49 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     return m ? `${m[1]}/${m[2]}` : null;
   }
   catColor(index: number): string { return CAT_COLORS[index % CAT_COLORS.length]; }
+  groupColor(index: number): string { return GROUP_COLORS[index % GROUP_COLORS.length]; }
+
+  activeGroupId = signal<number | null>(null);
+
+  activeGroup = computed((): SharedInvoiceGroup | null => {
+    const groups = this.sharedGroups();
+    if (!groups.length) return null;
+    const id = this.activeGroupId();
+    return groups.find(g => g.group_id === id) ?? groups[0];
+  });
+
+  activeGroupIndex = computed((): number => {
+    const active = this.activeGroup();
+    if (!active) return 0;
+    return Math.max(0, this.sharedGroups().findIndex(g => g.group_id === active.group_id));
+  });
+
+  selectGroup(groupId: number): void { this.activeGroupId.set(groupId); }
+
+  participantPct(amount: number, total: number): number {
+    if (!total) return 0;
+    return Math.round((Math.abs(amount) / Math.abs(total)) * 100);
+  }
+
+  initialOf(name: string): string { return (name || '?').trim().charAt(0).toUpperCase(); }
+
+  /**
+   * True when the effective closing date was anticipated because the nominal
+   * closing_day fell on a weekend (backend rule: Sat/Sun -> previous Friday).
+   */
+  closingAnticipated = computed((): boolean => {
+    const inv = this.selectedInvoice();
+    const card = this.card();
+    if (!inv || !card) return false;
+    const [y, m] = inv.period_end.split('-').map(Number);
+    const nominal = Math.min(card.closing_day, daysInMonth(y, m));
+    return +inv.period_end.split('-')[2] !== nominal;
+  });
+
+  /** "Voce" (accented) for the current user, otherwise the member name. */
+  displayName(p: InvoiceSharedParticipant): string {
+    return p.is_current_user ? 'Voc\u00EA' : p.name;
+  }
   myPortion(s: SharedDebtEntry): number { return s.amount / s.participant_count; }
   iPaid(s: SharedDebtEntry): boolean { return s.paid_by_tenant_id === this.myTenantId; }
   othersOwe(s: SharedDebtEntry): number { return s.amount - this.myPortion(s); }
