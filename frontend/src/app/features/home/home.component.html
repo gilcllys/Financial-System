@@ -2,7 +2,7 @@
 <div class="home-header">
   <div>
     <h1 class="home-header__title">{{ currentMonthName }} {{ currentYear }}</h1>
-    <p class="home-header__subtitle">Aqui est? o panorama geral do seu controle financeiro este m?s.</p>
+    <p class="home-header__subtitle">Aqui está o panorama geral do seu controle financeiro este mês.</p>
   </div>
   <div class="home-header__actions">
     <button class="btn btn--secondary btn--sm" type="button" (click)="showRecurringForm.set(!showRecurringForm())">
@@ -20,13 +20,13 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: text-bottom"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
         Cadastrar Gasto Fixo
       </span>
-      <button class="btn btn--ghost btn--sm" (click)="showRecurringForm.set(false)">? Fechar</button>
+      <button class="btn btn--ghost btn--sm" (click)="showRecurringForm.set(false)">✕ Fechar</button>
     </div>
     <div class="card__body">
       <form [formGroup]="recurringForm" (ngSubmit)="saveRecurring()" novalidate class="form-body">
         <div class="form-row">
           <div class="form-group" style="flex:2">
-            <label class="form-label">Descri??o</label>
+            <label class="form-label">Descrição</label>
             <input class="form-input" type="text" formControlName="description" placeholder="Ex: Netflix, Aluguel"/>
           </div>
           <div class="form-group" style="flex:1">
@@ -46,7 +46,7 @@
                 <input type="radio" formControlName="payment_method" value="dinheiro"/> Dinheiro
               </label>
               <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-                <input type="radio" formControlName="payment_method" value="cartao"/> Cart?o
+                <input type="radio" formControlName="payment_method" value="cartao"/> Cartão
               </label>
             </div>
           </div>
@@ -113,7 +113,7 @@
   </div>
 </div>
 
-<!-- ?? Posi??o nos Grupos ?? -->
+<!-- —— Posição nos Grupos —— -->
 @if (sharedDebts().length > 0) {
   <div class="card group-position-card" style="margin-bottom: var(--space-base)">
     <div class="card__header">
@@ -121,7 +121,7 @@
         <span class="card__icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         </span>
-        <span class="card__title">Posi??o nos Grupos</span>
+        <span class="card__title">Posição nos Grupos</span>
       </div>
       <a routerLink="/shared-debts" class="card__link">Ver todos os grupos &gt;</a>
     </div>
@@ -132,7 +132,7 @@
             <div class="group-row__avatar">{{ g.name.substring(0,2).toUpperCase() }}</div>
             <div>
               <h4 class="group-row__name">{{ g.name }}</h4>
-              <span class="group-row__sub">?ltima atualiza??o h? 2 dias</span>
+              <span class="group-row__sub">Última atualização há 2 dias</span>
             </div>
           </div>
           <div class="group-row__right">
@@ -164,13 +164,13 @@
   </div>
   <div class="card__body">
     @if (recurringTemplates().length === 0) {
-      <p class="empty-msg">Nenhum gasto fixo cadastrado para este m?s.</p>
+      <p class="empty-msg">Nenhum gasto fixo cadastrado para este mês.</p>
     } @else {
       <div class="data-table-wrapper">
         <table class="data-table">
           <thead>
             <tr>
-              <th>Descri??o</th>
+              <th>Descrição</th>
               <th>Categoria</th>
               <th>Dia</th>
               <th class="text-right">Valor</th>
@@ -199,7 +199,7 @@
                 <td style="display:flex;gap:4px;justify-content:flex-end">
                   <button class="btn btn--secondary btn--sm" type="button" (click)="toggleRecurring(t.id)"
                     [title]="t.is_active ? 'Pausar' : 'Ativar'">{{ t.is_active ? '?' : '?' }}</button>
-                  <button class="btn btn--danger btn--sm" type="button" (click)="deleteRecurring(t.id)">???</button>
+                  <button class="btn btn--danger btn--sm" type="button" (click)="deleteRecurring(t.id)">Excluir</button>
                 </td>
               </tr>
             }
@@ -225,7 +225,7 @@
     </div>
     <div class="card__body">
       @if (openInvoices().length === 0) {
-        <p class="empty-msg">Nenhum cart?o cadastrado.</p>
+        <p class="empty-msg">Nenhum cartão cadastrado.</p>
       }
       @for (inv of openInvoices(); track inv.card_id) {
         <a [routerLink]="['/cards', inv.card_id, 'expenses']" class="invoice-item">
@@ -320,7 +320,7 @@
             </div>
           </div>
           <div class="installment-item__value">
-            <p class="installment-item__amount mono">{{ formatCurrency(g.amountPerInstallment) }}/m?s</p>
+            <p class="installment-item__amount mono">{{ formatCurrency(g.amountPerInstallment) }}/mês</p>
           </div>
         </div>
       }
@@ -336,7 +336,7 @@
         </span>
         <span class="card__title">Gastos por Categoria</span>
       </div>
-      <a routerLink="/analytics" class="card__link">Ver Gr?fico</a>
+      <a routerLink="/analytics" class="card__link">Ver Gráfico</a>
     </div>
     <div class="card__body">
       @if (byCategory().length === 0) {
@@ -355,22 +355,22 @@
   </div>
 </div>
 
-<!-- ?? 2-Column Grid Row 3 (?ltimos Lan?amentos & Evolu??o Mensal) ?? -->
+<!-- —— 2-Column Grid Row 3 (Últimos Lançamentos & Evolução Mensal) —— -->
 <div class="grid-2col">
-  <!-- ?ltimos Lan?amentos -->
+  <!-- Últimos Lançamentos -->
   <div class="card">
     <div class="card__header">
       <div class="card__header-title">
         <span class="card__icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </span>
-        <span class="card__title">?ltimos Lan?amentos</span>
+        <span class="card__title">Últimos Lançamentos</span>
       </div>
       <a routerLink="/history" class="card__link">Ver Extrato</a>
     </div>
     <div class="card__body">
       @if (expenses().length === 0 && !tableLoading()) {
-        <p class="empty-msg">Nenhum lan?amento neste m?s.</p>
+        <p class="empty-msg">Nenhum lançamento neste mês.</p>
       }
       @for (exp of expenses().slice(0, 5); track exp.id) {
         <div class="expense-item">
@@ -394,14 +394,14 @@
     </div>
   </div>
 
-  <!-- Evolu??o Mensal (D3 Charts: lineChartEl & compChartEl) ?? -->
+  <!-- Evolução Mensal (D3 Charts: lineChartEl & compChartEl) —— -->
   <div class="card">
     <div class="card__header">
       <div class="card__header-title">
         <span class="card__icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
         </span>
-        <span class="card__title">Evolu??o Mensal ? {{ currentYear }}</span>
+        <span class="card__title">Evolução Mensal — {{ currentYear }}</span>
       </div>
       <div class="chart-legend">
         <span class="chart-legend__dot chart-legend__dot--green"></span> Receita
