@@ -137,10 +137,10 @@
     </div>
 
     <div class="chart-card">
-      <h2 class="chart-card__title">Gasto Mensal — {{ selectedInvoice()?.invoice_year }}</h2>
+      <h2 class="chart-card__title">Gasto por Fatura — {{ selectedInvoice()?.invoice_year }}</h2>
       <div class="chart-card__body">
         @if (monthlyChartDataSig()) {
-          <div #monthlyChartEl class="d3-chart-container" aria-label="Grafico de gastos mensais" role="img"></div>
+          <div #monthlyChartEl class="d3-chart-container" aria-label="Grafico de gastos por fatura" role="img"></div>
         } @else {
           <div class="empty-state" style="height:100%;display:flex;align-items:center;justify-content:center">
             Sem dados mensais

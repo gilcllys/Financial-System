@@ -33,6 +33,32 @@ const CAT_COLORS = [
 
 const MONTH_ABBR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+function nextMonth(year: number, month: number): { year: number; month: number } {
+  return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
+}
+
+function effectiveClosingDate(year: number, month: number, closingDay: number): Date {
+  const closing = new Date(year, month - 1, Math.min(closingDay, daysInMonth(year, month)));
+  if (closing.getDay() === 6) return new Date(year, month - 1, closing.getDate() - 1);
+  if (closing.getDay() === 0) return new Date(year, month - 1, closing.getDate() - 2);
+  return closing;
+}
+
+function invoiceFromClosing(closing: { year: number; month: number }): { year: number; month: number } {
+  return nextMonth(closing.year, closing.month);
+}
+
+function invoiceMonthForDate(dateStr: string, closingDay: number): { year: number; month: number } {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const expenseDate = new Date(year, month - 1, day);
+  const closing = effectiveClosingDate(year, month, closingDay);
+  return invoiceFromClosing(expenseDate > closing ? nextMonth(year, month) : { year, month });
+}
+
 @Component({
   selector: 'app-card-expenses',
   standalone: true,
@@ -166,12 +192,14 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   });
 
   monthlyChartDataSig = computed(() => {
+    const card = this.card();
     const year = this.selectedInvoice()?.invoice_year ?? new Date().getFullYear();
     const totals = Array.from({ length: 12 }, () => 0);
+    if (!card) return null;
+
     for (const e of this.allCardExpenses()) {
-      const [expenseYear, expenseMonth] = e.date.split('-').map(Number);
-      if (expenseYear === year && expenseMonth >= 1 && expenseMonth <= 12)
-        totals[expenseMonth - 1] += Math.abs(e.amount);
+      const invoice = invoiceMonthForDate(e.date, card.closing_day);
+      if (invoice.year === year) totals[invoice.month - 1] += Math.abs(e.amount);
     }
     if (!totals.some(t => t > 0)) return null;
     return { labels: MONTH_ABBR, values: totals.map(t => +t.toFixed(2)) };
