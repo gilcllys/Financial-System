@@ -1,975 +1,386 @@
-﻿<!-- ── Page header ── -->
-
-<div class="page-header">
-
+<!-- ?? Page Header ?? -->
+<div class="home-header">
   <div>
-
-    <p class="page-header__label">📅 Mês Atual</p>
-
-    <h1 class="page-header__title">{{ currentMonthName }} {{ currentYear }}</h1>
-
-    <p class="page-header__subtitle">Seus gastos de {{ currentMonthName }}</p>
-
+    <h1 class="home-header__title">{{ currentMonthName }} {{ currentYear }}</h1>
+    <p class="home-header__subtitle">Aqui est? o panorama geral do seu controle financeiro este m?s.</p>
   </div>
-
-  <div class="page-header__actions">
-
-    <a routerLink="/expenses/batch"  class="btn btn--outline">➕ Vários gastos</a>
-
-    <a routerLink="/expenses/import" class="btn btn--outline">📥 Importar Excel</a>
-
-    <a routerLink="/expenses/new"    class="btn btn--primary">+ Novo Gasto</a>
-
+  <div class="home-header__actions">
+    <button class="btn btn--secondary btn--sm" type="button" (click)="showRecurringForm.set(!showRecurringForm())">
+      + Novo Gasto Fixo
+    </button>
+    <a routerLink="/expenses/new" class="btn btn--primary btn--sm">+ Novo Gasto</a>
   </div>
-
 </div>
 
-
-
-<!-- ── Search ── -->
-
-<div class="search-bar">
-
-  <span class="search-bar__icon">🔍</span>
-
-  <input
-
-    class="search-bar__input"
-
-    type="search"
-
-    placeholder="Buscar por descrição..."
-
-    [value]="searchTerm()"
-
-    (input)="onSearchInput($any($event.target).value)"
-
-    aria-label="Buscar gastos"
-
-  />
-
-  @if (searchTerm()) {
-
-    <button class="search-bar__clear" (click)="onSearchInput('')" aria-label="Limpar busca">✕</button>
-
-  }
-
-</div>
-
-
-
-<!-- ── Filters ── -->
-
-<div class="filter-bar">
-
-  <select class="form-select" [ngModel]="filterMonth()" (ngModelChange)="filterMonth.set(+$event); onFilterChange()" aria-label="Mês">
-
-    @for (m of months; track m.value) {
-
-      <option [value]="m.value">{{ m.label }}</option>
-
-    }
-
-  </select>
-
-  <select class="form-select" [ngModel]="filterYear()" (ngModelChange)="filterYear.set(+$event); onFilterChange()" aria-label="Ano">
-
-    @for (y of years; track y) {
-
-      <option [value]="y">{{ y }}</option>
-
-    }
-
-  </select>
-
-  <select class="form-select" [ngModel]="filterCategory()" (ngModelChange)="filterCategory.set($event); onFilterChange()" aria-label="Categoria">
-
-    <option value="">Todas as categorias</option>
-
-    @for (cat of categories(); track cat.id) {
-
-      <option [value]="cat.id">{{ cat.name }}</option>
-
-    }
-
-  </select>
-
-</div>
-
-
-
-<!-- ── KPI Row — consolidado por 3 fontes ── -->
-
-<div class="kpi-row">
-
-  <div class="kpi-card">
-
-    <p class="kpi-card__label">Receitas</p>
-
-    <p class="kpi-card__value kpi-card__value--green">{{ formatCurrency(consolidated().income) }}</p>
-
-    <p class="kpi-card__sub">{{ currentMonthName }} {{ currentYear }}</p>
-
-  </div>
-
-  <div class="kpi-card kpi-card--breakdown">
-
-    <p class="kpi-card__label">Despesas Totais</p>
-
-    <p class="kpi-card__value kpi-card__value--red">{{ formatCurrency(consolidated().total_expenses) }}</p>
-
-    <div class="kpi-breakdown">
-
-      <span class="kpi-breakdown__item" title="Gastos em dinheiro">
-
-        💵 {{ formatCurrency(consolidated().cash_expenses) }}
-
-      </span>
-
-      <span class="kpi-breakdown__sep">+</span>
-
-      <span class="kpi-breakdown__item" title="Faturas abertas de cartão">
-
-        💳 {{ formatCurrency(consolidated().card_invoices) }}
-
-      </span>
-
-      <span class="kpi-breakdown__sep">+</span>
-
-      <span class="kpi-breakdown__item" title="Minha parte em gastos compartilhados">
-
-        🤝 {{ formatCurrency(consolidated().shared_my_portion) }}
-
-      </span>
-
+<!-- ?? Form Gasto Fixo (Collapsible) ?? -->
+@if (showRecurringForm()) {
+  <div class="card form-card" style="margin-bottom: var(--space-base)">
+    <div class="card__header">
+      <span class="card__title">?? Cadastrar Gasto Fixo</span>
+      <button class="btn btn--ghost btn--sm" (click)="showRecurringForm.set(false)">? Fechar</button>
     </div>
-
-  </div>
-
-  <div class="kpi-card">
-
-    <p class="kpi-card__label">Saldo</p>
-
-    <p class="kpi-card__value" [class]="consolidated().balance >= 0 ? 'kpi-card__value--blue' : 'kpi-card__value--red'">
-
-      {{ consolidated().balance >= 0 ? '+' : '-' }} {{ formatCurrency(consolidated().balance) }}
-
-    </p>
-
-    <p class="kpi-card__sub">disponível</p>
-
-  </div>
-
-  <div class="kpi-card">
-
-    <p class="kpi-card__label">Total Registros</p>
-
-    <p class="kpi-card__value">{{ totalCount() }}</p>
-
-    <p class="kpi-card__sub">lançamentos</p>
-
-  </div>
-
-</div>
-
-
-
-
-
-<!-- ── Posição nos Grupos ─────────────────────────────────────────────────── -->
-
-@if (sharedDebts().length > 0) {
-
-  <details class="groups-position" [attr.open]="true">
-
-    <summary class="groups-position__header" aria-label="Posição nos grupos compartilhados">
-
-      <span class="groups-position__title">🤝 Posição nos Grupos</span>
-
-      <span class="groups-position__net"
-
-        [class.value-up]="groupsNetBalance() >= 0"
-
-        [class.value-down]="groupsNetBalance() < 0">
-
-        {{ groupsNetBalance() >= 0 ? '+' : '' }}{{ formatCurrency(groupsNetBalance()) }}
-
-      </span>
-
-    </summary>
-
-    <div class="groups-position__body">
-
-      @for (g of sharedDebts(); track g.id) {
-
-        @let balance = g.my_portion > 0 ? -(g.my_portion) : 0;
-
-        <div class="group-pos-card">
-
-          <div class="group-pos-card__top">
-
-            <span class="group-pos-card__name">{{ g.name }}</span>
-
-            <div class="group-pos-card__members">
-
-              @for (m of g.members.slice(0, 3); track m) {
-
-                <span class="avatar-chip" [title]="m">{{ m.substring(0,2).toUpperCase() }}</span>
-
-              }
-
-            </div>
-
-          </div>
-
-          <div class="group-pos-card__stats">
-
-            <span>Total: <strong>{{ formatCurrency(g.total_amount) }}</strong></span>
-
-            <span>Minha parte: <strong class="value-down">{{ formatCurrency(g.my_portion) }}</strong></span>
-
-          </div>
-
-          <a [routerLink]="['/shared-debts', g.id]" class="btn btn--ghost btn--sm group-pos-card__link">
-
-            Ver grupo →
-
-          </a>
-
-        </div>
-
-      }
-
-    </div>
-
-  </details>
-
-}
-
-<!-- ── Gastos Fixos Individuais ─────────────────────────────────────────── -->
-
-<div class="section-block">
-
-  <div class="page-header" style="margin-top:var(--space-xl)">
-
-    <h2 class="section-title" style="margin:0">🔁 Gastos Fixos</h2>
-
-    <div style="display:flex;gap:8px">
-
-      <button class="btn btn--secondary btn--sm" type="button" (click)="generateCurrentMonth()">
-
-        ⚡ Gerar mês atual
-
-      </button>
-
-      <button class="btn btn--primary btn--sm" type="button"
-
-        (click)="showRecurringForm.set(!showRecurringForm())">
-
-        {{ showRecurringForm() ? '✕ Fechar' : '＋ Novo fixo' }}
-
-      </button>
-
-    </div>
-
-  </div>
-
-
-
-  @if (generateResult()) {
-
-    <div class="alert-box alert-box--success" style="margin-bottom:var(--space-sm)">
-
-      ✅ Criados: {{ generateResult()!.created.join(', ') || 'nenhum' }} |
-
-      Já existiam: {{ generateResult()!.skipped.join(', ') || 'nenhum' }}
-
-    </div>
-
-  }
-
-
-
-  @if (showRecurringForm()) {
-
-    <div class="card" style="margin-bottom:var(--space-md)">
-
-      <form [formGroup]="recurringForm" (ngSubmit)="saveRecurring()" novalidate
-
-        class="form-body">
-
+    <div class="card__body">
+      <form [formGroup]="recurringForm" (ngSubmit)="saveRecurring()" novalidate class="form-body">
         <div class="form-row">
-
           <div class="form-group" style="flex:2">
-
-            <label class="form-label">Descrição</label>
-
+            <label class="form-label">Descri??o</label>
             <input class="form-input" type="text" formControlName="description" placeholder="Ex: Netflix, Aluguel"/>
-
           </div>
-
           <div class="form-group" style="flex:1">
-
             <label class="form-label">Valor (R$)</label>
-
             <input class="form-input" type="number" step="0.01" formControlName="amount"/>
-
           </div>
-
           <div class="form-group" style="width:90px">
-
             <label class="form-label">Dia</label>
-
             <input class="form-input" type="number" min="1" max="28" formControlName="day_of_month"/>
-
           </div>
-
         </div>
-
         <div class="form-row">
-
           <div class="form-group">
-
             <label class="form-label">Forma de pagamento</label>
-
             <div class="radio-group">
-
               <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-
                 <input type="radio" formControlName="payment_method" value="dinheiro"/> Dinheiro
-
               </label>
-
               <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-
-                <input type="radio" formControlName="payment_method" value="cartao"/> Cartão
-
+                <input type="radio" formControlName="payment_method" value="cartao"/> Cart?o
               </label>
-
             </div>
-
           </div>
-
           <div class="form-group" style="flex:1">
-
             <label class="form-label">Categoria</label>
-
             <select class="form-select" formControlName="category_id">
-
               <option [ngValue]="null">Sem categoria</option>
-
               @for (cat of categories(); track cat.id) {
-
                 <option [ngValue]="cat.id">{{ cat.name }}</option>
-
               }
-
             </select>
-
           </div>
-
         </div>
-
         @if (recurringError()) { <div class="form-error-box">{{ recurringError() }}</div> }
-
-        <div class="form-actions">
-
+        <div class="form-actions" style="margin-top: 12px">
           <button class="btn btn--primary btn--sm" type="submit" [disabled]="savingRecurring()">
-
             @if (savingRecurring()) { <span class="spinner"></span> } Salvar gasto fixo
-
           </button>
-
         </div>
-
       </form>
-
     </div>
+  </div>
+}
 
-  }
-
-
-
-  @if (recurringTemplates().length === 0) {
-
-    <p class="text-muted" style="font-size:0.85rem;padding:8px 0">Nenhum gasto fixo cadastrado.</p>
-
-  } @else {
-
-    <div class="data-table-wrapper">
-
-      <table class="data-table">
-
-        <thead>
-
-          <tr>
-
-            <th>Descrição</th>
-
-            <th>Categoria</th>
-
-            <th>Dia</th>
-
-            <th class="text-right">Valor</th>
-
-            <th>Status</th>
-
-            <th></th>
-
-          </tr>
-
-        </thead>
-
-        <tbody>
-
-          @for (t of recurringTemplates(); track t.id) {
-
-            <tr [style.opacity]="t.is_active ? '1' : '0.5'">
-
-              <td style="font-weight:500">{{ t.description }}</td>
-
-              <td>
-
-                @if (t.category_name) {
-
-                  <span class="badge badge--primary">{{ t.category_name }}</span>
-
-                } @else {
-
-                  <span class="text-muted">—</span>
-
-                }
-
-              </td>
-
-              <td class="mono text-muted">dia {{ t.day_of_month }}</td>
-
-              <td class="text-right mono">R$ {{ t.amount }}</td>
-
-              <td>
-
-                <span [class]="t.is_active ? 'badge badge--success' : 'badge badge--muted'">
-
-                  {{ t.is_active ? 'Ativo' : 'Pausado' }}
-
-                </span>
-
-              </td>
-
-              <td style="display:flex;gap:4px;justify-content:flex-end">
-
-                <button class="btn btn--secondary btn--sm" type="button" (click)="toggleRecurring(t.id)"
-
-                  [title]="t.is_active ? 'Pausar' : 'Ativar'">{{ t.is_active ? '⏸' : '▶' }}</button>
-
-                <button class="btn btn--danger btn--sm" type="button" (click)="deleteRecurring(t.id)">🗑️</button>
-
-              </td>
-
-            </tr>
-
-          }
-
-        </tbody>
-
-      </table>
-
+<!-- ?? KPI Cards Row (3 Cards) ?? -->
+<div class="kpi-grid">
+  <!-- RECEITAS -->
+  <div class="kpi-clean-card">
+    <div class="kpi-clean-card__top">
+      <span class="kpi-clean-card__label">RECEITAS</span>
+      <span class="kpi-clean-card__icon kpi-clean-card__icon--green">?</span>
     </div>
+    <div class="kpi-clean-card__value kpi-clean-card__value--green">
+      {{ formatCurrency(consolidated().income) }}
+    </div>
+  </div>
 
-  }
+  <!-- DESPESAS -->
+  <div class="kpi-clean-card">
+    <div class="kpi-clean-card__top">
+      <span class="kpi-clean-card__label">DESPESAS</span>
+      <span class="kpi-clean-card__icon kpi-clean-card__icon--red">?</span>
+    </div>
+    <div class="kpi-clean-card__value kpi-clean-card__value--red">
+      {{ formatCurrency(consolidated().total_expenses) }}
+    </div>
+  </div>
 
+  <!-- SALDO ATUAL -->
+  <div class="kpi-clean-card">
+    <div class="kpi-clean-card__top">
+      <span class="kpi-clean-card__label">SALDO ATUAL</span>
+      <span class="kpi-clean-card__icon kpi-clean-card__icon--blue">??</span>
+    </div>
+    <div class="kpi-clean-card__value" [class.kpi-clean-card__value--red]="consolidated().balance < 0">
+      {{ consolidated().balance < 0 ? '-' : '' }}{{ formatCurrency(Math.abs(consolidated().balance)) }}
+    </div>
+  </div>
 </div>
 
-
-
-
-
-<!-- ── Dashboard cards grid ── -->
-
-@if (!dashLoading()) {
-
-  <div class="dash-grid">
-
-
-
-    <!-- Faturas Abertas -->
-
-    <div class="card">
-
-      <div class="card__header">
-
-        <span class="card__title">💳 Faturas Abertas</span>
-
-        <a routerLink="/cards" class="card__link">Ver cartões →</a>
-
+<!-- ?? Posi??o nos Grupos ?? -->
+@if (sharedDebts().length > 0) {
+  <div class="card group-position-card" style="margin-bottom: var(--space-base)">
+    <div class="card__header">
+      <div class="card__header-title">
+        <span class="card__icon">??</span>
+        <span class="card__title">Posi??o nos Grupos</span>
       </div>
-
-      <div class="card__body">
-
-        @if (openInvoices().length === 0) {
-
-          <p class="empty-msg">Nenhum cartão cadastrado.</p>
-
-        }
-
-        @for (inv of openInvoices(); track inv.card_id) {
-
-          <a [routerLink]="['/cards', inv.card_id, 'expenses']" class="invoice-item">
-
-            <div class="invoice-item__icon">💳</div>
-
-            <div class="invoice-item__info">
-
-              <p class="invoice-item__name">{{ inv.card_name }} ···· {{ inv.last_four_digits }}</p>
-
-              <p class="invoice-item__closing">
-
-                <span class="badge" [class]="daysClass(inv.days_to_close)">
-
-                  {{ daysLabel(inv.days_to_close) }}
-
-                </span>
-
-              </p>
-
-            </div>
-
-            <div class="invoice-item__value">
-
-              <p class="invoice-item__total">{{ formatCurrency(inv.total) }}</p>
-
-              <p class="invoice-item__count">{{ inv.count }} lançamentos</p>
-
-            </div>
-
-          </a>
-
-        }
-
-        @if (openInvoices().length > 0) {
-
-          <div class="invoice-total-row">
-
-            <span>Total em faturas</span>
-
-            <strong>{{ formatCurrency(totalInvoices()) }}</strong>
-
-          </div>
-
-        }
-
-      </div>
-
+      <a routerLink="/shared-debts" class="card__link">Ver todos os grupos &gt;</a>
     </div>
-
-
-
-    <!-- Gastos Compartilhados -->
-
-    <div class="card">
-
-      <div class="card__header">
-
-        <span class="card__title">🤝 Gastos Compartilhados <span class="badge badge--system">{{ sharedDebts().length }} ativos</span></span>
-
-        <a routerLink="/shared-debts" class="card__link">Ver todos →</a>
-
-      </div>
-
-      <div class="card__body">
-
-        @if (sharedDebts().length === 0) {
-
-          <p class="empty-msg">Nenhum gasto compartilhado ativo.</p>
-
-        }
-
-        @for (group of sharedDebts(); track group.id) {
-
-          <a [routerLink]="['/shared-debts', group.id]" class="shared-item">
-
-            <!-- Avatares dos membros (até 3) -->
-
-            <div class="shared-item__avatars">
-
-              @for (name of group.members.slice(0, 3); track name) {
-
-                <div class="shared-item__avatar" [title]="name">
-
-                  {{ name.substring(0, 2).toUpperCase() }}
-
-                </div>
-
-              }
-
-              @if (group.members.length > 3) {
-
-                <div class="shared-item__avatar shared-item__avatar--more">+{{ group.members.length - 3 }}</div>
-
-              }
-
+    <div class="card__body">
+      @for (g of sharedDebts().slice(0, 2); track g.id) {
+        <div class="group-row">
+          <div class="group-row__left">
+            <div class="group-row__avatar">{{ g.name.substring(0,2).toUpperCase() }}</div>
+            <div>
+              <h4 class="group-row__name">{{ g.name }}</h4>
+              <span class="group-row__sub">?ltima atualiza??o h? 2 dias</span>
             </div>
-
-            <!-- Info -->
-
-            <div class="shared-item__info">
-
-              <p class="shared-item__name">{{ group.name }}</p>
-
-              <p class="shared-item__members">{{ group.members.join(' + ') }}</p>
-
-            </div>
-
-            <!-- Valores -->
-
-            <div class="shared-item__values">
-
-              <p class="shared-item__total">{{ formatCurrency(group.total_amount) }}</p>
-
-              <p class="shared-item__portion">Sua parte: {{ formatCurrency(group.my_portion) }}</p>
-
-            </div>
-
-          </a>
-
-        }
-
-      </div>
-
-    </div>
-
-
-
-    <!-- Parcelamentos ── NOVO ── -->
-
-    <div class="card">
-
-      <div class="card__header">
-
-        <span class="card__title">📋 Parcelamentos Ativos</span>
-
-        <a routerLink="/installments" class="card__link">Ver todos →</a>
-
-      </div>
-
-      <div class="card__body">
-
-        @if (activeInstallments().length === 0) {
-
-          <p class="empty-msg">Nenhum parcelamento ativo.</p>
-
-        }
-
-        @for (g of activeInstallments(); track g.name) {
-
-          <div class="installment-item">
-
-            <div class="installment-item__info">
-
-              <p class="installment-item__name">{{ g.name }}</p>
-
-              <div class="installment-item__progress-wrap">
-
-                <div class="installment-item__progress-bar">
-
-                  <div class="installment-item__progress-fill"
-
-                       [style.width]="progressPct(g) + '%'">
-
-                  </div>
-
-                </div>
-
-                <span class="installment-item__pct">
-
-                  {{ g.paidInstallments }}/{{ g.totalInstallments }}
-
-                </span>
-
-              </div>
-
-            </div>
-
-            <div class="installment-item__value">
-
-              <p class="installment-item__amount">{{ formatCurrency(g.amountPerInstallment) }}/mês</p>
-
-              <p class="installment-item__remaining">
-
-                Restam {{ formatCurrency(g.remainingAmount) }}
-
-              </p>
-
-            </div>
-
           </div>
-
-        }
-
-        @if (activeInstallments().length > 0) {
-
-          <div class="invoice-total-row">
-
-            <span>Total restante em parcelas</span>
-
-            <strong>{{ formatCurrency(totalRemainingInstallments()) }}</strong>
-
-          </div>
-
-        }
-
-      </div>
-
-    </div>
-
-
-
-    <!-- Categorias -->
-
-    <div class="card">
-
-      <div class="card__header">
-
-        <span class="card__title">📊 Gastos por Categoria</span>
-
-      </div>
-
-      <div class="card__body">
-
-        @if (byCategory().length === 0) {
-
-          <p class="empty-msg">Nenhum gasto categorizado.</p>
-
-        }
-
-        @for (cat of byCategory().slice(0, 6); track cat.category_id) {
-
-          <div class="cat-item">
-
-            <span class="cat-item__label">{{ cat.category_name }}</span>
-
-            <div class="cat-item__bar-wrap">
-
-              <div class="cat-item__bar" [style.width]="categoryBarWidth(cat.total)"></div>
-
+          <div class="group-row__right">
+            <div class="group-row__val-block">
+              <span class="group-row__val-label">Total do Grupo</span>
+              <span class="mono group-row__val">{{ formatCurrency(g.total_amount) }}</span>
             </div>
-
-            <span class="cat-item__value">{{ formatCurrency(cat.total) }}</span>
-
-          </div>
-
-        }
-
-      </div>
-
-    </div>
-
-
-
-    <!-- Últimos Lançamentos -->
-
-    <div class="card">
-
-      <div class="card__header">
-
-        <span class="card__title">🕒 Últimos Lançamentos</span>
-
-        <a routerLink="/history" class="card__link">Ver histórico</a>
-      </div>
-
-      <div class="card__body">
-
-        @if (expenses().length === 0 && !tableLoading()) {
-
-          <p class="empty-msg">Nenhum lançamento neste mês.</p>
-
-        }
-
-        @for (exp of expenses().slice(0, 5); track exp.id) {
-
-          <div class="expense-item">
-
-            <div class="expense-item__icon">{{ exp.amount >= 0 ? '💰' : '💸' }}</div>
-
-            <div class="expense-item__info">
-
-              <p class="expense-item__desc">{{ exp.description }}</p>
-
-              <p class="expense-item__meta">
-
-                {{ exp.payment_method === 'cartao' ? '💳' : '💵' }}
-
-                {{ exp.date | slice:8:10 }}/{{ exp.date | slice:5:7 }}
-
-              </p>
-
+            <div class="group-row__val-block">
+              <span class="group-row__val-label">Sua Parte</span>
+              <span class="mono group-row__val group-row__val--blue">{{ formatCurrency(g.my_portion) }}</span>
             </div>
-
-            <p class="expense-item__amount" [class]="amountClass(exp.amount)">
-
-              {{ amountPrefix(exp.amount) }} {{ formatCurrency(exp.amount) }}
-
-            </p>
-
           </div>
-
-        }
-
-      </div>
-
-    </div>
-
-
-
-    <!-- Gráficos de Evolução — full width -->
-
-    <div class="card card--full">
-
-      <div class="card__header">
-
-        <span class="card__title">📈 Evolução Mensal – {{ currentYear }}</span>
-
-        <div class="chart-legend">
-
-          <span class="chart-legend__item" style="display:flex;align-items:center;gap:6px">
-
-            <span style="display:inline-block;width:20px;height:2px;border-top:2.5px dashed #16a34a"></span>Receita
-
-          </span>
-
-          <span class="chart-legend__item" style="display:flex;align-items:center;gap:6px">
-
-            <span style="display:inline-block;width:20px;height:2px;background:#ef4444"></span>Despesa
-
-          </span>
-
-          <span style="color:#e5e7eb;margin:0 4px">│</span>
-
-          <span class="chart-legend__item" style="display:flex;align-items:center;gap:6px">
-
-            <span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px"></span>Dinheiro
-
-          </span>
-
-          <span class="chart-legend__item" style="display:flex;align-items:center;gap:6px">
-
-            <span style="display:inline-block;width:10px;height:10px;background:#f97316;border-radius:2px"></span>Cartão
-
-          </span>
-
-          <span class="chart-legend__item" style="display:flex;align-items:center;gap:6px">
-
-            <span style="display:inline-block;width:10px;height:10px;background:#fbbf24;border-radius:2px"></span>Compartilhado
-
-          </span>
-
         </div>
-
-      </div>
-
-      <div class="chart-dual">
-
-        <div class="chart-dual__line" #lineChartEl style="position:relative"></div>
-
-
-
-        <div class="chart-dual__comp" #compChartEl></div>
-
-      </div>
-
+      }
     </div>
-
-
-
-  </div><!-- /dash-grid -->
-
+  </div>
 }
 
-
-
-<!-- ── Chart tooltips (position:fixed, attached via DOM events) ── -->
-
-@if (chartTooltip()) {
-
-  <div class="chart-tooltip"
-
-    [style.left.px]="chartTooltip()!.cx"
-
-    [style.top.px]="chartTooltip()!.cy">
-
-    <div class="chart-tooltip__title">📅 {{ chartTooltip()!.month }}</div>
-
-    <div class="chart-tooltip__row">
-
-      <span><span class="dot dot--green"></span>Receita</span>
-
-      <span class="chart-tooltip__val">{{ fmtCur(chartTooltip()!.income) }}</span>
-
+<!-- ?? Gastos Fixos Section ?? -->
+<div class="card fixed-expenses-card" style="margin-bottom: var(--space-base)">
+  <div class="card__header">
+    <div class="card__header-title">
+      <span class="card__icon">??</span>
+      <span class="card__title">Gastos Fixos</span>
     </div>
+    <button class="card__link btn-link" type="button" (click)="showRecurringForm.set(!showRecurringForm())">Gerenciar</button>
+  </div>
+  <div class="card__body">
+    @if (recurringTemplates().length === 0) {
+      <p class="empty-msg">Nenhum gasto fixo cadastrado para este m?s.</p>
+    } @else {
+      <div class="data-table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Descri??o</th>
+              <th>Categoria</th>
+              <th>Dia</th>
+              <th class="text-right">Valor</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (t of recurringTemplates(); track t.id) {
+              <tr [style.opacity]="t.is_active ? '1' : '0.5'">
+                <td style="font-weight:500">{{ t.description }}</td>
+                <td>
+                  @if (t.category_name) {
+                    <span class="badge badge--primary">{{ t.category_name }}</span>
+                  } @else {
+                    <span class="text-muted">?</span>
+                  }
+                </td>
+                <td class="mono text-muted">dia {{ t.day_of_month }}</td>
+                <td class="text-right mono">R$ {{ t.amount }}</td>
+                <td>
+                  <span [class]="t.is_active ? 'badge badge--success' : 'badge badge--muted'">
+                    {{ t.is_active ? 'Ativo' : 'Pausado' }}
+                  </span>
+                </td>
+                <td style="display:flex;gap:4px;justify-content:flex-end">
+                  <button class="btn btn--secondary btn--sm" type="button" (click)="toggleRecurring(t.id)"
+                    [title]="t.is_active ? 'Pausar' : 'Ativar'">{{ t.is_active ? '?' : '?' }}</button>
+                  <button class="btn btn--danger btn--sm" type="button" (click)="deleteRecurring(t.id)">???</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>
 
-    <div class="chart-tooltip__row">
-
-      <span><span class="dot dot--red"></span>Despesa</span>
-
-      <span class="chart-tooltip__val">{{ fmtCur(chartTooltip()!.expense) }}</span>
-
+<!-- ?? 2-Column Grid Row 1 (Faturas Abertas & Gastos Compartilhados) ?? -->
+<div class="grid-2col">
+  <!-- Faturas Abertas -->
+  <div class="card">
+    <div class="card__header">
+      <div class="card__header-title">
+        <span class="card__icon">??</span>
+        <span class="card__title">Faturas Abertas</span>
+      </div>
+      <a routerLink="/cards" class="card__link">Ver Detalhes</a>
     </div>
-
+    <div class="card__body">
+      @if (openInvoices().length === 0) {
+        <p class="empty-msg">Nenhum cart?o cadastrado.</p>
+      }
+      @for (inv of openInvoices(); track inv.card_id) {
+        <a [routerLink]="['/cards', inv.card_id, 'expenses']" class="invoice-item">
+          <div class="invoice-item__icon">??</div>
+          <div class="invoice-item__info">
+            <p class="invoice-item__name">{{ inv.card_name }} {{ inv.last_four_digits }}</p>
+            <p class="invoice-item__closing">
+              <span class="badge" [class]="daysClass(inv.days_to_close)">
+                {{ daysLabel(inv.days_to_close) }}
+              </span>
+            </p>
+          </div>
+          <div class="invoice-item__value">
+            <p class="invoice-item__total mono">{{ formatCurrency(inv.total) }}</p>
+          </div>
+        </a>
+      }
+      @if (openInvoices().length > 0) {
+        <div class="invoice-total-row">
+          <span>Total em Faturas</span>
+          <strong class="mono">{{ formatCurrency(totalInvoices()) }}</strong>
+        </div>
+      }
+    </div>
   </div>
 
-}
-
-
-
-@if (barTooltip()) {
-
-  <div class="chart-tooltip"
-
-    [style.left.px]="barTooltip()!.cx"
-
-    [style.top.px]="barTooltip()!.cy">
-
-    <div class="chart-tooltip__title">📅 {{ barTooltip()!.month }}</div>
-
-    <div class="chart-tooltip__row">
-
-      <span><span class="dot dot--red"></span>Dinheiro</span>
-
-      <span class="chart-tooltip__val">{{ fmtCur(barTooltip()!.cash) }}</span>
-
+  <!-- Gastos Compartilhados -->
+  <div class="card">
+    <div class="card__header">
+      <div class="card__header-title">
+        <span class="card__icon">??</span>
+        <span class="card__title">Gastos Compartilhados</span>
+      </div>
+      <a routerLink="/shared-debts" class="card__link">Dividir Outro</a>
     </div>
-
-    <div class="chart-tooltip__row">
-
-      <span><span class="dot dot--orange"></span>Cartão</span>
-
-      <span class="chart-tooltip__val">{{ fmtCur(barTooltip()!.card) }}</span>
-
+    <div class="card__body">
+      @if (sharedDebts().length === 0) {
+        <p class="empty-msg">Nenhum gasto compartilhado ativo.</p>
+      }
+      @for (group of sharedDebts().slice(0, 2); track group.id) {
+        <a [routerLink]="['/shared-debts', group.id]" class="shared-item">
+          <div class="shared-item__avatar">{{ group.name.substring(0, 2).toUpperCase() }}</div>
+          <div class="shared-item__info">
+            <p class="shared-item__name">{{ group.name }}</p>
+            <p class="shared-item__portion-sub">Sua parte: {{ formatCurrency(group.my_portion) }}</p>
+          </div>
+          <div class="shared-item__values">
+            <p class="shared-item__total mono">{{ formatCurrency(group.total_amount) }}</p>
+          </div>
+        </a>
+      }
+      @if (sharedDebts().length > 0) {
+        <div class="invoice-total-row">
+          <span>Total a Receber/Pagar</span>
+          <strong class="mono text-blue">{{ formatCurrency(consolidated().shared_my_portion) }}</strong>
+        </div>
+      }
     </div>
+  </div>
+</div>
 
-    <div class="chart-tooltip__row">
-
-      <span><span class="dot dot--yellow"></span>Compartilhado</span>
-
-      <span class="chart-tooltip__val">{{ fmtCur(barTooltip()!.shared) }}</span>
-
+<!-- ?? 2-Column Grid Row 2 (Parcelamentos Ativos & Gastos por Categoria) ?? -->
+<div class="grid-2col">
+  <!-- Parcelamentos Ativos -->
+  <div class="card">
+    <div class="card__header">
+      <div class="card__header-title">
+        <span class="card__icon">??</span>
+        <span class="card__title">Parcelamentos Ativos</span>
+      </div>
+      <a routerLink="/installments" class="card__link">Ver Todos</a>
     </div>
-
-    <div class="chart-tooltip__divider"></div>
-
-    <div class="chart-tooltip__row chart-tooltip__row--total">
-
-      <span>Total</span>
-
-      <span class="chart-tooltip__val">{{ fmtCur(barTooltip()!.total) }}</span>
-
+    <div class="card__body">
+      @if (activeInstallments().length === 0) {
+        <p class="empty-msg">Nenhum parcelamento ativo.</p>
+      }
+      @for (g of activeInstallments(); track g.name) {
+        <div class="installment-item">
+          <div class="installment-item__info">
+            <p class="installment-item__name">{{ g.name }}</p>
+            <span class="installment-item__sub">Parcela {{ g.paidInstallments }}/{{ g.totalInstallments }}</span>
+            <div class="installment-item__progress-wrap">
+              <div class="installment-item__progress-bar">
+                <div class="installment-item__progress-fill" [style.width]="progressPct(g) + '%'"></div>
+              </div>
+            </div>
+          </div>
+          <div class="installment-item__value">
+            <p class="installment-item__amount mono">{{ formatCurrency(g.amountPerInstallment) }}/m?s</p>
+          </div>
+        </div>
+      }
     </div>
-
   </div>
 
-}
+  <!-- Gastos por Categoria -->
+  <div class="card">
+    <div class="card__header">
+      <div class="card__header-title">
+        <span class="card__icon">??</span>
+        <span class="card__title">Gastos por Categoria</span>
+      </div>
+      <a routerLink="/analytics" class="card__link">Ver Gr?fico</a>
+    </div>
+    <div class="card__body">
+      @if (byCategory().length === 0) {
+        <p class="empty-msg">Nenhum gasto categorizado.</p>
+      }
+      @for (cat of byCategory().slice(0, 6); track cat.category_id) {
+        <div class="cat-item">
+          <span class="cat-item__label">{{ cat.category_name }}</span>
+          <div class="cat-item__bar-wrap">
+            <div class="cat-item__bar" [style.width]="categoryBarWidth(cat.total)"></div>
+          </div>
+          <span class="cat-item__value mono">{{ formatCurrency(cat.total) }}</span>
+        </div>
+      }
+    </div>
+  </div>
+</div>
 
+<!-- ?? 2-Column Grid Row 3 (?ltimos Lan?amentos & Evolu??o Mensal) ?? -->
+<div class="grid-2col">
+  <!-- ?ltimos Lan?amentos -->
+  <div class="card">
+    <div class="card__header">
+      <div class="card__header-title">
+        <span class="card__icon">??</span>
+        <span class="card__title">?ltimos Lan?amentos</span>
+      </div>
+      <a routerLink="/history" class="card__link">Ver Extrato</a>
+    </div>
+    <div class="card__body">
+      @if (expenses().length === 0 && !tableLoading()) {
+        <p class="empty-msg">Nenhum lan?amento neste m?s.</p>
+      }
+      @for (exp of expenses().slice(0, 5); track exp.id) {
+        <div class="expense-item">
+          <div class="expense-item__icon">??</div>
+          <div class="expense-item__info">
+            <p class="expense-item__desc">{{ exp.description }}</p>
+            <p class="expense-item__meta">
+              {{ exp.category ? exp.category.name : 'Geral' }}
+            </p>
+          </div>
+          <div class="expense-item__right">
+            <span class="expense-item__date text-muted">{{ exp.date | slice:8:10 }}/{{ exp.date | slice:5:7 }}</span>
+            <span class="expense-item__amount mono" [class.value-down]="exp.amount > 0">
+              -{{ formatCurrency(exp.amount) }}
+            </span>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
 
-
-
-
+  <!-- Evolu??o Mensal -->
+  <div class="card">
+    <div class="card__header">
+      <div class="card__header-title">
+        <span class="card__icon">??</span>
+        <span class="card__title">Evolu??o Mensal ? {{ currentYear }}</span>
+      </div>
+      <div class="chart-legend">
+        <span class="chart-legend__dot chart-legend__dot--green"></span> Receita
+        <span class="chart-legend__dot chart-legend__dot--red"></span> Despesa
+      </div>
+    </div>
+    <div class="card__body">
+      <div #monthlyChartEl class="d3-chart-container" style="height: 220px"></div>
+    </div>
+  </div>
+</div>
