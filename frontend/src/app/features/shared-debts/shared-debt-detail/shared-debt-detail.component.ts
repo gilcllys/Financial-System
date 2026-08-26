@@ -64,6 +64,7 @@ export class SharedDebtDetailComponent implements OnInit {
   filterCategory = signal<number | null>(null);
   currentPage = signal(1);
   totalCount = signal(0);
+  private openedEntryFromQuery = false;
   totalPages = computed(() => Math.max(1, Math.ceil(this.totalCount() / this.PAGE_SIZE)));
   pageNumbers = computed(() => Array.from({ length: this.totalPages() }, (_, i) => i + 1));
   cards = signal<CreditCard[]>([]);
@@ -235,7 +236,8 @@ export class SharedDebtDetailComponent implements OnInit {
       next: m => {
         this.members.set(m);
         this.participantIds.set(new Set(m.map(x => x.id)));
-        this.batchParticipantIds.set(new Set(m.map(x => x.id)));
+        this.batchParticipantIds.set(new Set(m.map(x => x.id)));
+        this.openEntryFromQuery();
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
@@ -255,12 +257,28 @@ export class SharedDebtDetailComponent implements OnInit {
     }).subscribe({
       next: (res: PaginatedResponse<SharedDebtEntry>) => {
         this.entries.set(res.results);
-        this.totalCount.set(res.count);
+        this.totalCount.set(res.count);
+        this.openEntryFromQuery();
       }
     });
     this.svc.balances(this.groupId).subscribe({ next: b => this.balances.set(b) });
   }
 
+  private openEntryFromQuery(): void {
+    if (this.openedEntryFromQuery || this.members().length === 0) return;
+    const rawEntryId = this.route.snapshot.queryParamMap.get('edit_entry');
+    if (!rawEntryId) return;
+    const entryId = Number(rawEntryId);
+    if (!Number.isFinite(entryId)) return;
+
+    const entry = this.entries().find(e => e.id === entryId);
+    if (!entry) return;
+
+    this.openedEntryFromQuery = true;
+    this.activeTab.set('entries');
+    this.editEntry(entry);
+  }
+
   applyFilter(): void { this.refreshEntriesAndBalances(true); }
 
   clearFilters(): void {

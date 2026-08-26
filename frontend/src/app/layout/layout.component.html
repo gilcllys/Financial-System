@@ -92,6 +92,16 @@
       <span class="sidebar__link-label">Supermercado</span>
     </a>
 
+    <a
+      routerLink="/history"
+      routerLinkActive="sidebar__link--active"
+      class="sidebar__link"
+      (click)="closeDrawer()"
+    >
+      <span class="sidebar__link-icon" aria-hidden="true">??</span>
+      <span class="sidebar__link-label">Historico</span>
+    </a>
+
     <a
       routerLink="/analytics"
       routerLinkActive="sidebar__link--active"
@@ -187,6 +197,10 @@
     <span class="bottom-nav__icon" aria-hidden="true">🛒</span>
     <span class="bottom-nav__label">Mercado</span>
   </a>
+  <a routerLink="/history" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
+    <span class="bottom-nav__icon" aria-hidden="true">??</span>
+    <span class="bottom-nav__label">Historico</span>
+  </a>
   <a routerLink="/analytics" routerLinkActive="bottom-nav__item--active" class="bottom-nav__item">
     <span class="bottom-nav__icon" aria-hidden="true">📈</span>
     <span class="bottom-nav__label">Análises</span>

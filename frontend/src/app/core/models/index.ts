@@ -72,6 +72,9 @@ export interface ExpenseFilters {
   category_id?: number;
   payment_method?: PaymentMethod;
   credit_card_id?: number;
+  start_date?: string;
+  end_date?: string;
+  search?: string;
 }
 
 export interface PaginatedResponse<T> {

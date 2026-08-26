@@ -39,12 +39,15 @@ export class ExpenseService {
   private http = inject(HttpClient);
   private base = `${environment.apiBaseUrl}/api/expenses/expenses`;
 
-  list(filters?: ExpenseFilters & { page?: number; page_size?: number; search?: string }): Observable<PaginatedResponse<Expense>> {
+  list(filters?: ExpenseFilters & { page?: number; page_size?: number }): Observable<PaginatedResponse<Expense>> {
     let params = new HttpParams();
     if (filters?.month)          params = params.set('month', filters.month);
     if (filters?.year)           params = params.set('year', filters.year);
     if (filters?.category_id)    params = params.set('category_id', filters.category_id);
     if (filters?.payment_method) params = params.set('payment_method', filters.payment_method);
+    if (filters?.credit_card_id) params = params.set('credit_card_id', filters.credit_card_id);
+    if (filters?.start_date)     params = params.set('start_date', filters.start_date);
+    if (filters?.end_date)       params = params.set('end_date', filters.end_date);
     if (filters?.search)         params = params.set('search', filters.search);
     if (filters?.page)           params = params.set('page', filters.page);
     if (filters?.page_size)      params = params.set('page_size', filters.page_size);

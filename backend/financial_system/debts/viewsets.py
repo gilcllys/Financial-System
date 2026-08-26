@@ -1,3 +1,5 @@
+from datetime import date
+
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.decorators import action
@@ -171,6 +173,12 @@ class SharedEntryViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError):
                 pass
 
+        payment_method = params.get('payment_method')
+        if payment_method is not None:
+            valid_choices = {choice[0] for choice in SharedEntry.PAYMENT_METHOD_CHOICES}
+            if payment_method in valid_choices:
+                qs = qs.filter(payment_method=payment_method)
+
         raw_month = params.get('month')
         raw_year  = params.get('year')
         if raw_month and raw_year:
@@ -191,6 +199,20 @@ class SharedEntryViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError):
                 pass
 
+        raw_start_date = params.get('start_date')
+        if raw_start_date:
+            try:
+                qs = qs.filter(date__gte=date.fromisoformat(raw_start_date))
+            except (ValueError, TypeError):
+                pass
+
+        raw_end_date = params.get('end_date')
+        if raw_end_date:
+            try:
+                qs = qs.filter(date__lte=date.fromisoformat(raw_end_date))
+            except (ValueError, TypeError):
+                pass
+
         return qs
 
     def _get_group_as_member(self, shared_debt_id):
