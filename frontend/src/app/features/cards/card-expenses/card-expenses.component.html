@@ -396,47 +396,66 @@
 <!-- Dividas Compartilhadas - agrupado por grupo, filtrado pelo periodo da fatura -->
 @if (filteredSharedEntries().length) {
   <div class="table-total-header" style="margin-top:var(--space-lg)">
-    <span class="table-total-header__label">Dividas Compartilhadas</span>
+    <span class="table-total-header__label">Dívidas Compartilhadas</span>
     <span class="table-total-header__value mono value-down">{{ formatAmount(sharedGrossTotal()) }}</span>
   </div>
 
-  <!-- Banner resumo compartilhado -->
-  <div class="shared-invoice-summary" style="margin-top:var(--space-base);display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-base);padding:var(--space-base);background:#f8faff;border:1px solid #dce8ff;border-radius:10px">
-    <div>
-      <p class="kpi-card__label" style="font-size:12px">Minha parte compartilhada</p>
-      <p class="value-down mono" style="font-size:1.1rem;font-weight:600">{{ formatAmount(sharedSummary().mySpend) }}</p>
-    </div>
-    <div>
-      <p class="kpi-card__label" style="font-size:12px">A receber de outros</p>
-      <p class="value-up mono" style="font-size:1.1rem;font-weight:600">{{ formatAmount(sharedSummary().toReceive) }}</p>
-    </div>
-    <div>
-      <p class="kpi-card__label" style="font-size:12px">Custo liquido</p>
-      <p class="mono" style="font-size:1.1rem;font-weight:600">{{ formatAmount(sharedSummary().mySpend - sharedSummary().toReceive) }}</p>
-    </div>
-  </div>
-
-  <div class="shared-groups-list" style="margin-top:var(--space-base);display:flex;flex-direction:column;gap:var(--space-base)">
+  <div class="shared-groups-list">
     @for (group of sharedGroups(); track group.group_id) {
-      <div class="shared-group-block">
-        <div class="shared-group-block__header">
-          <h3 class="shared-group-block__title">{{ group.group_name }}</h3>
-          <a [routerLink]="['/shared-debts', group.group_id]" class="btn btn--secondary btn--sm">Ver grupo</a>
-        </div>
-
-        <div class="shared-group-block__list">
-          @for (p of group.participants; track p.member_id; let i = $index) {
-            <div class="shared-group-block__row">
-              <span class="shared-group-block__index">{{ i + 1 }}</span>
-              <span class="shared-group-block__name">{{ p.is_current_user ? 'Voce' : p.name }}</span>
-              <span class="shared-group-block__amount mono">{{ formatAmount(p.amount) }}</span>
+      <div class="shared-group-card">
+        <div class="shared-group-card__header">
+          <div class="shared-group-card__group-info">
+            <div class="shared-group-card__avatar">👥</div>
+            <div>
+              <h3 class="shared-group-card__title">{{ group.group_name }}</h3>
+              <span class="shared-group-card__sub">{{ group.participants.length }} participantes</span>
             </div>
-          }
+          </div>
+          <a [routerLink]="['/shared-debts', group.group_id]" class="btn btn--secondary btn--sm btn--link-icon">
+            Ver grupo <span>→</span>
+          </a>
         </div>
 
-        <div class="shared-group-block__total-row">
-          <span>Total</span>
-          <span class="mono">{{ formatAmount(group.total) }}</span>
+        <div class="shared-group-card__table-wrapper">
+          <table class="shared-group-card__table" role="table" aria-label="Participantes do grupo">
+            <thead>
+              <tr>
+                <th scope="col" style="width: 44px; text-align: center">#</th>
+                <th scope="col">Membro</th>
+                <th scope="col" style="text-align: right">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of group.participants; track p.member_id; let i = $index) {
+                <tr [class.shared-group-card__row--user]="p.is_current_user">
+                  <td class="shared-group-card__cell-index">{{ i + 1 }}</td>
+                  <td class="shared-group-card__cell-name">
+                    <div class="shared-group-card__member">
+                      <span class="shared-group-card__member-avatar" [class.shared-group-card__member-avatar--me]="p.is_current_user">
+                        {{ (p.is_current_user ? 'Você' : p.name).charAt(0).toUpperCase() }}
+                      </span>
+                      <span class="shared-group-card__member-name">
+                        {{ p.is_current_user ? 'Você' : p.name }}
+                        @if (p.is_current_user) {
+                          <span class="badge--me">Minha parte</span>
+                        }
+                      </span>
+                    </div>
+                  </td>
+                  <td style="text-align: right">
+                    <span class="mono shared-group-card__amount" [class.shared-group-card__amount--me]="p.is_current_user">
+                      {{ formatAmount(p.amount) }}
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="shared-group-card__footer">
+          <span class="shared-group-card__footer-label">Total do Grupo</span>
+          <span class="mono shared-group-card__footer-total">{{ formatAmount(group.total) }}</span>
         </div>
       </div>
     }
