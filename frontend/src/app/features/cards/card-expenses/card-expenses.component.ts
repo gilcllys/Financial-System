@@ -1,4 +1,4 @@
-﻿import {
+import {
   Component,
   OnInit,
   OnDestroy,
@@ -24,7 +24,17 @@ import {
   Invoice,
   InvoiceExpensesResponse,
   InvoicePagination,
+  InvoiceSharedParticipant,
 } from '../../../core/models';
+
+export interface SharedInvoiceGroup {
+  group_id: number;
+  group_name: string;
+  total: number;
+  participants: InvoiceSharedParticipant[];
+  entries: SharedDebtEntry[];
+  myPortionTotal: number;
+}
 
 const CAT_COLORS = [
   '#0052ff', '#34c759', '#ff9f0a', '#ff3b30',
@@ -106,6 +116,30 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   sharedNormal = computed((): SharedDebtEntry[] =>
     this.filteredSharedEntries().filter(e => e.total_installments === 1)
   );
+
+  sharedGroups = computed((): SharedInvoiceGroup[] => {
+    const entries = this.filteredSharedEntries();
+    const breakdownGroups = this.invoiceData()?.summary.shared_breakdown?.groups ?? [];
+    const map = new Map<number, SharedInvoiceGroup>();
+    for (const e of entries) {
+      let group = map.get(e.shared_debt);
+      if (!group) {
+        const bd = breakdownGroups.find(g => g.group_id === e.shared_debt);
+        group = {
+          group_id: e.shared_debt,
+          group_name: e.shared_debt_name,
+          total: bd?.total ?? 0,
+          participants: bd?.participants ?? [],
+          entries: [],
+          myPortionTotal: 0,
+        };
+        map.set(e.shared_debt, group);
+      }
+      group.entries.push(e);
+      group.myPortionTotal += this.myPortion(e);
+    }
+    return [...map.values()].sort((a, b) => a.group_name.localeCompare(b.group_name));
+  });
 
   loadingInvoices    = signal(true);
   loadingExpenses    = signal(false);

@@ -1,4 +1,4 @@
-﻿// ─── TypeScript Models ────────────────────────────────────────────────────────
+// ─── TypeScript Models ────────────────────────────────────────────────────────
 
 export interface ExpenseCategory {
   id: number;
@@ -153,9 +153,17 @@ export interface InvoiceSharedParticipant {
   is_current_user: boolean;
 }
 
+export interface InvoiceSharedGroupBreakdown {
+  group_id: number;
+  group_name: string;
+  total: number;
+  participants: InvoiceSharedParticipant[];
+}
+
 export interface InvoiceSharedBreakdown {
   total: number;
   participants: InvoiceSharedParticipant[];
+  groups: InvoiceSharedGroupBreakdown[];
 }
 export interface InvoiceExpensesResponse {
   invoice_month: number;

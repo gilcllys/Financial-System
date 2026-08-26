@@ -1,4 +1,4 @@
-﻿import calendar
+import calendar
 from datetime import date, timedelta
 
 from django.db.models import Count, Sum
@@ -236,6 +236,7 @@ class InvoiceExpensesBehavior:
         _shared_my_total = 0.0
         _shared_gross_total = 0.0
         _shared_participants = {}
+        _shared_groups = {}
         for _e in _shared_entries:
             _amount = abs(float(_e.amount))
             _members = [p.member for p in _e.participants.all()]
@@ -245,6 +246,18 @@ class InvoiceExpensesBehavior:
             _portion = _amount / _p
             _shared_gross_total += _amount
             _shared_my_total += _portion
+
+            _group_row = _shared_groups.setdefault(
+                _e.shared_debt_id,
+                {
+                    'group_id': _e.shared_debt_id,
+                    'group_name': _e.shared_debt.name,
+                    'total': 0.0,
+                    'participants': {},
+                },
+            )
+            _group_row['total'] += _amount
+
             for _member in _members:
                 _row = _shared_participants.setdefault(
                     _member.id,
@@ -256,6 +269,17 @@ class InvoiceExpensesBehavior:
                     },
                 )
                 _row['amount'] += _portion
+
+                _group_participant_row = _group_row['participants'].setdefault(
+                    _member.id,
+                    {
+                        'member_id': _member.id,
+                        'name': _member.display_name,
+                        'amount': 0.0,
+                        'is_current_user': _member.tenant_id == self.card.tenant_id,
+                    },
+                )
+                _group_participant_row['amount'] += _portion
         _shared_my_total = round(_shared_my_total, 2)
         _shared_breakdown = {
             'total': round(_shared_gross_total, 2),
@@ -265,6 +289,21 @@ class InvoiceExpensesBehavior:
                     _shared_participants.values(),
                     key=lambda item: (not item['is_current_user'], item['name'].lower()),
                 )
+            ],
+            'groups': [
+                {
+                    'group_id': group['group_id'],
+                    'group_name': group['group_name'],
+                    'total': round(group['total'], 2),
+                    'participants': [
+                        {**p, 'amount': round(p['amount'], 2)}
+                        for p in sorted(
+                            group['participants'].values(),
+                            key=lambda item: (not item['is_current_user'], item['name'].lower()),
+                        )
+                    ],
+                }
+                for group in sorted(_shared_groups.values(), key=lambda g: g['group_name'].lower())
             ],
         }
         _expenses_total = grand_total
