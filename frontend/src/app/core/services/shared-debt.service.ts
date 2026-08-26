@@ -195,7 +195,10 @@ export class SharedDebtService {
     credit_card?: number;
     month?: number;
     year?: number;
+    payment_method?: 'dinheiro' | 'cartao';
     category?: number | null;
+    start_date?: string;
+    end_date?: string;
     page?: number;
     page_size?: number;
   }): Observable<PaginatedResponse<SharedDebtEntry>> {
@@ -204,7 +207,10 @@ export class SharedDebtService {
     if (params.credit_card != null) httpParams = httpParams.set('credit_card', params.credit_card);
     if (params.month  != null)      httpParams = httpParams.set('month', params.month);
     if (params.year   != null)      httpParams = httpParams.set('year',  params.year);
+    if (params.payment_method != null) httpParams = httpParams.set('payment_method', params.payment_method);
     if (params.category != null)    httpParams = httpParams.set('category', params.category);
+    if (params.start_date)          httpParams = httpParams.set('start_date', params.start_date);
+    if (params.end_date)            httpParams = httpParams.set('end_date', params.end_date);
     if (params.page   != null)      httpParams = httpParams.set('page', params.page);
     if (params.page_size != null)   httpParams = httpParams.set('page_size', params.page_size);
     return this.http.get<PaginatedResponse<SharedDebtEntry>>(`${this.base}/shared-entries/`, { params: httpParams });

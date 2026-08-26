@@ -111,6 +111,29 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             if payment_method in valid_choices:
                 qs = qs.filter(payment_method=payment_method)
 
+        # --- credit_card_id ------------------------------------------
+        raw_credit_card = params.get('credit_card_id')
+        if raw_credit_card is not None:
+            try:
+                qs = qs.filter(credit_card_id=int(raw_credit_card))
+            except (ValueError, TypeError):
+                pass
+
+        # --- start_date / end_date -----------------------------------
+        raw_start_date = params.get('start_date')
+        if raw_start_date:
+            try:
+                qs = qs.filter(date__gte=date.fromisoformat(raw_start_date))
+            except (ValueError, TypeError):
+                pass
+
+        raw_end_date = params.get('end_date')
+        if raw_end_date:
+            try:
+                qs = qs.filter(date__lte=date.fromisoformat(raw_end_date))
+            except (ValueError, TypeError):
+                pass
+
         # --- search (description icontains) --------------------------
         # [SEC-A03] Limita o tamanho da query para prevenir DoS via queries longas
         # (icontains é parameterizado pelo ORM — seguro contra SQL injection)

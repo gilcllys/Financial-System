@@ -114,6 +114,13 @@ export const routes: Routes = [
           import('./features/uncategorized/uncategorized.component').then(m => m.UncategorizedComponent),
       },
 
+      // Historico
+      {
+        path: 'history',
+        loadComponent: () =>
+          import('./features/history/history.component').then(m => m.HistoryComponent),
+      },
+
       // Analytics
       {
         path: 'analytics',
