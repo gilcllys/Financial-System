@@ -1,10 +1,10 @@
-﻿<!-- ── Page Header ── -->
+<!-- ─— Page Header ─— -->
 <div class="page-header">
   <div class="page-header__left">
-    <h1 class="page-header__title">Cartões</h1>
-    <p class="page-header__subtitle">Gerencie seus cartões e limites</p>
+    <h1 class="page-header__title">Meus Cartões</h1>
+    <p class="page-header__subtitle">Gerencie limites, vencimentos e veja extratos consolidados.</p>
   </div>
-  <a routerLink="/cards/new" class="btn btn--primary">+ Novo Cartão</a>
+  <a routerLink="/cards/new" class="btn btn--primary btn--pill">+ Novo Cartão</a>
 </div>
 
 @if (loading()) {
@@ -13,78 +13,81 @@
   </div>
 } @else if (cards().length === 0) {
   <div class="empty-state">
-    <div class="empty-state__icon">💳</div>
     <p class="empty-state__title">Nenhum cartão cadastrado</p>
-    <p class="empty-state__text">Adicione um cartão para registrar compras parceladas.</p>
-    <a routerLink="/cards/new" class="btn btn--primary" style="margin-top:16px">+ Novo Cartão</a>
+    <p class="empty-state__text">Adicione um cartão para gerenciar limites e faturas.</p>
+    <a routerLink="/cards/new" class="btn btn--primary btn--pill" style="margin-top:16px">+ Novo Cartão</a>
   </div>
 } @else {
 
-  <!-- ── Cards Grid ── -->
+  <!-- ─— Cards Grid (4 columns) ─— -->
   <div class="cc-grid" role="list" aria-label="Lista de cartões">
     @for (card of cards(); track card.id; let i = $index) {
-      <button
+      <div
         class="cc-card"
         [class.cc-card--selected]="selectedCardId() === card.id"
-        [style]="cardGradient(i)"
+        [style]="getCardGradient(card, i)"
         role="listitem"
-        type="button"
         (click)="selectCard(card, true)"
+        tabindex="0"
         [attr.aria-pressed]="selectedCardId() === card.id"
-        [attr.aria-label]="'Selecionar cartão ' + card.name"
       >
-        <!-- Status badge -->
+        <!-- Top Row: Name + Selected Badge + Menu -->
         <div class="cc-card__top">
-          <span class="cc-card__status">ATIVA</span>
-          <button
-            class="cc-card__menu"
-            type="button"
-            [attr.aria-label]="'Menu do cartão ' + card.name"
-            (click)="openMenu($event, card)"
-          >⋯</button>
-        </div>
-
-        <!-- Name + digits -->
-        <div class="cc-card__body">
           <h3 class="cc-card__name">{{ card.name }}</h3>
-          <span class="cc-card__digits">•••• •••• •••• {{ card.last_four_digits }}</span>
+          <div class="cc-card__top-right">
+            @if (selectedCardId() === card.id) {
+              <span class="cc-card__selected-badge">SELECIONADO</span>
+            }
+            <button
+              class="cc-card__menu"
+              type="button"
+              [attr.aria-label]="'Menu do cartão ' + card.name"
+              (click)="openMenu($event, card)"
+            >⋯</button>
+          </div>
         </div>
 
-        <!-- Footer: dates + total -->
+        <!-- Middle Row: Digits (Shows only 4 digits e.g. •••• 1234) -->
+        <div class="cc-card__body">
+          <span class="cc-card__digits">•••• {{ card.last_four_digits }}</span>
+        </div>
+
+        <!-- Bottom Row: Dates + Total -->
         <div class="cc-card__footer">
           <span class="cc-card__dates">
             Fecha dia {{ card.closing_day }} | Vence dia {{ card.due_day }}
           </span>
-          @if (invoiceTotals()[card.id] !== undefined) {
-            <span class="cc-card__total">
-              Fatura: {{ formatAmount(invoiceTotals()[card.id]) }}
-            </span>
-          }
+          <span class="cc-card__total">
+            {{ formatAmount(invoiceTotals()[card.id] ?? 0) }}
+          </span>
         </div>
-
-        <!-- Action button -->
-        <div class="cc-card__actions">
-          <a
-            [routerLink]="['/cards', card.id, 'expenses']"
-            class="cc-card__btn"
-            (click)="$event.stopPropagation()"
-            [attr.aria-label]="'Ver fatura de ' + card.name"
-          >Ver Fatura →</a>
-        </div>
-      </button>
+      </div>
     }
   </div>
 
-  <!-- ── Inline Invoice Section ── -->
+  <!-- ─— Inline Invoice Section ─— -->
   @if (selectedCard()) {
     <section class="invoice-section" aria-label="Fatura do cartão selecionado">
-      <!-- Section header with month nav -->
+      <!-- Section header -->
       <div class="invoice-section__header">
-        <h2 class="invoice-section__title">Fatura do Cartão Selecionado</h2>
-        <div class="invoice-section__nav" role="group" aria-label="Navegar meses">
-          <button class="invoice-nav-btn" type="button" (click)="prevMonth()" aria-label="Mês anterior">‹</button>
-          <span class="invoice-section__month">{{ currentMonthLabel() }}</span>
-          <button class="invoice-nav-btn" type="button" (click)="nextMonth()" aria-label="Próximo mês">›</button>
+        <h2 class="invoice-section__title">
+          Fatura de {{ currentMonthLabel() }} — {{ selectedCard()!.name }}
+        </h2>
+        <div class="invoice-section__actions">
+          <div class="invoice-section__nav" role="group" aria-label="Navegar meses">
+            <button class="invoice-nav-btn" type="button" (click)="prevMonth()" aria-label="Mês anterior">‹</button>
+            <span class="invoice-section__month">{{ currentMonthLabel() }}</span>
+            <button class="invoice-nav-btn" type="button" (click)="nextMonth()" aria-label="Próximo mês">›</button>
+          </div>
+          <a [routerLink]="['/cards', selectedCard()!.id, 'expenses']" class="btn-close-invoice">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/>
+              <line x1="16" x2="16" y1="2" y2="6"/>
+              <line x1="8" x2="8" y1="2" y2="6"/>
+              <line x1="3" x2="21" y1="10" y2="10"/>
+            </svg>
+            Ver fatura
+          </a>
         </div>
       </div>
 
@@ -92,66 +95,58 @@
         <div class="loading-wrapper"><span class="spinner"></span> Carregando fatura...</div>
       } @else if (invoiceExpenses().length === 0) {
         <div class="empty-state" style="padding: var(--space-xl) 0">
-          <div class="empty-state__icon">🧾</div>
+          <div class="empty-state__icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:#94a3b8"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="8" x2="16" y1="10" y2="10"/><line x1="8" x2="12" y1="14" y2="14"/></svg>
+          </div>
           <p class="empty-state__title">Sem gastos neste mês</p>
           <p class="empty-state__text">Nenhuma despesa registrada para {{ currentMonthLabel() }}.</p>
         </div>
       } @else {
         <div class="data-table-wrapper">
-          <table class="data-table" role="table" aria-label="Gastos da fatura">
+          <table class="data-table invoice-clean-table" role="table" aria-label="Gastos da fatura">
             <thead>
               <tr>
-                <th scope="col">Descrição</th>
-                <th scope="col">Data</th>
-                <th scope="col">Parcela</th>
-                <th scope="col" class="text-right">Valor</th>
+                <th scope="col">DESCRIÇÃO</th>
+                <th scope="col" class="text-center">DATA</th>
+                <th scope="col" class="text-center">PARCELA</th>
+                <th scope="col" class="text-right">VALOR</th>
               </tr>
             </thead>
             <tbody>
               @for (e of invoiceExpenses(); track e.id) {
                 <tr>
-                  <td style="font-weight:500">{{ e.description }}</td>
-                  <td class="mono text-muted" style="font-size:13px;white-space:nowrap">
-                    {{ formatDate(e.date) }}
-                  </td>
-                  <td>
-                    @if (installmentBadge(e); as badge) {
-                      <span class="badge--installment">{{ badge }}</span>
+                  <td class="col-desc">{{ e.description }}</td>
+                  <td class="col-date text-center mono">{{ formatDate(e.date) }}</td>
+                  <td class="col-parcela text-center">
+                    @let badge = getInstallmentBadge(e);
+                    @if (badge.isBadge) {
+                      <span class="badge--blue-pill">{{ badge.text }}</span>
                     } @else {
-                      <span class="text-muted">-</span>
+                      <span class="text-dash">-</span>
                     }
                   </td>
-                  <td class="text-right">
-                    <span class="value-down mono">{{ formatAmount(e.amount) }}</span>
-                  </td>
+                  <td class="col-value text-right mono red-amount">{{ formatAmount(e.amount) }}</td>
                 </tr>
               }
             </tbody>
           </table>
         </div>
 
-        <!-- Total -->
-        <div class="invoice-section__total">
-          <span>Total da fatura:</span>
-          <span class="value-down mono">{{ formatAmount(invoiceTotal()) }}</span>
+        <!-- Total da Fatura -->
+        <div class="invoice-section__footer-summary">
+          <span class="summary-label">Total da Fatura:</span>
+          <span class="summary-amount mono red-amount">{{ formatAmount(invoiceTotal()) }}</span>
         </div>
       }
-
-      <!-- Link to full invoice -->
-      <div style="margin-top: var(--space-base); text-align:right">
-        <a [routerLink]="['/cards', selectedCard()!.id, 'expenses']" class="btn btn--secondary btn--sm">
-          Ver fatura completa →
-        </a>
-      </div>
     </section>
   }
 }
 
-<!-- ── Context Menu ── -->
+<!-- ─— Context Menu ─— -->
 @if (menuCard()) {
   <div class="cc-menu-backdrop" (click)="closeMenu()" aria-hidden="true"></div>
   <div class="cc-menu" role="menu" [style.top.px]="menuY()" [style.left.px]="menuX()">
     <a [routerLink]="['/cards', menuCard()!.id, 'edit']" class="cc-menu__item" role="menuitem" (click)="closeMenu()">✏️ Editar</a>
-    <button class="cc-menu__item cc-menu__item--danger" role="menuitem" type="button" (click)="deleteFromMenu()">🗑️ Excluir</button>
+    <button class="cc-menu__item cc-menu__item--danger" role="menuitem" type="button" (click)="deleteFromMenu()">Ὕ1️ Excluir</button>
   </div>
 }
