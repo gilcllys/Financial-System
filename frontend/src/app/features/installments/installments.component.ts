@@ -73,6 +73,7 @@ function currentInvoice(closingDay: number): InvoiceRef {
   return invoiceFromClosing(next.year, next.month);
 }
 
+
 interface InstallmentGroup {
   name: string;
   cardId: number | null;
@@ -99,6 +100,14 @@ interface SharedInstallmentGroup {
   totalAmount: number;
   nextDate: string | null;
   entries: SharedDebtEntry[];
+}
+
+interface SharedDebtInstallmentSection {
+  shared_debt_id: number;
+  shared_debt_name: string;
+  groups: SharedInstallmentGroup[];
+  totalMyPortion: number;
+  largestMyPortion: number;
 }
 
 @Component({
@@ -149,12 +158,6 @@ export class InstallmentsComponent implements OnInit {
     return this.installmentInvoice(date, cardId)?.displayDate ?? date;
   }
 
-  private isCurrentInvoice(group: { cardId: number | null; nextDate: string | null }): boolean {
-    if (!group.nextDate) return false;
-    const card = group.cardId ? this.cardMap().get(group.cardId) : null;
-    if (!card) return group.nextDate.slice(0, 7) === new Date().toISOString().slice(0, 7);
-    return group.nextDate === currentInvoice(card.closing_day).displayDate;
-  }
 
   installmentGroups = computed((): InstallmentGroup[] => {
     const installmentExpenses = this.expenses().filter(e => /parcela\s+\d+\/\d+/i.test(e.description));
@@ -256,25 +259,54 @@ export class InstallmentsComponent implements OnInit {
     this.sharedInstallmentGroups().filter(g => g.paidInstallments === g.totalInstallments)
   );
 
+  sharedSections = computed((): SharedDebtInstallmentSection[] =>
+    this.groupSharedByDebt(this.activeSharedGroups())
+  );
+  finalizadasSharedSections = computed((): SharedDebtInstallmentSection[] =>
+    this.groupSharedByDebt(this.finalizadasSharedGroups())
+  );
+
   // KPIs
-  totalComprometido = computed(() =>
-    this.activeGroups().reduce((s, g) => s + g.amountPerInstallment * (g.totalInstallments - g.paidInstallments), 0)
+  totalParcelasIndividuais = computed(() =>
+    this.activeGroups().reduce((s, g) => s + g.amountPerInstallment, 0)
   );
-  parcelaEsteMes = computed(() =>
-    this.activeGroups().filter(g => this.isCurrentInvoice(g)).reduce((s, g) => s + g.amountPerInstallment, 0) +
-    this.activeSharedGroups().filter(g => this.isCurrentInvoice(g)).reduce((s, g) => s + g.myPortion, 0)
+  totalParcelasCompartilhadas = computed(() =>
+    this.activeSharedGroups().reduce((s, g) => s + g.myPortion, 0)
   );
-  quitamEm30Dias = computed(() => {
-    const limit = new Date();
-    limit.setDate(limit.getDate() + 30);
-    return this.activeGroups().filter(g => {
-      const remaining = g.totalInstallments - g.paidInstallments;
-      return remaining <= 3;
-    }).length;
-  });
-  maiorParcela = computed(() =>
+  maiorParcelaIndividual = computed(() =>
     Math.max(0, ...this.activeGroups().map(g => g.amountPerInstallment))
   );
+  maiorParcelaCompartilhada = computed(() =>
+    Math.max(0, ...this.activeSharedGroups().map(g => g.myPortion))
+  );
+
+  private groupSharedByDebt(groups: SharedInstallmentGroup[]): SharedDebtInstallmentSection[] {
+    const sections = new Map<number, SharedDebtInstallmentSection>();
+    for (const group of groups) {
+      const section = sections.get(group.shared_debt_id);
+      if (section) {
+        section.groups.push(group);
+        section.totalMyPortion += group.myPortion;
+        section.largestMyPortion = Math.max(section.largestMyPortion, group.myPortion);
+      } else {
+        sections.set(group.shared_debt_id, {
+          shared_debt_id: group.shared_debt_id,
+          shared_debt_name: group.shared_debt_name,
+          groups: [group],
+          totalMyPortion: group.myPortion,
+          largestMyPortion: group.myPortion,
+        });
+      }
+    }
+    return Array.from(sections.values())
+      .map(section => ({
+        ...section,
+        totalMyPortion: +section.totalMyPortion.toFixed(2),
+        largestMyPortion: +section.largestMyPortion.toFixed(2),
+        groups: section.groups.sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .sort((a, b) => a.shared_debt_name.localeCompare(b.shared_debt_name));
+  }
 
   ngOnInit(): void {
     this.fetchCards();

@@ -12,20 +12,22 @@
   <!-- KPI Cards -->
   <div class="kpi-row">
     <div class="kpi-card">
-      <span class="kpi-card__label">TOTAL COMPROMETIDO</span>
-      <span class="kpi-card__value kpi-card__value--red">{{ formatAmount(totalComprometido()) }}</span>
+      <span class="kpi-card__label">PARCELAS INDIVIDUAIS</span>
+      <span class="kpi-card__value kpi-card__value--red">{{ formatAmount(totalParcelasIndividuais()) }}</span>
+      <span class="kpi-card__sub">{{ activeGroups().length }} ativas</span>
     </div>
     <div class="kpi-card">
-      <span class="kpi-card__label">PARCELA ESTE MES</span>
-      <span class="kpi-card__value kpi-card__value--blue">{{ formatAmount(parcelaEsteMes()) }}</span>
+      <span class="kpi-card__label">PARCELAS COMPARTILHADAS</span>
+      <span class="kpi-card__value kpi-card__value--blue">{{ formatAmount(totalParcelasCompartilhadas()) }}</span>
+      <span class="kpi-card__sub">{{ activeSharedGroups().length }} ativas</span>
     </div>
     <div class="kpi-card">
-      <span class="kpi-card__label">QUITAM EM 30 DIAS</span>
-      <span class="kpi-card__value kpi-card__value--green">{{ quitamEm30Dias() }}</span>
+      <span class="kpi-card__label">MAIOR INDIVIDUAL</span>
+      <span class="kpi-card__value">{{ formatAmount(maiorParcelaIndividual()) }}</span>
     </div>
     <div class="kpi-card">
-      <span class="kpi-card__label">MAIOR PARCELA</span>
-      <span class="kpi-card__value">{{ formatAmount(maiorParcela()) }}/mes</span>
+      <span class="kpi-card__label">MAIOR COMPARTILHADA</span>
+      <span class="kpi-card__value">{{ formatAmount(maiorParcelaCompartilhada()) }}</span>
     </div>
   </div>
 
@@ -109,73 +111,119 @@
   @if (activeSharedGroups().length > 0 || finalizadasSharedGroups().length > 0) {
     <div class="section-card">
       <div class="section-card__header">
-        <h2 class="section-card__title">Parcelamentos de Dividas Compartilhadas</h2>
-        <p class="section-card__subtitle">Acompanhe o progresso dos parcelamentos dentro dos seus grupos.</p>
+        <div>
+          <h2 class="section-card__title">Parcelamentos de Dividas Compartilhadas</h2>
+          <p class="section-card__subtitle">Parcelas organizadas por grupo compartilhado.</p>
+        </div>
+        @if (finalizadasSharedGroups().length > 0) {
+          <button class="btn-ghost" (click)="toggleFinalizadasShared()" type="button">
+            {{ showFinalizadasShared() ? 'Ocultar finalizadas' : 'Ver finalizadas (' + finalizadasSharedGroups().length + ')' }}
+          </button>
+        }
       </div>
 
-      <table class="installments-table" aria-label="Parcelamentos compartilhados">
-        <thead>
-          <tr>
-            <th>DESCRICAO</th>
-            <th>GRUPO</th>
-            <th>CARTAO</th>
-            <th>PROGRESSO</th>
-            <th>PROXIMA PARCELA</th>
-            <th class="text-right">SUA PARTE</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (group of activeSharedGroups(); track group.installment_group_id) {
-            <tr>
-              <td class="col-desc"><span class="item-name">{{ group.name }}</span></td>
-              <td class="col-group">{{ group.shared_debt_name }}</td>
-              <td class="col-card">
-                <span class="card-chip">
-                  @if (group.cardName) { {{ group.cardName }} }
-                  <span class="badge-pessoal">Pessoal</span>
-                </span>
-              </td>
-              <td class="col-progress">
-                <div class="progress-cell">
-                  <span class="progress-label-sm">{{ group.paidInstallments }} de {{ group.totalInstallments }} parcelas</span>
-                  <div class="progress-bar-wrap">
-                    <div class="progress-bar" [style.width.%]="progressPct(group)" [style.background]="progressColor(progressPct(group))"></div>
-                  </div>
-                  <span class="progress-pct" [style.color]="progressColor(progressPct(group))">{{ progressPct(group) }}%</span>
-                </div>
-              </td>
-              <td class="col-date">{{ formatNextDate(group.nextDate) }}</td>
-              <td class="col-value text-right value-red">{{ formatAmount(group.myPortion) }}</td>
-            </tr>
-          }
-          @if (showFinalizadasShared()) {
-            @for (group of finalizadasSharedGroups(); track group.installment_group_id) {
-              <tr class="row-done">
-                <td class="col-desc"><span class="item-name item-name--done">{{ group.name }}</span></td>
-                <td class="col-group">{{ group.shared_debt_name }}</td>
-                <td class="col-card"><span class="card-chip"><span class="badge-pessoal">Pessoal</span></span></td>
-                <td class="col-progress">
-                  <div class="progress-cell">
-                    <span class="progress-label-sm">{{ group.totalInstallments }} de {{ group.totalInstallments }} parcelas</span>
-                    <div class="progress-bar-wrap"><div class="progress-bar" style="width:100%;background:#05b169"></div></div>
-                    <span class="progress-pct" style="color:#05b169">100%</span>
-                  </div>
-                </td>
-                <td class="col-date">-</td>
-                <td class="col-value text-right">{{ formatAmount(group.myPortion) }}</td>
-              </tr>
-            }
-          }
-        </tbody>
-      </table>
+      <div class="shared-installments">
+        @for (section of sharedSections(); track section.shared_debt_id) {
+          <section class="shared-installments__group" [attr.aria-label]="'Parcelamentos do grupo ' + section.shared_debt_name">
+            <div class="shared-installments__header">
+              <div>
+                <h3 class="shared-installments__title">{{ section.shared_debt_name }}</h3>
+                <p class="shared-installments__meta">{{ section.groups.length }} parcelamento(s) ativo(s)</p>
+              </div>
+              <div class="shared-installments__summary">
+                <span>Total: <strong>{{ formatAmount(section.totalMyPortion) }}</strong></span>
+                <span>Maior: <strong>{{ formatAmount(section.largestMyPortion) }}</strong></span>
+              </div>
+            </div>
 
-      @if (finalizadasSharedGroups().length > 0) {
-        <button class="btn-ghost btn-ghost--bottom" (click)="toggleFinalizadasShared()" type="button">
-          {{ showFinalizadasShared() ? 'Ocultar finalizadas' : 'Ver finalizadas (' + finalizadasSharedGroups().length + ')' }}
-        </button>
-      }
+            <table class="installments-table" aria-label="Parcelamentos compartilhados de {{ section.shared_debt_name }}">
+              <thead>
+                <tr>
+                  <th>DESCRICAO</th>
+                  <th>CARTAO</th>
+                  <th>PROGRESSO</th>
+                  <th>PROXIMA PARCELA</th>
+                  <th class="text-right">SUA PARTE</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (group of section.groups; track group.installment_group_id) {
+                  <tr>
+                    <td class="col-desc"><span class="item-name">{{ group.name }}</span></td>
+                    <td class="col-card">
+                      <span class="card-chip">
+                        @if (group.cardName) { {{ group.cardName }} }
+                        <span class="badge-pessoal">Pessoal</span>
+                      </span>
+                    </td>
+                    <td class="col-progress">
+                      <div class="progress-cell">
+                        <span class="progress-label-sm">{{ group.paidInstallments }} de {{ group.totalInstallments }} parcelas</span>
+                        <div class="progress-bar-wrap">
+                          <div class="progress-bar" [style.width.%]="progressPct(group)" [style.background]="progressColor(progressPct(group))"></div>
+                        </div>
+                        <span class="progress-pct" [style.color]="progressColor(progressPct(group))">{{ progressPct(group) }}%</span>
+                      </div>
+                    </td>
+                    <td class="col-date">{{ formatNextDate(group.nextDate) }}</td>
+                    <td class="col-value text-right value-red">{{ formatAmount(group.myPortion) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </section>
+        }
+
+        @if (showFinalizadasShared()) {
+          @for (section of finalizadasSharedSections(); track section.shared_debt_id) {
+            <section class="shared-installments__group shared-installments__group--done" [attr.aria-label]="'Parcelamentos finalizados do grupo ' + section.shared_debt_name">
+              <div class="shared-installments__header">
+                <div>
+                  <h3 class="shared-installments__title">{{ section.shared_debt_name }}</h3>
+                  <p class="shared-installments__meta">{{ section.groups.length }} finalizado(s)</p>
+                </div>
+              </div>
+
+              <table class="installments-table" aria-label="Parcelamentos finalizados de {{ section.shared_debt_name }}">
+                <thead>
+                  <tr>
+                    <th>DESCRICAO</th>
+                    <th>CARTAO</th>
+                    <th>PROGRESSO</th>
+                    <th>PROXIMA PARCELA</th>
+                    <th class="text-right">SUA PARTE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (group of section.groups; track group.installment_group_id) {
+                    <tr class="row-done">
+                      <td class="col-desc"><span class="item-name item-name--done">{{ group.name }}</span></td>
+                      <td class="col-card">
+                        <span class="card-chip">
+                          @if (group.cardName) { {{ group.cardName }} }
+                          <span class="badge-pessoal">Pessoal</span>
+                        </span>
+                      </td>
+                      <td class="col-progress">
+                        <div class="progress-cell">
+                          <span class="progress-label-sm">{{ group.totalInstallments }} de {{ group.totalInstallments }} parcelas</span>
+                          <div class="progress-bar-wrap"><div class="progress-bar" style="width:100%;background:#05b169"></div></div>
+                          <span class="progress-pct" style="color:#05b169">100%</span>
+                        </div>
+                      </td>
+                      <td class="col-date">-</td>
+                      <td class="col-value text-right">{{ formatAmount(group.myPortion) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </section>
+          }
+        }
+      </div>
     </div>
   }
+
 
   @if (activeGroups().length === 0 && activeSharedGroups().length === 0 && finalizadasGroups().length === 0 && finalizadasSharedGroups().length === 0) {
     <div class="empty-state">
