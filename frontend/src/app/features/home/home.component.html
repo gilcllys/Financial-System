@@ -386,7 +386,7 @@
     <div class="card">
       <div class="card__header">
         <span class="card__title">🕒 Últimos Lançamentos</span>
-        <a routerLink="/home" class="card__link">Ver tabela ↓</a>
+        <a routerLink="/history" class="card__link">Ver historico ?</a>
       </div>
       <div class="card__body">
         @if (expenses().length === 0 && !tableLoading()) {
@@ -442,128 +442,6 @@
 
   </div><!-- /dash-grid -->
 }
-
-<!-- ── Tabela completa de gastos ── -->
-<div class="card card--full table-section">
-  <div class="card__header">
-    <span class="card__title">📋 Todos os Gastos</span>
-  </div>
-
-  <!-- Tabs -->
-  <div class="table-tabs">
-    <button class="table-tab" [class.table-tab--active]="activeTab() === 'individual'" (click)="switchTab('individual')">
-      💳 Individuais
-    </button>
-    <button class="table-tab" [class.table-tab--active]="activeTab() === 'compartilhada'" (click)="switchTab('compartilhada')">
-      👥 Compartilhadas
-    </button>
-  </div>
-
-  <!-- Tab: Individuais -->
-  @if (activeTab() === 'individual') {
-    @if (tableLoading()) {
-      <div class="loading-state"><div class="spinner"></div><p>Carregando...</p></div>
-    } @else if (expenses().length === 0) {
-      <div class="empty-state">
-        <div class="empty-state__icon">💸</div>
-        <p class="empty-state__title">Nenhum gasto encontrado</p>
-        <p class="empty-state__text">Tente ajustar os filtros ou adicione um novo gasto.</p>
-        <a routerLink="/expenses/new" class="btn btn--primary" style="margin-top:16px">+ Novo Gasto</a>
-      </div>
-    } @else {
-      <div class="data-table-wrapper">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Descrição</th>
-              <th>Categoria</th>
-              <th>Data</th>
-              <th class="text-right">Valor</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (e of expenses(); track e.id) {
-              <tr>
-                <td><span class="expense-desc__text">{{ e.description }}</span></td>
-                <td><span class="badge badge--neutral">{{ categoryName(e.category_id) }}</span></td>
-                <td class="mono text-muted">{{ e.date | slice:8:10 }}/{{ e.date | slice:5:7 }}/{{ e.date | slice:0:4 }}</td>
-                <td class="text-right">
-                  <span [class]="'mono ' + amountClass(e.amount)">
-                    {{ amountPrefix(e.amount) }} {{ formatCurrency(e.amount) }}
-                  </span>
-                </td>
-                <td>
-                  <div class="action-buttons">
-                    <a [routerLink]="['/expenses', e.id, 'edit']" class="btn btn--ghost btn--sm">✏️</a>
-                    <button class="btn btn--ghost btn--sm" (click)="delete(e.id)" [disabled]="deletingId() === e.id">
-                      @if (deletingId() === e.id) { <span class="spinner spinner--sm"></span> } @else { 🗑️ }
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-
-      @if (totalPages() > 1) {
-        <nav class="pagination">
-          <button class="pagination__btn" (click)="goToPage(currentPage() - 1)" [disabled]="currentPage() === 1">‹</button>
-          @for (p of pageNumbers(); track p) {
-            <button class="pagination__btn" [class.pagination__btn--active]="p === currentPage()" (click)="goToPage(p)">{{ p }}</button>
-          }
-          <button class="pagination__btn" (click)="goToPage(currentPage() + 1)" [disabled]="currentPage() === totalPages()">›</button>
-          <span class="pagination__info">{{ currentPage() }} de {{ totalPages() }} ({{ totalCount() }} registros)</span>
-        </nav>
-      }
-    }
-  }
-
-  <!-- Tab: Compartilhadas -->
-  @if (activeTab() === 'compartilhada') {
-    @if (sharedEntriesLoading()) {
-      <div class="loading-state"><div class="spinner"></div><p>Carregando...</p></div>
-    } @else if (sharedEntries().length === 0) {
-      <div class="empty-state">
-        <div class="empty-state__icon">🤝</div>
-        <p class="empty-state__title">Nenhum gasto compartilhado neste mês</p>
-        <p class="empty-state__text">Gastos de grupos compartilhados aparecerão aqui.</p>
-      </div>
-    } @else {
-      <div class="data-table-wrapper">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Descrição</th>
-              <th>Grupo</th>
-              <th>Categoria</th>
-              <th>Data</th>
-              <th>Pago por</th>
-              <th class="text-right">Total</th>
-              <th class="text-right">Sua Parte</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (e of sharedEntries(); track e.id) {
-              <tr>
-                <td><span class="expense-desc__text">{{ e.description }}</span></td>
-                <td><span class="badge badge--neutral">{{ e.shared_debt_name || '—' }}</span></td>
-                <td>@if (e.category_name) { <span class="badge badge--primary" style="font-size:11px">{{ e.category_name }}</span> } @else { <span class="text-muted">—</span> }</td>
-                <td class="mono text-muted">{{ e.date | slice:8:10 }}/{{ e.date | slice:5:7 }}/{{ e.date | slice:0:4 }}</td>
-                <td class="text-muted">{{ e.paid_by_name }}</td>
-                <td class="text-right mono">{{ formatCurrency(e.amount) }}</td>
-                <td class="text-right">
-                  <span class="mono value--down">- {{ formatCurrency(myPortion(e)) }}</span>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    }
-  }
-</div>
 
 <!-- ── Chart tooltips (position:fixed, attached via DOM events) ── -->
 @if (chartTooltip()) {

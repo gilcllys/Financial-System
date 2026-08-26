@@ -29,7 +29,7 @@
         [style]="cardGradient(i)"
         role="listitem"
         type="button"
-        (click)="selectCard(card)"
+        (click)="selectCard(card, true)"
         [attr.aria-pressed]="selectedCardId() === card.id"
         [attr.aria-label]="'Selecionar cartão ' + card.name"
       >
