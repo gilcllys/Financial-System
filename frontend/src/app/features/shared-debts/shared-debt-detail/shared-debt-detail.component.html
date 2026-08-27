@@ -221,6 +221,7 @@
                         <th class="text-right">VALOR</th>
                         <th class="text-right">MINHA PARTE</th>
                         <th>STATUS</th>
+                        <th class="text-center">PAGO</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -236,6 +237,9 @@
                             } @else {
                               <span class="status-pending">Pendente</span>
                             }
+                          </td>
+                          <td class="col-paid text-center">
+                            <button class="badge-paid" [class.badge-paid--yes]="e.paid" (click)="togglePaid(e)">{{ e.paid ? 'Sim' : 'Nao' }}</button>
                           </td>
                         </tr>
                       }
@@ -294,6 +298,7 @@
                     <th>CATEGORIA</th>
                     <th class="text-right">TOTAL</th>
                     <th class="text-right">MINHA PARTE</th>
+                    <th class="text-center">PAGO</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -328,6 +333,9 @@
                       </td>
                       <td class="text-right mono">{{ formatCurrency(e.amount) }}</td>
                       <td class="text-right value-red mono">{{ formatCurrency(myPortion(e)) }}</td>
+                      <td class="col-paid text-center">
+                        <button class="badge-paid" [class.badge-paid--yes]="e.paid" (click)="togglePaid(e)">{{ e.paid ? 'Sim' : 'Nao' }}</button>
+                      </td>
                     </tr>
                   }
                 </tbody>
