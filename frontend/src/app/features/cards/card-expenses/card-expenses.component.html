@@ -85,12 +85,12 @@
               Compartilhado
               @if (sharedGroups().length) { <em>({{ sharedGroups().length }} grupos)</em> }
             </span>
-            <span class="sum-card__line-value mono">{{ formatAmount(sharedTotal()) }}</span>
+            <span class="sum-card__line-value mono">{{ formatAmount(sharedGrossTotal()) }}</span>
           </div>
         </div>
         <div class="sum-card__hero">
           <span class="sum-card__hero-label">Total</span>
-          <strong class="sum-card__hero-value mono">{{ formatAmount(filteredTotal()) }}</strong>
+          <strong class="sum-card__hero-value mono">{{ formatAmount(invoiceGrandTotal()) }}</strong>
         </div>
       </article>
 
@@ -172,6 +172,15 @@
             <h3 class="panel__title">Top Categorias</h3>
           </header>
           <div #donutChartEl class="d3-chart-container" role="img" aria-label="Grafico de categorias"></div>
+          <ul class="donut-legend">
+            @for (item of donutLegend(); track item.label) {
+              <li class="donut-legend__item">
+                <span class="donut-legend__dot" [style.background]="item.color"></span>
+                <span class="donut-legend__label">{{ item.label }}</span>
+                <span class="donut-legend__value mono">{{ formatAmount(item.value) }}</span>
+              </li>
+            }
+          </ul>
         </section>
       }
     </div>

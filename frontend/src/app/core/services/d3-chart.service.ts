@@ -155,7 +155,7 @@ export class D3ChartService {
   }
 
   /** Simple vertical bar chart with optional average line */
-  renderBar(el: HTMLElement, data: BarData[], opts?: { color?: string; highlightLast?: boolean; showAvgLine?: boolean }): void {
+  renderBar(el: HTMLElement, data: BarData[], opts?: { color?: string; highlightLast?: boolean; showAvgLine?: boolean; maxTicks?: number }): void {
     d3.select(el).selectAll('*').remove();
     if (!data.length) return;
     const W = el.clientWidth || 500, H = el.clientHeight || 220;
@@ -194,7 +194,15 @@ export class D3ChartService {
       }
     }
 
-    svg.append('g').attr('transform', `translate(0,${h})`).call(d3.axisBottom(x).tickSize(0).tickPadding(6))
+    // When there are many bars (e.g. one per day of the invoice), showing every
+    // label overlaps and becomes unreadable. Thin them out to at most `maxTicks`,
+    // evenly spaced, while keeping every bar rendered.
+    const xAxis = d3.axisBottom(x).tickSize(0).tickPadding(6);
+    if (opts?.maxTicks && data.length > opts.maxTicks) {
+      const step = Math.ceil(data.length / opts.maxTicks);
+      xAxis.tickValues(data.map(d => d.label).filter((_, i) => i % step === 0));
+    }
+    svg.append('g').attr('transform', `translate(0,${h})`).call(xAxis)
       .call(g => { g.select('.domain').attr('stroke', 'rgba(0,0,0,0.1)'); g.selectAll('text').attr('font-size', '11px'); });
     svg.append('g').call(d3.axisLeft(y).ticks(5).tickFormat(v => FMT.format(+v)))
       .call(g => g.select('.domain').remove());
