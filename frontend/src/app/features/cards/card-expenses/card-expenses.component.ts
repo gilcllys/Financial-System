@@ -159,6 +159,9 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   sharedParticipants    = computed(() => this.sharedBreakdown()?.participants ?? []);
   hasSharedInInvoice    = computed(() => (this.invoiceData()?.summary.shared_total ?? 0) > 0);
   totalTransactions     = computed(() => this.invoiceData()?.summary.count ?? 0);
+  // Total real da fatura: individual + valor cheio dos grupos compartilhados (o banco cobra o valor integral,
+  // a divisao com os demais participantes e apenas um controle a parte).
+  invoiceGrandTotal     = computed(() => this.expensesTotal() + this.sharedGrossTotal());
 
   dropdownCategories = computed(() =>
     this.chartData()?.by_category ?? this.invoiceData()?.by_category ?? [],
@@ -203,6 +206,13 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
       labels: [...top5.map(c => c.category_name), ...(other > 0 ? ['Outros'] : [])],
       values: [...top5.map(c => +Math.abs(c.total).toFixed(2)), ...(other > 0 ? [+other.toFixed(2)] : [])],
     };
+  });
+
+  /** Legend entries for the "Top Categorias" donut chart, matching its slice colors. */
+  donutLegend = computed(() => {
+    const d = this.donutChartDataSig();
+    if (!d) return [];
+    return d.labels.map((label, i) => ({ label, value: d.values[i], color: this.catColor(i) }));
   });
 
   /**
@@ -315,7 +325,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     const el = this.dailyEl?.nativeElement;
     if (!el) return;
     const barData: BarData[] = data.labels.map((l, i) => ({ label: l, value: data.values[i] }));
-    this.d3.renderBar(el, barData, { showAvgLine: true });
+    this.d3.renderBar(el, barData, { showAvgLine: true, maxTicks: 8 });
   }
 
   private renderWeeklyChart(data: { labels: string[]; values: number[] }): void {
