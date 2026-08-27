@@ -52,6 +52,11 @@ class CreateSharedEntryInputSerializer(serializers.Serializer):
         max_value=120,
         help_text='Número de parcelas a gerar (1 = sem parcelamento).',
     )
+    paid = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text='Indica se a despesa ja foi paga/quitada.',
+    )
 
 
 class JoinSharedDebtInputSerializer(serializers.Serializer):

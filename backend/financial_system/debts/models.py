@@ -168,6 +168,12 @@ class SharedEntry(BaseModel):
         help_text='Número desta parcela (1-based).',
     )
 
+    paid = models.BooleanField(
+        db_column='paid',
+        default=False,
+        help_text='Indica se esta despesa compartilhada ja foi paga/quitada.',
+    )
+
     class Meta:
         db_table = 'shared_entries'
         verbose_name = 'Shared Entry'

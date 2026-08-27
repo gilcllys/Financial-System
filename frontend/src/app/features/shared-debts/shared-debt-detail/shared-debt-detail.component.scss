@@ -168,6 +168,13 @@
   &--danger:hover { color: #cf202f; border-color: #cf202f; }
 }
 
+.badge-paid {
+  border: 1px solid var(--color-hairline); background: var(--color-surface-soft);
+  color: var(--color-muted); font-size: 12px; font-weight: 600;
+  padding: 3px 10px; border-radius: 999px; cursor: pointer;
+  &--yes { background: #05b169; border-color: #05b169; color: #fff; }
+}
+
 .value-red { color: #cf202f; font-weight: 600; }
 
 /* Pagination */

@@ -39,6 +39,7 @@ export interface SharedDebtEntry {
   installment_group_id: string | null;
   total_installments: number;
   installment_number: number;
+  paid: boolean;
   created_by_tenant_id: string;
   created_at: string;
 }
@@ -86,6 +87,7 @@ export interface CreateEntryPayload {
   credit_card_id?: number | null;
   category_id?: number | null;
   total_installments_input?: number;
+  paid?: boolean;
 }
 
 export interface PersonalSummary {

@@ -62,6 +62,7 @@ class SharedEntrySerializer(serializers.ModelSerializer):
             'installment_group_id',
             'total_installments',
             'installment_number',
+            'paid',
             'created_by_tenant_id',
             'created_at',
         ]

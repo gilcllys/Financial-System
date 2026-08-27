@@ -354,6 +354,8 @@ class UpdateSharedEntryBehavior:
             entry.credit_card_id = credit_card_id
             if 'category_id' in data or not self.partial:
                 entry.category_id = data.get('category_id', entry.category_id if self.partial else None)
+            if 'paid' in data:
+                entry.paid = data['paid']
             entry.save()
 
             # Re-sync participants only when requested.
