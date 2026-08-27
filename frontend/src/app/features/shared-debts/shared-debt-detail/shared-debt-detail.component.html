@@ -103,6 +103,7 @@
                 <th>DATA</th>
                 <th class="text-right">TOTAL</th>
                 <th class="text-right">MINHA PARTE</th>
+                <th class="text-center">PAGO</th>
                 <th>ACOES</th>
               </tr>
             </thead>
@@ -140,6 +141,12 @@
                   <td class="col-total text-right mono">{{ formatCurrency(e.amount) }}</td>
                   <td class="col-mine text-right">
                     <span class="value-red mono">{{ formatCurrency(myPortion(e)) }}</span>
+                  </td>
+                  <td class="col-paid text-center">
+                    <button type="button" class="badge-paid" [class.badge-paid--yes]="e.paid"
+                      (click)="togglePaid(e)" [attr.aria-label]="e.paid ? 'Marcar como nao pago' : 'Marcar como pago'">
+                      {{ e.paid ? 'Sim' : 'Nao' }}
+                    </button>
                   </td>
                   <td class="col-actions">
                     <button class="icon-btn" type="button" (click)="editEntry(e)" aria-label="Editar">&#9998;</button>

@@ -430,6 +430,14 @@ export class SharedDebtDetailComponent implements OnInit {
     });
   }
 
+  togglePaid(entry: SharedDebtEntry): void {
+    const nextPaid = !entry.paid;
+    this.svc.updateEntry(entry.id, { paid: nextPaid }).subscribe({
+      next: () => this.refreshEntriesAndBalances(),
+      error: () => alert('Erro ao atualizar status de pagamento.'),
+    });
+  }
+
   // ── Group deletion (owner only) ─────────────────────────────────────────
   deleteGroup(): void {
     const name = this.group()?.name ?? 'este grupo';
