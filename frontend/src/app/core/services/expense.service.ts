@@ -32,6 +32,8 @@ export interface RecurringExpenseTemplate {
 export interface GenerateMonthResult {
   created: string[];
   skipped: string[];
+  /** Templates ignorados por configuracao invalida (ex: cartao sem cartao). */
+  skipped_invalid?: string[];
 }
 
 @Injectable({ providedIn: 'root' })

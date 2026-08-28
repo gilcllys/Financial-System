@@ -247,8 +247,12 @@ class RecurringExpenseBehavior:
         from datetime import date as date_cls
         from expenses.models import RecurringExpenseTemplate, Expense
         templates = RecurringExpenseTemplate.objects.filter(tenant_id=self.tenant_id, is_active=True)
-        created, skipped = [], []
+        created, skipped, skipped_invalid = [], [], []
         for tpl in templates:
+            # cartao sem cartao gera despesa orfa, invisivel em qualquer fatura
+            if tpl.payment_method == 'cartao' and tpl.credit_card_id is None:
+                skipped_invalid.append(tpl.description)
+                continue
             last_day = cal_mod.monthrange(year, month)[1]
             day = min(tpl.day_of_month, last_day)
             entry_date = date_cls(year, month, day)
@@ -266,10 +270,14 @@ class RecurringExpenseBehavior:
                 category_id=tpl.category_id,
                 description=tpl.description,
                 quantity=1,
-                amount=tpl.amount,
+                amount=-abs(tpl.amount),  # gasto fixo e sempre despesa
                 date=entry_date,
                 payment_method=tpl.payment_method,
                 credit_card_id=tpl.credit_card_id,
             )
             created.append(tpl.description)
-        return Response({'created': created, 'skipped': skipped})
+        return Response({
+            'created': created,
+            'skipped': skipped,
+            'skipped_invalid': skipped_invalid,
+        })

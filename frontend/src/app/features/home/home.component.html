@@ -50,6 +50,17 @@
               </label>
             </div>
           </div>
+          @if (recurringIsCartao) {
+            <div class="form-group" style="flex:1">
+              <label class="form-label">Cartao</label>
+              <select class="form-select" formControlName="credit_card_id">
+                <option [ngValue]="null">Selecione o cartao</option>
+                @for (card of creditCards(); track card.id) {
+                  <option [ngValue]="card.id">{{ card.name }}</option>
+                }
+              </select>
+            </div>
+          }
           <div class="form-group" style="flex:1">
             <label class="form-label">Categoria</label>
             <select class="form-select" formControlName="category_id">
