@@ -215,13 +215,31 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
    * full/integral amount (what was actually charged), tagged with a
    * kind flag so the UI can tell them apart and filter by type.
    */
+  /**
+   * O DRF serializa `category` como o id (FK), nao como objeto aninhado, e a
+   * lista de categorias pode nao ter chegado ainda. Resolvemos o id nas duas
+   * formas e caimos para o catalogo local quando o nome nao vem do backend.
+   */
+  private resolveCategoryId(e: Expense): number | null {
+    const nested = typeof e.category === 'object' && e.category !== null ? e.category.id : null;
+    return e.category_id ?? (typeof e.category === 'number' ? e.category : nested);
+  }
+
+  private resolveCategoryName(e: Expense): string | null {
+    if (e.category_name) return e.category_name;
+    if (typeof e.category === 'object' && e.category !== null && e.category.name) return e.category.name;
+    const id = this.resolveCategoryId(e);
+    if (id == null) return null;
+    return this.allCategories().find(c => c.id === id)?.name ?? null;
+  }
+
   combinedRows = computed((): CombinedExpenseRow[] => {
     const individual: CombinedExpenseRow[] = (this.chartData()?.expenses ?? []).map(e => ({
       key: `ind-${e.id}`,
       kind: 'individual' as const,
       description: e.description,
-      categoryId: e.category?.id ?? null,
-      categoryName: e.category?.name ?? null,
+      categoryId: this.resolveCategoryId(e),
+      categoryName: this.resolveCategoryName(e),
       date: e.date,
       amount: Math.abs(e.amount),
       installmentBadge: this.installmentBadge(e),

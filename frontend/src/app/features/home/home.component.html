@@ -380,7 +380,7 @@
           <div class="expense-item__info">
             <p class="expense-item__desc">{{ exp.description }}</p>
             <p class="expense-item__meta">
-              {{ exp.category ? exp.category.name : "Geral" }}
+              {{ expenseCategoryName(exp) }}
             </p>
           </div>
           <div class="expense-item__right">

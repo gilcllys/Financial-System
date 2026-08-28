@@ -295,8 +295,8 @@
   align-items: start;
 }
 
-/* Charts AND the individual-expenses table share the left column so the
-   right rail never leaves a vertical gap below the chart grid. */
+/* Only the charts live in the left column. The expenses table was moved out
+   of the grid so it can span the full page width. */
 .analysis__main {
   display: flex;
   flex-direction: column;
@@ -662,7 +662,7 @@
 }
 
 /* ---------------- individual expenses ---------------- */
-.ind-section { display: flex; flex-direction: column; gap: var(--space-sm); margin-top: var(--space-xxs); }
+.ind-section { display: flex; flex-direction: column; gap: var(--space-sm); margin-top: var(--space-base); width: 100%; min-width: 0; }
 
 .ind-section__head {
   display: flex;

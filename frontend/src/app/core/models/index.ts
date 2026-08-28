@@ -13,7 +13,11 @@ export interface Expense {
   id: number;
   tenant_id: string;
   category_id: number;
-  category?: ExpenseCategory;
+  /** A API retorna o id (FK do DRF); o objeto aninhado nao e enviado. */
+  category?: ExpenseCategory | number | null;
+
+  /** Nome da categoria, exposto pelo ExpenseSerializer. */
+  category_name?: string | null;
   payment_method: PaymentMethod;
   credit_card_id: number | null;
   description: string;
