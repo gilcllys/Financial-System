@@ -454,9 +454,6 @@
               <h3 class="shared-panel__title">D&iacute;vidas Compartilhadas</h3>
               <span class="chip chip--ghost">{{ sharedGroups().length }} grupos</span>
             </div>
-            <span class="shared-panel__caption">Sua parte total</span>
-            <strong class="shared-panel__hero mono">{{ formatAmount(sharedTotal()) }}</strong>
-            <span class="shared-panel__sub">Soma de {{ sharedGroups().length }} grupos compartilhados</span>
           </header>
 
           <div class="shared-tabs" role="tablist" aria-label="Grupos compartilhados">
@@ -484,11 +481,6 @@
                   <p class="shared-body__name">{{ g.group_name }}</p>
                   <p class="shared-body__meta">{{ g.participants.length }} participantes</p>
                 </div>
-              </div>
-
-              <div class="shared-body__mine">
-                <span class="shared-body__mine-label">Sua parte neste grupo</span>
-                <strong class="shared-body__mine-value mono">{{ formatAmount(g.myPortionTotal) }}</strong>
               </div>
 
               <div class="split-bar" role="img" [attr.aria-label]="'Divisao do grupo ' + g.group_name">
@@ -536,40 +528,6 @@
               </a>
             </div>
           }
-        </section>
-      }
-
-      @if (invoiceData()?.by_category?.length) {
-        <section class="panel" aria-label="Distribuicao por categorias">
-          <header class="panel__head">
-            <h3 class="panel__title">Distribui&ccedil;&atilde;o por Categorias</h3>
-            @if (selectedCategoryId()) {
-              <button type="button" class="panel__clear" (click)="selectCategory(null)">Limpar</button>
-            }
-          </header>
-          <ul class="cat-list">
-            @for (cat of invoiceData()!.by_category; track cat.category_id; let i = $index) {
-              <li>
-                <button
-                  type="button"
-                  class="cat-item"
-                  [class.cat-item--active]="selectedCategoryId() === cat.category_id"
-                  [style.--c-color]="catColor(i)"
-                  [attr.aria-pressed]="selectedCategoryId() === cat.category_id"
-                  (click)="selectCategory(selectedCategoryId() === cat.category_id ? null : cat.category_id)"
-                >
-                  <span class="cat-item__top">
-                    <span class="dot" [style.background]="catColor(i)" aria-hidden="true"></span>
-                    <span class="cat-item__name">{{ cat.category_name }}</span>
-                    <span class="cat-item__value mono">{{ formatAmount(cat.total) }} <em>({{ roundPct(cat.percentage) }}%)</em></span>
-                  </span>
-                  <span class="cat-item__track" role="progressbar" [attr.aria-valuenow]="roundPct(cat.percentage)" aria-valuemin="0" aria-valuemax="100">
-                    <span class="cat-item__fill" [style.width.%]="cat.percentage"></span>
-                  </span>
-                </button>
-              </li>
-            }
-          </ul>
         </section>
       }
 
