@@ -112,6 +112,13 @@ export class ExpenseService {
     return this.http.post<RecurringExpenseTemplate>(`${this.base}/recurring-templates/`, payload);
   }
 
+  updateRecurringTemplate(id: number, payload: {
+    description: string; amount: number; day_of_month?: number;
+    payment_method?: string; credit_card_id?: number | null; category_id?: number | null;
+  }): Observable<RecurringExpenseTemplate> {
+    return this.http.put<RecurringExpenseTemplate>(`${this.base}/recurring-templates/${id}/`, payload);
+  }
+
   deleteRecurringTemplate(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/recurring-templates/${id}/`);
   }

@@ -228,6 +228,28 @@ class RecurringExpenseBehavior:
         )
         return Response(RecurringExpenseTemplateSerializer(tpl).data, status=status.HTTP_201_CREATED)
 
+    def update(self, template_id: int, data: dict) -> Response:
+        from expenses.models import RecurringExpenseTemplate
+        from expenses.serializer import RecurringExpenseTemplateSerializer
+        try:
+            tpl = RecurringExpenseTemplate.objects.get(id=template_id, tenant_id=self.tenant_id)
+        except RecurringExpenseTemplate.DoesNotExist:
+            return Response({'detail': 'Template nao encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        day = int(data.get('day_of_month', tpl.day_of_month))
+        if not (1 <= day <= 28):
+            return Response({'detail': 'day_of_month deve ser entre 1 e 28.'}, status=status.HTTP_400_BAD_REQUEST)
+        tpl.description = data['description']
+        tpl.amount = data['amount']
+        tpl.day_of_month = day
+        tpl.payment_method = data.get('payment_method', 'dinheiro')
+        tpl.credit_card_id = data.get('credit_card_id')
+        tpl.category_id = data.get('category_id')
+        tpl.save(update_fields=[
+            'description', 'amount', 'day_of_month', 'payment_method',
+            'credit_card', 'category', 'updated_at',
+        ])
+        return Response(RecurringExpenseTemplateSerializer(tpl).data)
+
     def toggle_active(self, template_id: int) -> Response:
         from expenses.models import RecurringExpenseTemplate
         from expenses.serializer import RecurringExpenseTemplateSerializer

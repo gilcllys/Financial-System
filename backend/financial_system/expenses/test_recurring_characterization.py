@@ -136,3 +136,89 @@ class RecurringExpenseCharacterizationTest(TestCase):
         RecurringExpenseBehavior(self.OTHER_TENANT).generate_month(9, 2026)
 
         self.assertFalse(Expense.objects.filter(tenant_id=self.OTHER_TENANT).exists())
+
+
+class RecurringExpenseUpdateTest(TestCase):
+    """Edicao de template, usada pela tela de gerenciamento de gastos fixos."""
+
+    TENANT = "tenant-recurring-upd"
+    OTHER_TENANT = "tenant-recurring-other"
+
+    def setUp(self):
+        self.category = ExpenseCategory.objects.create(
+            tenant_id=self.TENANT, name="Assinaturas"
+        )
+        self.card = CreditCard.objects.create(
+            tenant_id=self.TENANT, name="Itau Azul", closing_day=25, due_day=3
+        )
+        self.tpl = RecurringExpenseTemplate.objects.create(
+            tenant_id=self.TENANT,
+            description="Netflix",
+            amount=Decimal("20.90"),
+            day_of_month=3,
+            payment_method="cartao",
+            credit_card=self.card,
+            category=self.category,
+        )
+
+    def _payload(self, **overrides):
+        data = dict(
+            description="Netflix",
+            amount=Decimal("29.90"),
+            day_of_month=10,
+            payment_method="cartao",
+            credit_card_id=self.card.id,
+            category_id=self.category.id,
+        )
+        data.update(overrides)
+        return data
+
+    def test_atualiza_campos_do_template(self):
+        response = RecurringExpenseBehavior(self.TENANT).update(self.tpl.id, self._payload())
+
+        self.assertEqual(response.status_code, 200)
+        self.tpl.refresh_from_db()
+        self.assertEqual(self.tpl.amount, Decimal("29.90"))
+        self.assertEqual(self.tpl.day_of_month, 10)
+
+    def test_preserva_is_active_ao_editar(self):
+        """Editar nao pode reativar um template pausado."""
+        self.tpl.is_active = False
+        self.tpl.save(update_fields=["is_active"])
+
+        RecurringExpenseBehavior(self.TENANT).update(self.tpl.id, self._payload())
+
+        self.tpl.refresh_from_db()
+        self.assertFalse(self.tpl.is_active)
+
+    def test_permite_trocar_de_cartao_para_dinheiro(self):
+        RecurringExpenseBehavior(self.TENANT).update(
+            self.tpl.id, self._payload(payment_method="dinheiro", credit_card_id=None)
+        )
+
+        self.tpl.refresh_from_db()
+        self.assertEqual(self.tpl.payment_method, "dinheiro")
+        self.assertIsNone(self.tpl.credit_card_id)
+
+    def test_rejeita_dia_fora_do_intervalo(self):
+        response = RecurringExpenseBehavior(self.TENANT).update(
+            self.tpl.id, self._payload(day_of_month=31)
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.tpl.refresh_from_db()
+        self.assertEqual(self.tpl.day_of_month, 3)
+
+    def test_nao_edita_template_de_outro_tenant(self):
+        response = RecurringExpenseBehavior(self.OTHER_TENANT).update(
+            self.tpl.id, self._payload()
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.tpl.refresh_from_db()
+        self.assertEqual(self.tpl.amount, Decimal("20.90"))
+
+    def test_template_inexistente_retorna_404(self):
+        response = RecurringExpenseBehavior(self.TENANT).update(999999, self._payload())
+
+        self.assertEqual(response.status_code, 404)
