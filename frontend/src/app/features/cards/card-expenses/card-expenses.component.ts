@@ -10,17 +10,19 @@ import {
   ElementRef,
 } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { ReactiveFormsModule, FormControl } from '@angular/forms';
+import { ReactiveFormsModule, FormsModule, FormControl } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 import { CardService } from '../../../core/services/card.service';
 import { ExpenseService } from '../../../core/services/expense.service';
 import { SharedDebtService, SharedDebtEntry } from '../../../core/services/shared-debt.service';
+import { CategoryService } from '../../../core/services/category.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { D3ChartService, BarData, DonutData, AreaData } from '../../../core/services/d3-chart.service';
 import {
   CreditCard,
   Expense,
+  ExpenseCategory,
   Invoice,
   InvoiceExpensesResponse,
   InvoicePagination,
@@ -34,6 +36,32 @@ export interface SharedInvoiceGroup {
   participants: InvoiceSharedParticipant[];
   entries: SharedDebtEntry[];
   myPortionTotal: number;
+}
+
+/**
+ * A single row in the unified "Gastos da Fatura" table, merging individual
+ * expenses with shared-debt entries (shown at their full/integral amount,
+ * since that is what was actually charged on the card).
+ */
+export interface CombinedExpenseRow {
+  key: string;
+  kind: 'individual' | 'compartilhado';
+  description: string;
+  categoryId: number | null;
+  categoryName: string | null;
+  date: string;
+  amount: number;
+  installmentBadge: string | null;
+  groupName: string | null;
+  expense: Expense | null;
+  sharedEntry: SharedDebtEntry | null;
+}
+
+export interface EditSharedDraft {
+  description: string;
+  amount: number;
+  date: string;
+  category_id: number | null;
 }
 
 const CAT_COLORS = [
@@ -52,7 +80,7 @@ function daysInMonth(year: number, month: number): number {
 @Component({
   selector: 'app-card-expenses',
   standalone: true,
-  imports: [RouterLink, ReactiveFormsModule],
+  imports: [RouterLink, ReactiveFormsModule, FormsModule],
   templateUrl: './card-expenses.component.html',
   styleUrls: ['./card-expenses.component.scss'],
 })
@@ -61,6 +89,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   private cardSvc    = inject(CardService);
   private expenseSvc = inject(ExpenseService);
   private sharedSvc  = inject(SharedDebtService);
+  private categorySvc = inject(CategoryService);
   private auth       = inject(AuthService);
   private d3         = inject(D3ChartService);
   readonly myTenantId: string | null = (this.auth.userProfile as any).sub ?? null;
@@ -82,6 +111,17 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   chartData          = signal<InvoiceExpensesResponse | null>(null);
   allCardExpenses    = signal<Expense[]>([]);
   sharedEntries      = signal<SharedDebtEntry[]>([]);
+  allCategories      = signal<ExpenseCategory[]>([]);
+
+  // Unified "Gastos da Fatura" table filters (all applied client-side).
+  typeFilter      = signal<'all' | 'individual' | 'compartilhado'>('all');
+  dateFromFilter  = signal<string>('');
+  dateToFilter    = signal<string>('');
+
+  // Inline edit state for shared-debt rows (edited directly on this screen).
+  editingSharedId = signal<number | null>(null);
+  editDraft       = signal<EditSharedDraft | null>(null);
+  savingEdit      = signal(false);
 
   filteredSharedEntries = computed((): SharedDebtEntry[] => {
     const inv = this.selectedInvoice();
@@ -165,6 +205,81 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
 
   dropdownCategories = computed(() =>
     this.chartData()?.by_category ?? this.invoiceData()?.by_category ?? [],
+  );
+
+  /**
+   * Unified rows for the "Gastos da Fatura" table: individual expenses (from
+   * the unpaginated chart data, up to 200 per invoice) plus shared-debt
+   * entries paid on this card within the invoice period, each shown at its
+   * full/integral amount (what was actually charged), tagged with a
+   * kind flag so the UI can tell them apart and filter by type.
+   */
+  combinedRows = computed((): CombinedExpenseRow[] => {
+    const individual: CombinedExpenseRow[] = (this.chartData()?.expenses ?? []).map(e => ({
+      key: `ind-${e.id}`,
+      kind: 'individual' as const,
+      description: e.description,
+      categoryId: e.category?.id ?? null,
+      categoryName: e.category?.name ?? null,
+      date: e.date,
+      amount: Math.abs(e.amount),
+      installmentBadge: this.installmentBadge(e),
+      groupName: null,
+      expense: e,
+      sharedEntry: null,
+    }));
+    const shared: CombinedExpenseRow[] = this.filteredSharedEntries().map(e => ({
+      key: `shr-${e.id}`,
+      kind: 'compartilhado' as const,
+      description: e.description,
+      categoryId: e.category,
+      categoryName: e.category_name,
+      date: e.date,
+      amount: Math.abs(e.amount),
+      installmentBadge: e.total_installments > 1 ? `${e.installment_number}/${e.total_installments}` : null,
+      groupName: e.shared_debt_name,
+      expense: null,
+      sharedEntry: e,
+    }));
+    return [...individual, ...shared];
+  });
+
+  combinedFiltered = computed((): CombinedExpenseRow[] => {
+    let rows = this.combinedRows();
+    const type = this.typeFilter();
+    if (type !== 'all') rows = rows.filter(r => r.kind === type);
+    const search = this.searchControl.value?.trim().toLowerCase();
+    if (search) rows = rows.filter(r => r.description.toLowerCase().includes(search));
+    const catId = this.selectedCategoryId();
+    if (catId != null) rows = rows.filter(r => r.categoryId === catId);
+    const from = this.dateFromFilter();
+    if (from) rows = rows.filter(r => r.date >= from);
+    const to = this.dateToFilter();
+    if (to) rows = rows.filter(r => r.date <= to);
+    return [...rows].sort((a, b) => b.date.localeCompare(a.date) || a.description.localeCompare(b.description));
+  });
+
+  combinedFilteredCount = computed(() => this.combinedFiltered().length);
+  combinedFilteredTotal = computed(() => this.combinedFiltered().reduce((sum, r) => sum + r.amount, 0));
+  combinedTotalPages    = computed(() => Math.max(1, Math.ceil(this.combinedFilteredCount() / this.pageSize)));
+
+  combinedPageRows = computed((): CombinedExpenseRow[] => {
+    const page  = Math.min(this.currentPage(), this.combinedTotalPages());
+    const start = (page - 1) * this.pageSize;
+    return this.combinedFiltered().slice(start, start + this.pageSize);
+  });
+
+  combinedPageRange = computed((): number[] => {
+    const total   = this.combinedTotalPages();
+    const current = Math.min(this.currentPage(), total);
+    const start   = Math.max(1, current - 2);
+    const end     = Math.min(total, current + 2);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  });
+
+  hasActiveFilters = computed(() =>
+    !!this.searchControl.value || this.selectedCategoryId() != null ||
+    this.typeFilter() !== 'all' || !!this.dateFromFilter() || !!this.dateToFilter()
   );
 
   private dailyChartDataSig = computed(() => {
@@ -255,6 +370,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     this.cardSvc.get(this.cardId).subscribe({ next: c => this.card.set(c) });
     this.cardSvc.getAllCardExpenses(this.cardId).subscribe({ next: e => this.allCardExpenses.set(e) });
     this.sharedSvc.listEntries({ credit_card: this.cardId }).subscribe({ next: res => this.sharedEntries.set(res.results) });
+    this.categorySvc.list().subscribe({ next: cats => this.allCategories.set(cats) });
     this.cardSvc.getInvoices(this.cardId).subscribe({
       next: invoices => {
         this.invoices.set(invoices);
@@ -293,8 +409,96 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   deleteExpense(expense: Expense): void {
     if (!confirm(`Excluir "${expense.description}"?`)) return;
     this.expenseSvc.delete(expense.id).subscribe({
-      next:  () => { const inv = this.selectedInvoice(); if (inv) this.loadPage(inv); },
+      next:  () => { const inv = this.selectedInvoice(); if (inv) { this.loadPage(inv); this.loadChart(inv); } },
       error: () => alert('Erro ao excluir o gasto. Tente novamente.'),
+    });
+  }
+
+  // ─── Unified table filters (type / date range) ──────────────────────────
+  onTypeFilterChange(event: Event): void {
+    const val = (event.target as HTMLSelectElement).value as 'all' | 'individual' | 'compartilhado';
+    this.typeFilter.set(val);
+    this.currentPage.set(1);
+  }
+  onDateFromChange(event: Event): void {
+    this.dateFromFilter.set((event.target as HTMLInputElement).value);
+    this.currentPage.set(1);
+  }
+  onDateToChange(event: Event): void {
+    this.dateToFilter.set((event.target as HTMLInputElement).value);
+    this.currentPage.set(1);
+  }
+  clearAllFilters(): void {
+    this.searchControl.setValue('');
+    this.selectedCategoryId.set(null);
+    this.typeFilter.set('all');
+    this.dateFromFilter.set('');
+    this.dateToFilter.set('');
+    this.currentPage.set(1);
+    this.loadPage();
+  }
+
+  // ─── Inline edit/delete for shared-debt rows (done directly on this screen) ──
+  startEditShared(row: CombinedExpenseRow): void {
+    const s = row.sharedEntry;
+    if (!s) return;
+    this.editingSharedId.set(s.id);
+    this.editDraft.set({
+      description: s.description,
+      amount: Math.abs(s.amount),
+      date: s.date,
+      category_id: s.category,
+    });
+  }
+
+  cancelEditShared(): void {
+    this.editingSharedId.set(null);
+    this.editDraft.set(null);
+  }
+
+  updateEditDraft(patch: Partial<EditSharedDraft>): void {
+    const current = this.editDraft();
+    if (!current) return;
+    this.editDraft.set({ ...current, ...patch });
+  }
+
+  saveEditShared(): void {
+    const id = this.editingSharedId();
+    const draft = this.editDraft();
+    if (id == null || !draft) return;
+    this.savingEdit.set(true);
+    this.sharedSvc.updateEntry(id, {
+      description: draft.description,
+      amount: draft.amount,
+      date: draft.date,
+      category_id: draft.category_id ?? undefined,
+    }).subscribe({
+      next: () => {
+        this.savingEdit.set(false);
+        this.editingSharedId.set(null);
+        this.editDraft.set(null);
+        this.reloadSharedEntries();
+      },
+      error: () => {
+        this.savingEdit.set(false);
+        alert('Erro ao salvar a alteracao. Tente novamente.');
+      },
+    });
+  }
+
+  deleteSharedEntry(row: CombinedExpenseRow): void {
+    const s = row.sharedEntry;
+    if (!s) return;
+    if (!confirm(`Cancelar/excluir "${s.description}" (compartilhado)?`)) return;
+    this.sharedSvc.deleteEntry(s.id).subscribe({
+      next: () => this.reloadSharedEntries(),
+      error: () => alert('Erro ao excluir o gasto compartilhado. Tente novamente.'),
+    });
+  }
+
+  private reloadSharedEntries(): void {
+    this.sharedSvc.listEntries({ credit_card: this.cardId }).subscribe({
+      next: res => this.sharedEntries.set(res.results),
     });
   }
 
