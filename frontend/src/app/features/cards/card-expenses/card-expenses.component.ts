@@ -117,6 +117,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   typeFilter      = signal<'all' | 'individual' | 'compartilhado'>('all');
   dateFromFilter  = signal<string>('');
   dateToFilter    = signal<string>('');
+  dateSortDir     = signal<'asc' | 'desc'>('desc');
 
   // Inline edit state for shared-debt rows (edited directly on this screen).
   editingSharedId = signal<number | null>(null);
@@ -256,7 +257,8 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     if (from) rows = rows.filter(r => r.date >= from);
     const to = this.dateToFilter();
     if (to) rows = rows.filter(r => r.date <= to);
-    return [...rows].sort((a, b) => b.date.localeCompare(a.date) || a.description.localeCompare(b.description));
+    const dir = this.dateSortDir() === 'asc' ? 1 : -1;
+    return [...rows].sort((a, b) => dir * a.date.localeCompare(b.date) || a.description.localeCompare(b.description));
   });
 
   combinedFilteredCount = computed(() => this.combinedFiltered().length);
@@ -428,6 +430,11 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     this.dateToFilter.set((event.target as HTMLInputElement).value);
     this.currentPage.set(1);
   }
+  toggleDateSort(): void {
+    this.dateSortDir.set(this.dateSortDir() === 'asc' ? 'desc' : 'asc');
+    this.currentPage.set(1);
+  }
+
   clearAllFilters(): void {
     this.searchControl.setValue('');
     this.selectedCategoryId.set(null);
