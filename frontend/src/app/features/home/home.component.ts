@@ -245,6 +245,14 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     return this.categories().find(c => c.id === id)?.name ?? '—';
   }
 
+  /** O DRF envia `category` como id; o objeto aninhado nunca chega. */
+  expenseCategoryName(exp: Expense): string {
+    const nested = typeof exp.category === 'object' && exp.category !== null ? exp.category.id : null;
+    const id = exp.category_id ?? (typeof exp.category === 'number' ? exp.category : nested);
+    if (id == null) return 'Geral';
+    return this.categories().find(c => c.id === id)?.name ?? 'Geral';
+  }
+
   formatCurrency(value: number): string {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(value));
   }

@@ -5,6 +5,9 @@ from expenses.models import Expense
 class ExpenseSerializer(serializers.ModelSerializer):
     # Expõe category_id explicitamente para leitura e escrita
     category_id = serializers.IntegerField(source='category.id', read_only=True)
+    # Nome da categoria para exibição, espelhando o contrato de shared_entries.
+    # Sem isso o front só recebe o id e não consegue renderizar a categoria.
+    category_name = serializers.CharField(source='category.name', read_only=True)
 
     class Meta:
         model = Expense

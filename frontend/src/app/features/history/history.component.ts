@@ -136,7 +136,9 @@ export class HistoryComponent implements OnInit {
   }
 
   categoryName(expense: Expense): string {
-    return expense.category?.name ?? this.categories().find(c => c.id === expense.category_id)?.name ?? 'Sem categoria';
+    const nested = typeof expense.category === 'object' && expense.category !== null ? expense.category.name : null;
+    return expense.category_name ?? nested
+      ?? this.categories().find(c => c.id === expense.category_id)?.name ?? 'Sem categoria';
   }
 
   cardName(cardId: number | null | undefined): string {
