@@ -1,0 +1,11 @@
+FROM node:20-alpine
+
+RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
+ENV CHROME_BIN=/usr/bin/chromium-browser
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+
+CMD ["npx", "ng", "test", "--no-watch", "--no-progress", "--browsers=ChromeHeadlessCI"]

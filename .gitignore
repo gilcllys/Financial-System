@@ -154,3 +154,6 @@ frontend/.angular
 Thumbs.db
 frontend/financial-system-ui/.angular
 .aider*
+
+# Faturas/extratos baixados do banco (dados sensiveis)
+*.pdf
