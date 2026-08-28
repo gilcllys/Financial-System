@@ -280,7 +280,6 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   });
 
   combinedFilteredCount = computed(() => this.combinedFiltered().length);
-  combinedFilteredTotal = computed(() => this.combinedFiltered().reduce((sum, r) => sum + r.amount, 0));
   combinedTotalPages    = computed(() => Math.max(1, Math.ceil(this.combinedFilteredCount() / this.pageSize)));
 
   combinedPageRows = computed((): CombinedExpenseRow[] => {
