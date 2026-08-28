@@ -30,6 +30,13 @@ class CreateExpenseInputSerializer(serializers.Serializer):
     is_installment = serializers.BooleanField(required=False, default=False)
     installments = serializers.IntegerField(required=False, default=1)
 
+    def validate(self, attrs):
+        if attrs.get('payment_method') == 'cartao' and attrs.get('credit_card_id') is None:
+            raise serializers.ValidationError({
+                'credit_card_id': 'Obrigatório quando payment_method é "cartao".',
+            })
+        return attrs
+
 
 class BulkCreateExpenseInputSerializer(serializers.Serializer):
     items = CreateExpenseInputSerializer(many=True, allow_empty=False)
@@ -72,6 +79,13 @@ class CreateRecurringExpenseInputSerializer(serializers.Serializer):
     payment_method = serializers.ChoiceField(choices=['dinheiro', 'cartao'], required=False, default='dinheiro')
     credit_card_id = serializers.IntegerField(required=False, allow_null=True, default=None)
     category_id = serializers.IntegerField(required=False, allow_null=True, default=None)
+
+    def validate(self, attrs):
+        if attrs.get('payment_method') == 'cartao' and attrs.get('credit_card_id') is None:
+            raise serializers.ValidationError({
+                'credit_card_id': 'Obrigatório quando payment_method é "cartao".',
+            })
+        return attrs
 
 
 class GenerateMonthInputSerializer(serializers.Serializer):

@@ -259,9 +259,18 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             .values_list('name', flat=True)
         )
 
+        from cards.models import CreditCard
+        card_names = list(
+            CreditCard.objects
+            .filter(tenant_id=tenant)
+            .order_by('name')
+            .values_list('name', flat=True)
+        )
+
         headers = [
             'descricao', 'tipo', 'valor', 'data', 'categoria',
             'metodo_pagamento', 'quantidade', 'parcelado', 'parcelas',
+            'cartao',
         ]
 
         wb = Workbook()
@@ -277,11 +286,11 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         sample_category = categories[0] if categories else 'Alimentação'
         ws.append([
             'Mercado do mês', 'despesa', 150.00, '2026-08-01', sample_category,
-            'dinheiro', 1, 'nao', 1,
+            'dinheiro', 1, 'nao', 1, '',
         ])
 
-        # Larguras razoáveis (9 colunas)
-        widths = [28, 12, 12, 14, 22, 18, 12, 12, 10]
+        # Larguras razoáveis (10 colunas)
+        widths = [28, 12, 12, 14, 22, 18, 12, 12, 10, 22]
         for col_idx, width in enumerate(widths, start=1):
             ws.column_dimensions[get_column_letter(col_idx)].width = width
 
@@ -294,7 +303,8 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             cat_ws.cell(row=i, column=1, value=name)
 
         # Colunas: A descricao, B tipo, C valor, D data, E categoria,
-        #          F metodo_pagamento, G quantidade, H parcelado, I parcelas.
+        #          F metodo_pagamento, G quantidade, H parcelado, I parcelas,
+        #          J cartao (obrigatório quando metodo_pagamento = "cartao").
 
         # Dropdown tipo (coluna B)
         tipo_dv = DataValidation(
@@ -327,6 +337,20 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         )
         ws.add_data_validation(parc_dv)
         parc_dv.add('H2:H1000')
+
+        # Sheet + dropdown de cartões (coluna J).
+        if card_names:
+            card_ws = wb.create_sheet('Cartoes')
+            card_ws.cell(row=1, column=1, value='Cartões disponíveis').font = bold
+            for i, name in enumerate(card_names, start=2):
+                card_ws.cell(row=i, column=1, value=name)
+            card_dv = DataValidation(
+                type='list',
+                formula1=f'=Cartoes!$A$2:$A${len(card_names) + 1}',
+                allow_blank=True,
+            )
+            ws.add_data_validation(card_dv)
+            card_dv.add('J2:J1000')
 
         from django.http import HttpResponse
         bio = io.BytesIO()
@@ -405,6 +429,12 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             for c in ExpenseCategory.objects.filter(tenant_id__in=['system', tenant])
         }
 
+        from cards.models import CreditCard
+        card_map = {
+            c.name.strip().lower(): c.id
+            for c in CreditCard.objects.filter(tenant_id=tenant)
+        }
+
         def get_cell(row, name):
             idx = header_map.get(name)
             if idx is None or idx >= len(row):
@@ -474,6 +504,24 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             if payment_method not in ('dinheiro', 'cartao'):
                 row_errors.append('metodo_pagamento inválido')
 
+            # cartao sem credit_card vinculado gera lançamento invisível na fatura.
+            card_raw = get_cell(row, 'cartao')
+            card_name = str(card_raw).strip() if card_raw not in (None, '') else ''
+            credit_card_id = None
+            if payment_method == 'cartao':
+                if not card_name:
+                    row_errors.append(
+                        'cartao é obrigatório quando metodo_pagamento = "cartao"'
+                    )
+                else:
+                    credit_card_id = card_map.get(card_name.lower())
+                    if credit_card_id is None:
+                        row_errors.append(f'cartao "{card_name}" não encontrado')
+            elif card_name:
+                row_errors.append(
+                    'cartao só pode ser informado quando metodo_pagamento = "cartao"'
+                )
+
             qty_raw = get_cell(row, 'quantidade')
             quantity = 1
             if qty_raw not in (None, ''):
@@ -510,6 +558,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
                 'date': data_val,
                 'quantity': quantity,
                 'payment_method': payment_method,
+                'credit_card_id': credit_card_id,
                 'is_installment': parcelado == 'sim',
                 'installments': parcelas,
             })

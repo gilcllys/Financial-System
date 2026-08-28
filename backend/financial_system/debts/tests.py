@@ -11,6 +11,8 @@ from debts.behaviors import (
     JoinSharedDebtBehavior,
     UpdateSharedEntryBehavior,
     _round2,
+    _split_installments,
+    _strip_installment_suffix,
 )
 from debts.models import (
     SharedDebt,
@@ -228,8 +230,8 @@ class CreateSharedEntryBehaviorTests(TestCase):
         card = CreditCard.objects.create(
             tenant_id='someone-else',
             name='Nubank',
-            due_date=10,
-            best_purchase_date=1,
+            due_day=10,
+            closing_day=1,
             last_four_digits='1234',
         )
         resp = CreateSharedEntryBehavior(
@@ -237,6 +239,155 @@ class CreateSharedEntryBehaviorTests(TestCase):
         ).run()
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(SharedEntry.objects.count(), 0)
+
+
+class SplitInstallmentsTests(SimpleTestCase):
+    """Regressao: cada parcela recebia o valor CHEIO em vez da fracao."""
+
+    def test_divides_total_across_installments(self):
+        # Caso real: "Milhas Livelo" R$ 511,56 em 4x deve dar 127,89 por parcela.
+        self.assertEqual(
+            _split_installments(Decimal('511.56'), 4),
+            [Decimal('127.89')] * 4,
+        )
+
+    def test_sum_of_installments_equals_total(self):
+        for total, n in [('100.00', 3), ('0.05', 3), ('10.00', 7), ('999.99', 6)]:
+            parts = _split_installments(Decimal(total), n)
+            self.assertEqual(len(parts), n)
+            self.assertEqual(sum(parts), Decimal(total), f'{total} em {n}x')
+
+    def test_residual_cents_go_to_first_installments(self):
+        self.assertEqual(
+            _split_installments(Decimal('100.00'), 3),
+            [Decimal('33.34'), Decimal('33.33'), Decimal('33.33')],
+        )
+
+    def test_single_installment_returns_full_amount(self):
+        self.assertEqual(_split_installments(Decimal('127.89'), 1), [Decimal('127.89')])
+
+
+class StripInstallmentSuffixTests(SimpleTestCase):
+    """Regressao: descricao acumulava sufixos ao reparcelar uma parcela."""
+
+    def test_removes_suffix(self):
+        self.assertEqual(_strip_installment_suffix('Milhas Livelo (1/4)'), 'Milhas Livelo')
+
+    def test_removes_repeated_suffixes(self):
+        self.assertEqual(_strip_installment_suffix('Milhas Livelo (1/4) (1/4)'), 'Milhas Livelo')
+
+    def test_keeps_description_without_suffix(self):
+        self.assertEqual(_strip_installment_suffix('Jantar'), 'Jantar')
+
+    def test_does_not_touch_parentheses_in_the_middle(self):
+        self.assertEqual(_strip_installment_suffix('Pizza (meio a meio)'), 'Pizza (meio a meio)')
+
+
+class SharedEntryInstallmentCreationTests(TestCase):
+    """Parcelamento de despesa compartilhada ponta a ponta."""
+
+    def setUp(self):
+        self.user = _make_user(tenant_id='owner-1')
+        self.group = SharedDebt.objects.create(name='G', owner_tenant_id='owner-1')
+        self.m1 = SharedDebtMember.objects.create(
+            shared_debt=self.group, tenant_id='owner-1', display_name='Owner'
+        )
+        self.m2 = SharedDebtMember.objects.create(
+            shared_debt=self.group, tenant_id=None, display_name='Bob'
+        )
+
+    def _data(self, **overrides):
+        data = {
+            'description': 'Milhas Livelo',
+            'amount': Decimal('511.56'),
+            'date': __import__('datetime').date(2026, 8, 17),
+            'paid_by': self.m1.id,
+            'participant_ids': [],
+            'payment_method': 'dinheiro',
+            'credit_card_id': None,
+            'category_id': None,
+        }
+        data.update(overrides)
+        return data
+
+    def test_installments_split_the_total(self):
+        resp = CreateSharedEntryBehavior(
+            self.group, self.user, self._data(total_installments_input=4)
+        ).run()
+        self.assertEqual(resp.status_code, 201)
+
+        entries = SharedEntry.objects.order_by('installment_number')
+        self.assertEqual(entries.count(), 4)
+        # Cada parcela = fracao, e a soma = total da compra.
+        for e in entries:
+            self.assertEqual(e.amount, Decimal('127.89'))
+        self.assertEqual(sum(e.amount for e in entries), Decimal('511.56'))
+
+    def test_installments_share_group_id_and_numbering(self):
+        CreateSharedEntryBehavior(
+            self.group, self.user, self._data(total_installments_input=4)
+        ).run()
+        entries = list(SharedEntry.objects.order_by('installment_number'))
+        gids = {e.installment_group_id for e in entries}
+        self.assertEqual(len(gids), 1)
+        self.assertIsNotNone(entries[0].installment_group_id)
+        self.assertEqual([e.installment_number for e in entries], [1, 2, 3, 4])
+        self.assertTrue(all(e.total_installments == 4 for e in entries))
+        self.assertEqual(entries[0].description, 'Milhas Livelo (1/4)')
+
+    def test_single_installment_keeps_full_amount_and_no_group(self):
+        CreateSharedEntryBehavior(self.group, self.user, self._data()).run()
+        entry = SharedEntry.objects.get()
+        self.assertEqual(entry.amount, Decimal('511.56'))
+        self.assertIsNone(entry.installment_group_id)
+        self.assertEqual(entry.description, 'Milhas Livelo')
+
+
+class SharedEntryCardValidationTests(TestCase):
+    """cartao sem credit_card_id deixa o lancamento invisivel na fatura."""
+
+    def setUp(self):
+        self.user = _make_user(tenant_id='owner-1')
+        self.group = SharedDebt.objects.create(name='G', owner_tenant_id='owner-1')
+        self.me = SharedDebtMember.objects.create(
+            shared_debt=self.group, tenant_id='owner-1', display_name='Owner'
+        )
+        self.other = SharedDebtMember.objects.create(
+            shared_debt=self.group, tenant_id=None, display_name='Bob'
+        )
+
+    def _data(self, **overrides):
+        data = {
+            'description': 'Compra',
+            'amount': Decimal('50.00'),
+            'date': __import__('datetime').date(2026, 8, 17),
+            'paid_by': self.me.id,
+            'participant_ids': [],
+            'payment_method': 'dinheiro',
+            'credit_card_id': None,
+            'category_id': None,
+        }
+        data.update(overrides)
+        return data
+
+    def test_cartao_without_card_is_rejected(self):
+        resp = CreateSharedEntryBehavior(
+            self.group, self.user, self._data(payment_method='cartao')
+        ).run()
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(SharedEntry.objects.count(), 0)
+
+    def test_cartao_without_card_allowed_when_someone_else_paid(self):
+        # Cartao de terceiro nao esta cadastrado neste tenant: nao exigimos.
+        resp = CreateSharedEntryBehavior(
+            self.group, self.user,
+            self._data(payment_method='cartao', paid_by=self.other.id),
+        ).run()
+        self.assertEqual(resp.status_code, 201)
+
+    def test_dinheiro_is_unaffected(self):
+        resp = CreateSharedEntryBehavior(self.group, self.user, self._data()).run()
+        self.assertEqual(resp.status_code, 201)
 
 
 class BalancesBehaviorTests(TestCase):
@@ -566,8 +717,8 @@ class SharedEntryUpdateEndpointTests(TestCase):
         card = CreditCard.objects.create(
             tenant_id='evil-tenant',
             name='Evil Card',
-            due_date=5,
-            best_purchase_date=1,
+            due_day=5,
+            closing_day=1,
             last_four_digits='9999',
         )
         payload = self._put_payload(payment_method='cartao', credit_card_id=card.id)
@@ -582,8 +733,8 @@ class SharedEntryUpdateEndpointTests(TestCase):
         card = CreditCard.objects.create(
             tenant_id='owner-u',
             name='My Card',
-            due_date=10,
-            best_purchase_date=1,
+            due_day=10,
+            closing_day=1,
             last_four_digits='1111',
         )
         # First set cartao.

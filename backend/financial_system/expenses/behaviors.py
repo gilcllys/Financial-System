@@ -1,12 +1,50 @@
+import re
 from datetime import date
 from dateutil.relativedelta import relativedelta
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 from typing import List
 from django.db import transaction
 from rest_framework.response import Response
 from rest_framework import status
 
 from expenses.models import Expense
+
+_TWO_PLACES = Decimal('0.01')
+
+# Sufixo de parcela gerado por _create_installments (um ou mais, no fim da string).
+_INSTALLMENT_SUFFIX_RE = re.compile(r'(?:\s*-\s*Parcela\s+\d+\s*/\s*\d+)+\s*$', re.IGNORECASE)
+
+
+def _strip_installment_suffix(description: str) -> str:
+    """
+    Remove o sufixo " - Parcela X/Y" do fim da descrição.
+
+    Necessário porque a UI permite reparcelar uma despesa que JÁ é uma parcela:
+    sem isso a descrição acumula ("Item - Parcela 1/2 - Parcela 1/2") e quebra
+    tanto o agrupamento da tela de Parcelas quanto o delete-installments.
+    """
+    if not description:
+        return description
+    return _INSTALLMENT_SUFFIX_RE.sub('', description).strip()
+
+
+def _split_installments(total_amount, installments: int) -> list:
+    """
+    Divide um valor total em N parcelas com 2 casas decimais.
+
+    Os centavos residuais são distribuídos nas primeiras parcelas, garantindo
+    que a soma das parcelas seja exatamente igual ao total.
+    """
+    total = Decimal(str(total_amount)).quantize(_TWO_PLACES, rounding=ROUND_HALF_UP)
+    if installments < 2:
+        return [total]
+
+    base = (total / installments).quantize(_TWO_PLACES, rounding=ROUND_DOWN)
+    amounts = [base] * installments
+    residual_cents = int((total - base * installments) / _TWO_PLACES)
+    for i in range(residual_cents):
+        amounts[i] += _TWO_PLACES
+    return amounts
 
 
 class CreateExpenseBehavior:
@@ -28,7 +66,17 @@ class CreateExpenseBehavior:
         self.installments = data.get('installments', 1)
         self.is_installment = data.get('is_installment', False)
 
+    def _validate_payment(self):
+        """cartao sem credit_card_id gera lançamento invisível em qualquer fatura."""
+        if self.payment_method == 'cartao' and self.credit_card_id is None:
+            raise ValueError(
+                'credit_card_id é obrigatório quando payment_method é "cartao".'
+            )
+        if self.payment_method == 'dinheiro':
+            self.credit_card_id = None
+
     def _build_expense(self, description: str, amount: Decimal, expense_date) -> Expense:
+        self._validate_payment()
         expense = Expense.objects.create(
             tenant_id=self.tenant_id,
             category_id=self.category_id,
@@ -56,15 +104,18 @@ class CreateExpenseBehavior:
     @transaction.atomic
     def _create_installments(self) -> List[Expense]:
         expenses = []
-        installment_amount = self.amount / self.installments
+        base_description = _strip_installment_suffix(self.description)
+        installment_amounts = _split_installments(self.amount, self.installments)
         current_date = (
             self.date
             if isinstance(self.date, date)
             else date.fromisoformat(str(self.date))
         )
         for i in range(1, self.installments + 1):
-            desc = f"{self.description} - Parcela {i}/{self.installments}"
-            expenses.append(self._build_expense(desc, installment_amount, current_date))
+            desc = f"{base_description} - Parcela {i}/{self.installments}"
+            expenses.append(
+                self._build_expense(desc, installment_amounts[i - 1], current_date)
+            )
             current_date = current_date + relativedelta(months=1)
         return expenses
 
@@ -80,7 +131,7 @@ class CreateExpenseBehavior:
                         'is_installment': True,
                         'installments': self.installments,
                         'total_amount': float(self.amount),
-                        'installment_amount': float(self.amount / self.installments),
+                        'installment_amount': float(expenses[0].amount),
                         'expenses': [
                             {
                                 'id': e.id,

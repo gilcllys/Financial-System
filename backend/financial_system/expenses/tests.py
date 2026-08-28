@@ -3,6 +3,12 @@ from django.test import SimpleTestCase, RequestFactory
 from rest_framework.request import Request
 from expenses.viewsets import ExpensePagination, ExpenseViewSet
 from expenses.serializer import DeleteInstallmentsInputSerializer
+from decimal import Decimal
+from expenses.behaviors import (
+    CreateExpenseBehavior,
+    _split_installments,
+    _strip_installment_suffix,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -491,3 +497,76 @@ class DeleteInstallmentsActionTest(SimpleTestCase):
             delete_return=(3, {'expenses.Expense': 3}),
         )
         mock_objects.filter.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Regressao: parcelamento e sufixo de descricao
+# ---------------------------------------------------------------------------
+
+class SplitInstallmentsTests(SimpleTestCase):
+    """Parcelas devem somar exatamente o total, sem perder centavos."""
+
+    def test_sum_always_equals_total(self):
+        for total, n in [('100.00', 3), ('0.05', 3), ('485.92', 2), ('999.99', 7)]:
+            parts = _split_installments(Decimal(total), n)
+            self.assertEqual(len(parts), n)
+            self.assertEqual(sum(parts), Decimal(total), f'{total} em {n}x')
+
+    def test_residual_cents_go_to_first_installments(self):
+        self.assertEqual(
+            _split_installments(Decimal('100.00'), 3),
+            [Decimal('33.34'), Decimal('33.33'), Decimal('33.33')],
+        )
+
+    def test_single_installment(self):
+        self.assertEqual(_split_installments(Decimal('242.96'), 1), [Decimal('242.96')])
+
+
+class StripInstallmentSuffixTests(SimpleTestCase):
+    """Regressao: reparcelar uma parcela acumulava " - Parcela X/Y"."""
+
+    def test_removes_single_suffix(self):
+        self.assertEqual(
+            _strip_installment_suffix('Aspirador para a mamae - Parcela 1/2'),
+            'Aspirador para a mamae',
+        )
+
+    def test_removes_duplicated_suffix(self):
+        self.assertEqual(
+            _strip_installment_suffix('Aspirador para a mamae - Parcela 1/2 - Parcela 1/2'),
+            'Aspirador para a mamae',
+        )
+
+    def test_keeps_plain_description(self):
+        self.assertEqual(_strip_installment_suffix('Celular novo'), 'Celular novo')
+
+    def test_does_not_touch_fraction_in_the_middle(self):
+        self.assertEqual(_strip_installment_suffix('Curso 2/3 aulas'), 'Curso 2/3 aulas')
+
+
+class CreateExpenseCardValidationTests(SimpleTestCase):
+    """payment_method='cartao' sem cartao deixa o gasto fora de qualquer fatura."""
+
+    def test_cartao_without_card_raises(self):
+        behavior = CreateExpenseBehavior(data={
+            'description': 'Netflix', 'amount': -44.90, 'date': '2026-08-01',
+            'payment_method': 'cartao', 'credit_card_id': None,
+        })
+        with self.assertRaises(ValueError):
+            behavior._validate_payment()
+
+    def test_cartao_with_card_is_ok(self):
+        behavior = CreateExpenseBehavior(data={
+            'description': 'Netflix', 'amount': -44.90, 'date': '2026-08-01',
+            'payment_method': 'cartao', 'credit_card_id': 6,
+        })
+        behavior._validate_payment()
+        self.assertEqual(behavior.credit_card_id, 6)
+
+    def test_dinheiro_clears_card(self):
+        behavior = CreateExpenseBehavior(data={
+            'description': 'Feira', 'amount': -30.00, 'date': '2026-08-01',
+            'payment_method': 'dinheiro', 'credit_card_id': 6,
+        })
+        behavior._validate_payment()
+        self.assertIsNone(behavior.credit_card_id)
