@@ -1,6 +1,6 @@
 ﻿import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { Location } from '@angular/common';
 import { ExpenseService, RecurringExpenseTemplate, GenerateMonthResult } from '../../../core/services/expense.service';
@@ -8,6 +8,7 @@ import { SharedDebtService, SharedDebtGroup, SharedDebtMember } from '../../../c
 import { CardService } from '../../../core/services/card.service';
 import { CategoryService } from '../../../core/services/category.service';
 import { CreditCard, ExpenseCategory } from '../../../core/models';
+import { ToastService } from '../../../core/services/toast.service';
 
 @Component({
   selector: 'app-expense-form',
@@ -25,6 +26,12 @@ export class ExpenseFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private location = inject(Location);
   private sharedDebtSvc = inject(SharedDebtService);
+  private toast = inject(ToastService);
+
+  /** Mensagem única para a regra cartao => credit_card_id obrigatorio. */
+  private readonly CARD_REQUIRED_MSG =
+    'Selecione um cartão de crédito. Gastos com método "Cartão de Crédito" precisam estar '
+    + 'vinculados a um cartão, senão não aparecem em nenhuma fatura.';
 
   // ── Modo Individual / Compartilhado ──────────────────────────────────────
   mode = signal<'individual' | 'shared' | 'recurring'>('individual');
@@ -79,7 +86,10 @@ export class ExpenseFormComponent implements OnInit {
         this.recurringForm.reset({ description: '', amount: null, day_of_month: 1, payment_method: 'dinheiro', category_id: null });
         this.loadRecurringTemplates();
       },
-      error: () => this.savingRecurring.set(false),
+      error: err => {
+        this.savingRecurring.set(false);
+        this.toast.apiError(err, 'Erro ao salvar gasto fixo.');
+      },
     });
   }
 
@@ -152,7 +162,23 @@ export class ExpenseFormComponent implements OnInit {
     this.isIncome.set(income);
   }
 
+  /** cartao => credit_card_id obrigatorio, espelhando a regra do backend. */
+  private bindCardRequiredRule(form: FormGroup): void {
+    form.get('payment_method')!.valueChanges.subscribe((val: unknown) => {
+      const ctrl = form.get('credit_card_id')!;
+      if (val === 'cartao') {
+        ctrl.setValidators(Validators.required);
+      } else {
+        ctrl.clearValidators();
+        ctrl.setValue(null);
+      }
+      ctrl.updateValueAndValidity();
+    });
+  }
+
   private setupConditionals(): void {
+    this.bindCardRequiredRule(this.sharedForm);
+
     this.form.get('is_installment')!.valueChanges.subscribe(val => {
       const installmentsCtrl = this.form.get('installments')!;
       const quantityCtrl = this.form.get('quantity')!;
@@ -182,6 +208,17 @@ export class ExpenseFormComponent implements OnInit {
     this.cardService.list().subscribe({ next: cards => this.cards.set(cards) });
   }
 
+  /**
+   * Remove o sufixo " - Parcela X/Y" do fim da descrição.
+   *
+   * Ao editar uma parcela e reconvertê-la em parcelado, o backend anexa um novo
+   * sufixo. Sem limpar aqui, a descrição acumularia
+   * ("Item - Parcela 1/2 - Parcela 1/2").
+   */
+  private stripInstallmentSuffix(description: string): string {
+    return (description ?? '').replace(/(?:\s*-\s*Parcela\s+\d+\s*\/\s*\d+)+\s*$/i, '').trim();
+  }
+
   private loadExpense(id: number): void {
     this.loading.set(true);
     this.expenseService.get(id).subscribe({
@@ -189,7 +226,7 @@ export class ExpenseFormComponent implements OnInit {
         // Define o toggle baseado no sinal do amount
         this.isIncome.set(expense.amount >= 0);
         this.form.patchValue({
-          description: expense.description ?? '',
+          description: this.stripInstallmentSuffix(expense.description ?? ''),
           amount: Math.abs(expense.amount),
           date: expense.date,
           category_id: expense.category_id,
@@ -236,10 +273,24 @@ export class ExpenseFormComponent implements OnInit {
   }
 
   submitShared(): void {
-    if (this.sharedForm.invalid) { this.sharedForm.markAllAsTouched(); return; }
-    if (!this.selectedGroupId()) { return; }
+    if (this.sharedForm.invalid) {
+      this.sharedForm.markAllAsTouched();
+      if (this.sharedIsCartao && !this.sharedForm.value.credit_card_id) {
+        this.errorMessage.set(this.CARD_REQUIRED_MSG);
+        this.toast.error(this.CARD_REQUIRED_MSG);
+      }
+      return;
+    }
+    if (!this.selectedGroupId()) {
+      this.toast.warning('Selecione um grupo de despesa compartilhada.');
+      return;
+    }
     const parts = [...this.participantIds()];
-    if (parts.length === 0) { this.errorMessage.set('Selecione ao menos um participante.'); return; }
+    if (parts.length === 0) {
+      this.errorMessage.set('Selecione ao menos um participante.');
+      this.toast.warning('Selecione ao menos um participante.');
+      return;
+    }
     this.savingShared.set(true);
     this.errorMessage.set('');
     const v = this.sharedForm.getRawValue();
@@ -255,16 +306,28 @@ export class ExpenseFormComponent implements OnInit {
       credit_card_id: v.payment_method === 'cartao' ? v.credit_card_id : null,
       category_id: v.category_id,
     }).subscribe({
-      next: () => this.router.navigate(['/home']),
+      next: () => {
+        this.toast.success('Gasto compartilhado criado.');
+        this.router.navigate(['/home']);
+      },
       error: err => {
         this.savingShared.set(false);
-        this.errorMessage.set(err?.error?.detail ?? 'Erro ao salvar gasto compartilhado.');
+        this.errorMessage.set(
+          this.toast.apiError(err, 'Erro ao salvar gasto compartilhado.')
+        );
       },
     });
   }
 
   submit(): void {
-    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      if (this.isCartao && !this.form.value.credit_card_id) {
+        this.errorMessage.set(this.CARD_REQUIRED_MSG);
+        this.toast.error(this.CARD_REQUIRED_MSG);
+      }
+      return;
+    }
     this.saving.set(true);
     this.errorMessage.set('');
 
@@ -296,13 +359,17 @@ export class ExpenseFormComponent implements OnInit {
             next: () => this.location.back(),
             error: err => {
               this.saving.set(false);
-              this.errorMessage.set(err?.error?.detail ?? 'Erro ao criar parcelas. Tente novamente.');
+              this.errorMessage.set(
+                this.toast.apiError(err, 'Erro ao criar parcelas. Tente novamente.')
+              );
             },
           });
         },
-        error: () => {
+        error: err => {
           this.saving.set(false);
-          this.errorMessage.set('Erro ao remover gasto original. Tente novamente.');
+          this.errorMessage.set(
+            this.toast.apiError(err, 'Erro ao remover gasto original. Tente novamente.')
+          );
         },
       });
       return;
@@ -313,10 +380,15 @@ export class ExpenseFormComponent implements OnInit {
       : this.expenseService.create(payload);
 
     req$.subscribe({
-      next: () => this.location.back(),
+      next: () => {
+        this.toast.success(this.isEdit() ? 'Gasto atualizado.' : 'Gasto criado.');
+        this.location.back();
+      },
       error: err => {
         this.saving.set(false);
-        this.errorMessage.set(err?.error?.detail ?? 'Erro ao salvar gasto. Tente novamente.');
+        this.errorMessage.set(
+          this.toast.apiError(err, 'Erro ao salvar gasto. Tente novamente.')
+        );
       },
     });
   }

@@ -1,4 +1,5 @@
-from decimal import Decimal, ROUND_HALF_UP
+import re
+from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 
 import uuid
 from dateutil.relativedelta import relativedelta
@@ -32,6 +33,44 @@ _TWO_PLACES = Decimal('0.01')
 
 def _round2(value: Decimal) -> Decimal:
     return Decimal(value).quantize(_TWO_PLACES, rounding=ROUND_HALF_UP)
+
+
+# Sufixo de parcela das compartilhadas: " (X/Y)", um ou mais, no fim da string.
+_INSTALLMENT_SUFFIX_RE = re.compile(r'(?:\s*\(\d+\s*/\s*\d+\))+\s*$')
+
+
+def _strip_installment_suffix(description: str) -> str:
+    """
+    Remove o sufixo " (X/Y)" do fim da descrição.
+
+    Evita acumular sufixos ("Item (1/4) (1/4)") caso uma entrada já parcelada
+    seja reparcelada, o que quebraria o agrupamento na tela de Parcelas.
+    """
+    if not description:
+        return description
+    return _INSTALLMENT_SUFFIX_RE.sub('', description).strip()
+
+
+def _split_installments(total_amount, installments: int) -> list:
+    """
+    Divide um valor total em N parcelas com 2 casas decimais.
+
+    Os centavos residuais da divisao sao distribuidos nas primeiras parcelas,
+    garantindo que a soma das parcelas seja exatamente igual ao total.
+    Ex.: 100.00 em 3 -> [33.34, 33.33, 33.33]
+    """
+    total = _round2(Decimal(str(total_amount)))
+    if installments < 2:
+        return [total]
+
+    base = (total / installments).quantize(_TWO_PLACES, rounding=ROUND_DOWN)
+    amounts = [base] * installments
+
+    residual_cents = int((total - base * installments) / _TWO_PLACES)
+    for i in range(residual_cents):
+        amounts[i] += _TWO_PLACES
+
+    return amounts
 
 
 class CreateSharedDebtBehavior:
@@ -141,6 +180,19 @@ class JoinSharedDebtBehavior:
         )
 
 
+def _payer_belongs_to_tenant(paid_by_id, tenant_id) -> bool:
+    """
+    True quando quem pagou é o próprio usuário autenticado.
+
+    Só nesse caso exigimos credit_card_id: se outro membro pagou com o cartão
+    dele, esse cartão não está (nem deve estar) cadastrado neste tenant.
+    """
+    return SharedDebtMember.objects.filter(
+        id=paid_by_id,
+        tenant_id=tenant_id,
+    ).exists()
+
+
 class CreateSharedEntryBehavior:
     """Cria uma despesa compartilhada e seus participantes (rateio igual)."""
 
@@ -193,6 +245,21 @@ class CreateSharedEntryBehavior:
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # payment_method='cartao' exige cartão vinculado quando quem pagou foi o
+        # próprio usuário, senão o lançamento fica invisível em qualquer fatura.
+        if (
+            self.payment_method == 'cartao'
+            and self.credit_card_id is None
+            and _payer_belongs_to_tenant(self.paid_by_id, self.user.tenant_id)
+        ):
+            return Response(
+                {
+                    'success': False,
+                    'message': 'credit_card_id é obrigatório quando payment_method é "cartao".',
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # [SEC-A01] IDOR: cartão precisa pertencer ao tenant autenticado.
         if self.credit_card_id is not None:
             owns_card = CreditCard.objects.filter(
@@ -208,19 +275,29 @@ class CreateSharedEntryBehavior:
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+        # payment_method='dinheiro' nunca carrega cartão. Limpamos só aqui, após o
+        # guard de IDOR: limpar antes esconderia uma tentativa de usar cartão
+        # de outro tenant.
+        if self.payment_method == 'dinheiro':
+            self.credit_card_id = None
+
         total = self.total_installments
         group_id = uuid.uuid4() if total > 1 else None
+        # O valor informado é o TOTAL da compra: cada parcela recebe apenas a
+        # sua fração, nunca o valor cheio.
+        installment_amounts = _split_installments(self.amount, total)
+        base_description = _strip_installment_suffix(self.description)
 
         with transaction.atomic():
             entries = []
             for i in range(total):
                 entry_date = self.date + relativedelta(months=i) if total > 1 else self.date
-                desc = f"{self.description} ({i + 1}/{total})" if total > 1 else self.description
+                desc = f"{base_description} ({i + 1}/{total})" if total > 1 else base_description
                 entry = SharedEntry.objects.create(
                     shared_debt=self.shared_debt,
                     paid_by_id=self.paid_by_id,
                     description=desc,
-                    amount=self.amount,
+                    amount=installment_amounts[i],
                     date=entry_date,
                     payment_method=self.payment_method,
                     credit_card_id=self.credit_card_id,
@@ -325,6 +402,21 @@ class UpdateSharedEntryBehavior:
         # payment_method='dinheiro' clears credit_card.
         if payment_method == 'dinheiro':
             credit_card_id = None
+
+        # payment_method='cartao' exige cartão vinculado quando quem pagou foi o
+        # próprio usuário (cartão de terceiro não existe neste tenant).
+        if (
+            payment_method == 'cartao'
+            and credit_card_id is None
+            and _payer_belongs_to_tenant(paid_by_id, self.user.tenant_id)
+        ):
+            return Response(
+                {
+                    'success': False,
+                    'message': 'credit_card_id é obrigatório quando payment_method é "cartao".',
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # [SEC-A01] IDOR guard.
         if credit_card_id is not None:
