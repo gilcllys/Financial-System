@@ -39,12 +39,18 @@ def _split_installments(total_amount, installments: int) -> list:
     if installments < 2:
         return [total]
 
-    base = (total / installments).quantize(_TWO_PLACES, rounding=ROUND_DOWN)
+    # Despesa em Expense.amount e sempre negativa. ROUND_DOWN trunca em direcao
+    # ao zero e o residual sai negativo, entao o rateio so funciona no valor
+    # absoluto; o sinal e reaplicado no fim.
+    sign = -1 if total < 0 else 1
+    magnitude = abs(total)
+
+    base = (magnitude / installments).quantize(_TWO_PLACES, rounding=ROUND_DOWN)
     amounts = [base] * installments
-    residual_cents = int((total - base * installments) / _TWO_PLACES)
+    residual_cents = int((magnitude - base * installments) / _TWO_PLACES)
     for i in range(residual_cents):
         amounts[i] += _TWO_PLACES
-    return amounts
+    return [a * sign for a in amounts]
 
 
 class CreateExpenseBehavior:
