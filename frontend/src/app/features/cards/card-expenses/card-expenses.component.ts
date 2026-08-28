@@ -12,7 +12,7 @@ import {
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ReactiveFormsModule, FormsModule, FormControl } from '@angular/forms';
 import { Subject } from 'rxjs';
-import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
+import { takeUntil } from 'rxjs/operators';
 import { CardService } from '../../../core/services/card.service';
 import { ExpenseService } from '../../../core/services/expense.service';
 import { SharedDebtService, SharedDebtEntry } from '../../../core/services/shared-debt.service';
@@ -169,6 +169,9 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   readonly pageSize  = 20;
 
   searchControl = new FormControl<string>('', { nonNullable: true });
+  // Espelha searchControl num signal: computed() nao rastreia FormControl,
+  // entao ler .value dentro de combinedFiltered nunca disparava recalculo.
+  searchTerm = signal<string>('');
 
   pagination = computed((): InvoicePagination | null => this.invoiceData()?.pagination ?? null);
 
@@ -267,7 +270,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     let rows = this.combinedRows();
     const type = this.typeFilter();
     if (type !== 'all') rows = rows.filter(r => r.kind === type);
-    const search = this.searchControl.value?.trim().toLowerCase();
+    const search = this.searchTerm();
     if (search) rows = rows.filter(r => r.description.toLowerCase().includes(search));
     const catId = this.selectedCategoryId();
     if (catId != null) rows = rows.filter(r => r.categoryId === catId);
@@ -297,7 +300,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   });
 
   hasActiveFilters = computed(() =>
-    !!this.searchControl.value || this.selectedCategoryId() != null ||
+    !!this.searchTerm() || this.selectedCategoryId() != null ||
     this.typeFilter() !== 'all' || !!this.dateFromFilter() || !!this.dateToFilter()
   );
 
@@ -404,8 +407,11 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
       error: () => this.loadingInvoices.set(false),
     });
     this.searchControl.valueChanges.pipe(
-      debounceTime(400), distinctUntilChanged(), takeUntil(this.destroy$),
-    ).subscribe(() => { this.currentPage.set(1); this.loadPage(); });
+      takeUntil(this.destroy$),
+    ).subscribe(value => {
+      this.searchTerm.set((value ?? '').trim().toLowerCase());
+      this.currentPage.set(1);
+    });
   }
 
   ngOnDestroy(): void { this.destroy$.next(); this.destroy$.complete(); }
@@ -415,6 +421,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     this.selectedCategoryId.set(null);
     this.currentPage.set(1);
     this.searchControl.setValue('', { emitEvent: false });
+    this.searchTerm.set('');
     this.chartData.set(null);
     this.loadPage(invoice);
     this.loadChart(invoice);
@@ -534,7 +541,6 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     this.cardSvc.getInvoiceExpenses(
       this.cardId, inv.invoice_month, inv.invoice_year,
       this.selectedCategoryId() ?? undefined, this.currentPage(), this.pageSize,
-      this.searchControl.value || undefined,
     ).subscribe({
       next:  data => { this.invoiceData.set(data); this.loadingExpenses.set(false); },
       error: ()   => this.loadingExpenses.set(false),
