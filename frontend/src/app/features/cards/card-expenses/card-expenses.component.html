@@ -1,4 +1,4 @@
-<div class="inv-page">
+﻿<div class="inv-page">
 
   <!-- ============ HEADER ============ -->
   <header class="inv-head">
@@ -185,14 +185,14 @@
       }
     </div>
 
-  <!-- ============ INDIVIDUAL EXPENSES ============ -->
-  <section class="ind-section" aria-label="Gastos individuais da fatura">
+  <!-- ============ COMBINED EXPENSES (INDIVIDUAL + COMPARTILHADO) ============ -->
+  <section class="ind-section" aria-label="Gastos da fatura">
     <header class="ind-section__head">
       <div>
-        <h2 class="sec-title sec-title--flush">Gastos Individuais da Fatura</h2>
-        <p class="ind-section__sub">Lan&ccedil;amentos exclusivos que comp&otilde;em sua parte direta</p>
+        <h2 class="sec-title sec-title--flush">Gastos da Fatura</h2>
+        <p class="ind-section__sub">Lan&ccedil;amentos individuais e compartilhados desta fatura (valor integral)</p>
       </div>
-      <span class="chip chip--total mono">Total: {{ formatAmount(expensesTotal()) }}</span>
+      <span class="chip chip--total mono">Total: {{ formatAmount(combinedFilteredTotal()) }}</span>
     </header>
 
     <div class="filters">
@@ -219,6 +219,33 @@
           <option [value]="cat.category_id" [selected]="selectedCategoryId() === cat.category_id">{{ cat.category_name }}</option>
         }
       </select>
+
+      <select class="filters__select" (change)="onTypeFilterChange($event)" aria-label="Filtrar por tipo">
+        <option value="all" [selected]="typeFilter() === 'all'">Todos os tipos</option>
+        <option value="individual" [selected]="typeFilter() === 'individual'">Individual</option>
+        <option value="compartilhado" [selected]="typeFilter() === 'compartilhado'">Compartilhado</option>
+      </select>
+
+      <input
+        class="filters__select filters__date"
+        type="date"
+        [value]="dateFromFilter()"
+        (change)="onDateFromChange($event)"
+        aria-label="Data inicial"
+        title="Data inicial"
+      />
+      <input
+        class="filters__select filters__date"
+        type="date"
+        [value]="dateToFilter()"
+        (change)="onDateToChange($event)"
+        aria-label="Data final"
+        title="Data final"
+      />
+
+      @if (hasActiveFilters()) {
+        <button type="button" class="btn btn--secondary btn--sm" (click)="clearAllFilters()">Limpar filtros</button>
+      }
     </div>
 
     @if (loadingExpenses()) {
@@ -228,24 +255,25 @@
         <p class="empty-state__title">Selecione uma fatura</p>
         <p class="empty-state__text">Escolha uma fatura acima para ver os gastos.</p>
       </div>
-    } @else if (!filteredExpenses().length) {
+    } @else if (!combinedFiltered().length) {
       <div class="empty-state">
         <p class="empty-state__title">Nenhum gasto encontrado</p>
         <p class="empty-state__text">
-          @if (selectedCategoryId() || searchControl.value) {
-            Tente ajustar os filtros de busca ou categoria.
+          @if (hasActiveFilters()) {
+            Tente ajustar os filtros de busca, tipo, categoria ou data.
           } @else {
-            Esta fatura n&atilde;o possui gastos individuais.
+            Esta fatura n&atilde;o possui gastos.
           }
         </p>
       </div>
     } @else {
       <div class="panel panel--flush">
         <div class="data-table-wrapper">
-          <table class="data-table ind-table" aria-label="Gastos individuais da fatura">
+          <table class="data-table ind-table" aria-label="Gastos da fatura">
             <thead>
               <tr>
                 <th scope="col">Descri&ccedil;&atilde;o</th>
+                <th scope="col">Tipo</th>
                 <th scope="col">Categoria</th>
                 <th scope="col">Data</th>
                 <th scope="col" class="text-right">Valor</th>
@@ -253,61 +281,149 @@
               </tr>
             </thead>
             <tbody>
-              @for (e of filteredExpenses(); track e.id; let i = $index) {
-                <tr>
-                  <td>
-                    <span class="ind-table__desc">{{ e.description }}</span>
-                    @if (installmentBadge(e); as badge) {
-                      <span class="ind-table__note">Parcela {{ badge }}</span>
-                    }
-                  </td>
-                  <td>
-                    @if (e.category) {
-                      <span class="cat-badge" [style.--c-color]="catColor(i)">{{ e.category.name }}</span>
-                    } @else {
-                      <span class="text-muted">&mdash;</span>
-                    }
-                  </td>
-                  <td class="mono ind-table__date">{{ formatDateFull(e.date) }}</td>
-                  <td class="text-right"><span class="mono ind-table__value">{{ formatAmount(e.amount) }}</span></td>
-                  <td class="text-right">
-                    <div class="row-actions">
-                      <a
-                        [routerLink]="['/expenses', e.id, 'edit']"
-                        class="icon-btn"
-                        [attr.aria-label]="'Editar ' + e.description"
-                        title="Editar"
+              @for (row of combinedPageRows(); track row.key; let i = $index) {
+                @if (row.kind === 'compartilhado' && editingSharedId() === row.sharedEntry?.id && editDraft(); as draft) {
+                  <tr class="ind-table__edit-row">
+                    <td>
+                      <input
+                        class="ind-table__edit-input"
+                        type="text"
+                        [value]="draft.description"
+                        (input)="updateEditDraft({ description: $any($event.target).value })"
+                        aria-label="Descricao"
+                      />
+                    </td>
+                    <td><span class="type-badge type-badge--shared">Compartilhado</span></td>
+                    <td>
+                      <select
+                        class="ind-table__edit-input"
+                        (change)="updateEditDraft({ category_id: $any($event.target).value ? +$any($event.target).value : null })"
+                        aria-label="Categoria"
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                          <path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-                        </svg>
-                      </a>
-                      <button
-                        type="button"
-                        class="icon-btn icon-btn--danger"
-                        (click)="deleteExpense(e)"
-                        [attr.aria-label]="'Excluir ' + e.description"
-                        title="Excluir"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                          <path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path>
-                          <path d="M10 11v6"></path><path d="M14 11v6"></path>
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                        <option value="">Sem categoria</option>
+                        @for (cat of allCategories(); track cat.id) {
+                          <option [value]="cat.id" [selected]="draft.category_id === cat.id">{{ cat.name }}</option>
+                        }
+                      </select>
+                    </td>
+                    <td>
+                      <input
+                        class="ind-table__edit-input"
+                        type="date"
+                        [value]="draft.date"
+                        (change)="updateEditDraft({ date: $any($event.target).value })"
+                        aria-label="Data"
+                      />
+                    </td>
+                    <td class="text-right">
+                      <input
+                        class="ind-table__edit-input ind-table__edit-input--amount"
+                        type="number"
+                        step="0.01"
+                        [value]="draft.amount"
+                        (input)="updateEditDraft({ amount: +$any($event.target).value })"
+                        aria-label="Valor"
+                      />
+                    </td>
+                    <td class="text-right">
+                      <div class="row-actions">
+                        <button type="button" class="btn btn--primary btn--sm" [disabled]="savingEdit()" (click)="saveEditShared()">Salvar</button>
+                        <button type="button" class="btn btn--secondary btn--sm" [disabled]="savingEdit()" (click)="cancelEditShared()">Cancelar</button>
+                      </div>
+                    </td>
+                  </tr>
+                } @else {
+                  <tr>
+                    <td>
+                      <span class="ind-table__desc">{{ row.description }}</span>
+                      @if (row.installmentBadge; as badge) {
+                        <span class="ind-table__note">Parcela {{ badge }}</span>
+                      }
+                      @if (row.groupName) {
+                        <span class="ind-table__note">{{ row.groupName }}</span>
+                      }
+                    </td>
+                    <td>
+                      @if (row.kind === 'individual') {
+                        <span class="type-badge type-badge--individual">Individual</span>
+                      } @else {
+                        <span class="type-badge type-badge--shared">Compartilhado</span>
+                      }
+                    </td>
+                    <td>
+                      @if (row.categoryName) {
+                        <span class="cat-badge" [style.--c-color]="catColor(i)">{{ row.categoryName }}</span>
+                      } @else {
+                        <span class="text-muted">&mdash;</span>
+                      }
+                    </td>
+                    <td class="mono ind-table__date">{{ formatDateFull(row.date) }}</td>
+                    <td class="text-right"><span class="mono ind-table__value">{{ formatAmount(row.amount) }}</span></td>
+                    <td class="text-right">
+                      <div class="row-actions">
+                        @if (row.kind === 'individual' && row.expense; as e) {
+                          <a
+                            [routerLink]="['/expenses', e.id, 'edit']"
+                            class="icon-btn"
+                            [attr.aria-label]="'Editar ' + e.description"
+                            title="Editar"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                            </svg>
+                          </a>
+                          <button
+                            type="button"
+                            class="icon-btn icon-btn--danger"
+                            (click)="deleteExpense(e)"
+                            [attr.aria-label]="'Excluir ' + e.description"
+                            title="Excluir"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path>
+                              <path d="M10 11v6"></path><path d="M14 11v6"></path>
+                            </svg>
+                          </button>
+                        } @else {
+                          <button
+                            type="button"
+                            class="icon-btn"
+                            (click)="startEditShared(row)"
+                            [attr.aria-label]="'Editar ' + row.description"
+                            title="Editar"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            class="icon-btn icon-btn--danger"
+                            (click)="deleteSharedEntry(row)"
+                            [attr.aria-label]="'Excluir ' + row.description"
+                            title="Excluir"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path>
+                              <path d="M10 11v6"></path><path d="M14 11v6"></path>
+                            </svg>
+                          </button>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
               }
             </tbody>
           </table>
         </div>
       </div>
 
-      @if (pagination() && pagination()!.total_pages > 1) {
+      @if (combinedTotalPages() > 1) {
         <nav class="pagination" aria-label="Paginacao de gastos">
           <button type="button" class="btn btn--secondary btn--sm" [disabled]="currentPage()===1" (click)="changePage(1)" aria-label="Primeira pagina">&laquo;</button>
           <button type="button" class="btn btn--secondary btn--sm" [disabled]="currentPage()===1" (click)="changePage(currentPage()-1)" aria-label="Pagina anterior">&lsaquo;</button>
-          @for (p of pageRange(); track p) {
+          @for (p of combinedPageRange(); track p) {
             <button
               type="button"
               class="btn btn--sm"
@@ -317,10 +433,10 @@
               [attr.aria-current]="p === currentPage() ? 'page' : null"
             >{{ p }}</button>
           }
-          <button type="button" class="btn btn--secondary btn--sm" [disabled]="currentPage()===pagination()!.total_pages" (click)="changePage(currentPage()+1)" aria-label="Proxima pagina">&rsaquo;</button>
-          <button type="button" class="btn btn--secondary btn--sm" [disabled]="currentPage()===pagination()!.total_pages" (click)="changePage(pagination()!.total_pages)" aria-label="Ultima pagina">&raquo;</button>
+          <button type="button" class="btn btn--secondary btn--sm" [disabled]="currentPage()===combinedTotalPages()" (click)="changePage(currentPage()+1)" aria-label="Proxima pagina">&rsaquo;</button>
+          <button type="button" class="btn btn--secondary btn--sm" [disabled]="currentPage()===combinedTotalPages()" (click)="changePage(combinedTotalPages())" aria-label="Ultima pagina">&raquo;</button>
           <span class="pagination__info">
-            P&aacute;gina {{ currentPage() }} de {{ pagination()!.total_pages }} &middot; {{ pagination()!.total_count }} gastos
+            P&aacute;gina {{ currentPage() }} de {{ combinedTotalPages() }} &middot; {{ combinedFilteredCount() }} gastos
           </span>
         </nav>
       }

@@ -818,6 +818,46 @@
 
 .row-actions { display: inline-flex; gap: 6px; justify-content: flex-end; }
 
+.filters__date {
+  flex: 0 1 160px;
+  padding: 11px 14px;
+  border: 1px solid var(--inv-line);
+  border-radius: 12px;
+  background: var(--color-canvas);
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-ink);
+
+  &:focus { outline: none; border-color: var(--inv-blue); box-shadow: 0 0 0 3px rgba(0, 82, 255, 0.12); }
+}
+
+.type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--rounded-pill);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.type-badge--individual { color: #0052ff; background: rgba(0, 82, 255, 0.12); }
+.type-badge--shared { color: #0a9d5c; background: rgba(10, 157, 92, 0.12); }
+
+.ind-table__edit-row td { padding-top: 10px; padding-bottom: 10px; background: var(--color-surface-soft); }
+.ind-table__edit-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--inv-line);
+  border-radius: 8px;
+  background: var(--color-canvas);
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-ink);
+
+  &:focus { outline: none; border-color: var(--inv-blue); box-shadow: 0 0 0 3px rgba(0, 82, 255, 0.12); }
+}
+.ind-table__edit-input--amount { text-align: right; }
+
 .icon-btn {
   width: 32px;
   height: 32px;
