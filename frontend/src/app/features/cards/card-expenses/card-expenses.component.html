@@ -94,33 +94,6 @@
         </div>
       </article>
 
-      <article class="sum-card">
-        <h2 class="sum-card__label"><span class="dot dot--blue" aria-hidden="true"></span> Individual</h2>
-        <p class="sum-card__caption">Gastos exclusivos seus nesta fatura</p>
-        <div class="sum-card__panel">
-          <span class="sum-card__panel-title">Total</span>
-          <strong class="sum-card__hero-value mono">{{ formatAmount(expensesTotal()) }}</strong>
-        </div>
-        <p class="sum-card__foot">{{ totalTransactions() }} lan&ccedil;amentos</p>
-      </article>
-
-      <article class="sum-card">
-        <h2 class="sum-card__label"><span class="dot dot--green" aria-hidden="true"></span> Compartilhado</h2>
-        <p class="sum-card__caption">Sua parte = <strong class="mono">{{ formatAmount(sharedTotal()) }}</strong></p>
-        <div class="sum-card__panel sum-card__panel--green">
-          <span class="sum-card__panel-title">Sua parte por grupo</span>
-          @for (g of sharedGroups(); track g.group_id; let i = $index) {
-            <div class="sum-card__line">
-              <span class="dot" [style.background]="groupColor(i)" aria-hidden="true"></span>
-              <span class="sum-card__line-label">{{ g.group_name }}</span>
-              <span class="sum-card__line-value mono">{{ formatAmount(g.myPortionTotal) }}</span>
-            </div>
-          } @empty {
-            <p class="sum-card__empty">Nenhum grupo nesta fatura</p>
-          }
-        </div>
-      </article>
-
     </section>
   }
   <!-- ============ ANALYSIS ============ -->
@@ -275,7 +248,26 @@
                 <th scope="col">Descri&ccedil;&atilde;o</th>
                 <th scope="col">Tipo</th>
                 <th scope="col">Categoria</th>
-                <th scope="col">Data</th>
+                <th scope="col">
+                  <button
+                    type="button"
+                    class="th-sort-btn"
+                    (click)="toggleDateSort()"
+                    [attr.aria-label]="dateSortDir() === 'asc' ? 'Ordenar datas de forma decrescente' : 'Ordenar datas de forma crescente'"
+                    [title]="dateSortDir() === 'asc' ? 'Data (crescente) - clique para inverter' : 'Data (decrescente) - clique para inverter'"
+                  >
+                    Data
+                    @if (dateSortDir() === 'asc') {
+                      <svg class="th-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 19V5"></path><path d="m5 12 7-7 7 7"></path>
+                      </svg>
+                    } @else {
+                      <svg class="th-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path>
+                      </svg>
+                    }
+                  </button>
+                </th>
                 <th scope="col" class="text-right">Valor</th>
                 <th scope="col" class="text-right">A&ccedil;&otilde;es</th>
               </tr>
