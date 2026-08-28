@@ -189,16 +189,22 @@ class InvoiceExpensesBehavior:
         if self.search:
             qs = qs.filter(description__icontains=self.search)
 
-        agg = qs.aggregate(total=Sum(Abs('amount')), count=Count('id'))
-        grand_total = round(float(agg['total'] or 0), 2)
+        agg = qs.aggregate(total=Sum('amount'), count=Count('id'))
+        # amount e negativo para despesa e positivo para credito/estorno.
+        # Somar com sinal faz o credito ABATER a fatura, como no extrato
+        # do banco. Com Abs() um estorno era somado como se fosse gasto.
+        grand_total = round(-float(agg['total'] or 0), 2)
 
         # Breakdown sempre do período completo (sem filtro de categoria)
         base_qs = Expense.objects.filter(**base_filter)
+        # Creditos nao pertencem a nenhuma categoria de gasto: incluir
+        # um estorno aqui inflaria a categoria e quebraria os percentuais.
+        debit_qs = base_qs.filter(amount__lt=0)
         period_total = round(
-            float(base_qs.aggregate(t=Sum(Abs('amount')))['t'] or 0), 2
+            float(debit_qs.aggregate(t=Sum(Abs('amount')))['t'] or 0), 2
         )
         cat_rows = (
-            base_qs
+            debit_qs
             .values('category_id', 'category__name')
             .annotate(cat_total=Sum(Abs('amount')), cat_count=Count('id'))
             .order_by('-cat_total')
@@ -368,7 +374,7 @@ class OpenInvoicesBehavior:
                     date__gte=period_start,
                     date__lte=period_end,
                 )
-                .aggregate(total=Sum(Abs('amount')), count=Count('id'))
+                .aggregate(total=Sum('amount'), count=Count('id'))
             )
 
             days_to_close = (period_end - date.today()).days
@@ -384,7 +390,7 @@ class OpenInvoicesBehavior:
                 'period_end': period_end.isoformat(),
                 'due_date': due.isoformat(),
                 'days_to_close': days_to_close,
-                'total': round(float(agg['total'] or 0), 2),
+                'total': round(-float(agg['total'] or 0), 2),
                 'count': agg['count'] or 0,
             })
 
