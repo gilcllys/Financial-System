@@ -454,9 +454,6 @@
               <h3 class="shared-panel__title">D&iacute;vidas Compartilhadas</h3>
               <span class="chip chip--ghost">{{ sharedGroups().length }} grupos</span>
             </div>
-            <span class="shared-panel__caption">Sua parte total</span>
-            <strong class="shared-panel__hero mono">{{ formatAmount(sharedTotal()) }}</strong>
-            <span class="shared-panel__sub">Soma de {{ sharedGroups().length }} grupos compartilhados</span>
           </header>
 
           <div class="shared-tabs" role="tablist" aria-label="Grupos compartilhados">
@@ -484,11 +481,6 @@
                   <p class="shared-body__name">{{ g.group_name }}</p>
                   <p class="shared-body__meta">{{ g.participants.length }} participantes</p>
                 </div>
-              </div>
-
-              <div class="shared-body__mine">
-                <span class="shared-body__mine-label">Sua parte neste grupo</span>
-                <strong class="shared-body__mine-value mono">{{ formatAmount(g.myPortionTotal) }}</strong>
               </div>
 
               <div class="split-bar" role="img" [attr.aria-label]="'Divisao do grupo ' + g.group_name">

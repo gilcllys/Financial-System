@@ -456,24 +456,7 @@
   margin-bottom: var(--space-xs);
 }
 
-.shared-panel__title { margin: 0; font-size: 14px; font-weight: 600; }
-
-.shared-panel__caption {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.shared-panel__hero {
-  font-size: 30px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
-}
-
-.shared-panel__sub { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
+.shared-panel__title { margin: 0; font-size: 14px; font-weight: 600; color: #fff; }
 
 .shared-tabs {
   display: flex;
@@ -537,27 +520,6 @@
 .shared-body__name { margin: 0; font-size: 14px; font-weight: 600; color: var(--color-ink); }
 .shared-body__meta { margin: 0; font-size: 12px; color: var(--color-muted); }
 
-.shared-body__mine {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: var(--inv-green-soft);
-}
-.shared-body__mine-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-muted);
-}
-.shared-body__mine-value {
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--color-ink);
-}
 
 .split-bar {
   display: flex;
@@ -927,7 +889,6 @@
   .analysis__charts { grid-template-columns: minmax(0, 1fr); }
   .inv-head__title { font-size: 18px; }
   .sum-card__hero-value { font-size: 26px; }
-  .shared-panel__hero { font-size: 26px; }
   .ind-table th, .ind-table td { padding: 12px var(--space-sm); }
   .pagination__info { margin-left: 0; width: 100%; }
 }
