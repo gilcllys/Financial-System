@@ -539,40 +539,6 @@
         </section>
       }
 
-      @if (invoiceData()?.by_category?.length) {
-        <section class="panel" aria-label="Distribuicao por categorias">
-          <header class="panel__head">
-            <h3 class="panel__title">Distribui&ccedil;&atilde;o por Categorias</h3>
-            @if (selectedCategoryId()) {
-              <button type="button" class="panel__clear" (click)="selectCategory(null)">Limpar</button>
-            }
-          </header>
-          <ul class="cat-list">
-            @for (cat of invoiceData()!.by_category; track cat.category_id; let i = $index) {
-              <li>
-                <button
-                  type="button"
-                  class="cat-item"
-                  [class.cat-item--active]="selectedCategoryId() === cat.category_id"
-                  [style.--c-color]="catColor(i)"
-                  [attr.aria-pressed]="selectedCategoryId() === cat.category_id"
-                  (click)="selectCategory(selectedCategoryId() === cat.category_id ? null : cat.category_id)"
-                >
-                  <span class="cat-item__top">
-                    <span class="dot" [style.background]="catColor(i)" aria-hidden="true"></span>
-                    <span class="cat-item__name">{{ cat.category_name }}</span>
-                    <span class="cat-item__value mono">{{ formatAmount(cat.total) }} <em>({{ roundPct(cat.percentage) }}%)</em></span>
-                  </span>
-                  <span class="cat-item__track" role="progressbar" [attr.aria-valuenow]="roundPct(cat.percentage)" aria-valuemin="0" aria-valuemax="100">
-                    <span class="cat-item__fill" [style.width.%]="cat.percentage"></span>
-                  </span>
-                </button>
-              </li>
-            }
-          </ul>
-        </section>
-      }
-
     </aside>
 
   </div>
