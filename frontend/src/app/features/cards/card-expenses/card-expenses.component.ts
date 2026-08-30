@@ -391,7 +391,6 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     this.cardId = +this.route.snapshot.paramMap.get('id')!;
     this.cardSvc.get(this.cardId).subscribe({ next: c => this.card.set(c) });
     this.cardSvc.getAllCardExpenses(this.cardId).subscribe({ next: e => this.allCardExpenses.set(e) });
-    this.sharedSvc.listEntries({ credit_card: this.cardId }).subscribe({ next: res => this.sharedEntries.set(res.results) });
     this.categorySvc.list().subscribe({ next: cats => this.allCategories.set(cats) });
     this.cardSvc.getInvoices(this.cardId).subscribe({
       next: invoices => {
@@ -402,6 +401,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
           this.selectedInvoice.set(current);
           this.loadPage(current);
           this.loadChart(current);
+          this.loadSharedEntries(current);
         }
       },
       error: () => this.loadingInvoices.set(false),
@@ -425,6 +425,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     this.chartData.set(null);
     this.loadPage(invoice);
     this.loadChart(invoice);
+    this.loadSharedEntries(invoice);
   }
 
   selectCategory(categoryId: number | null): void { this.selectedCategoryId.set(categoryId); this.currentPage.set(1); this.loadPage(); }
@@ -527,10 +528,45 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     });
   }
 
-  private reloadSharedEntries(): void {
-    this.sharedSvc.listEntries({ credit_card: this.cardId }).subscribe({
-      next: res => this.sharedEntries.set(res.results),
+  /**
+   * Busca os compartilhados do cartao dentro do PERIODO DA FATURA selecionada
+   * (start_date/end_date), nao month/year solto e sem filtro de data.
+   *
+   * A tabela "Gastos da Fatura" nao tem controle de pagina para o tipo
+   * Compartilhado: se parasse na 1a pagina do backend (page_size=20),
+   * lancamentos antigos do MESMO periodo ficavam presos numa pagina 2 que a
+   * UI nunca pedia, sempre que havia parcelas futuras (data maior) ocupando
+   * a pagina 1 por causa da ordenacao decrescente por data. Por isso este
+   * metodo pagina ate esgotar `next`, acumulando TODO o periodo da fatura de
+   * uma vez (a paginacao da tabela em si e so client-side, sobre este total).
+   */
+  private loadSharedEntries(invoice: Invoice): void {
+    this.fetchSharedEntriesPage(invoice, 1, []);
+  }
+
+  private fetchSharedEntriesPage(invoice: Invoice, page: number, acc: SharedDebtEntry[]): void {
+    this.sharedSvc.listEntries({
+      credit_card: this.cardId,
+      start_date: invoice.period_start,
+      end_date: invoice.period_end,
+      page,
+      page_size: 100,
+    }).subscribe({
+      next: res => {
+        const merged = [...acc, ...res.results];
+        if (res.next) {
+          this.fetchSharedEntriesPage(invoice, page + 1, merged);
+        } else {
+          this.sharedEntries.set(merged);
+        }
+      },
+      error: () => this.sharedEntries.set(acc),
     });
+  }
+
+  private reloadSharedEntries(): void {
+    const inv = this.selectedInvoice();
+    if (inv) this.loadSharedEntries(inv);
   }
 
   private loadPage(invoice?: Invoice): void {
