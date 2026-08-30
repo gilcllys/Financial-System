@@ -1,4 +1,4 @@
-﻿import { Routes } from '@angular/router';
+import { Routes } from '@angular/router';
 import { LayoutComponent } from './layout/layout.component';
 import { authGuard } from './core/auth/auth.guard';
 
@@ -76,6 +76,13 @@ export const routes: Routes = [
         path: 'categories/:id/edit',
         loadComponent: () =>
           import('./features/categories/category-form/category-form.component').then(m => m.CategoryFormComponent),
+      },
+
+      // Gastos Fixos (recorrentes)
+      {
+        path: 'recurring-expenses',
+        loadComponent: () =>
+          import('./features/recurring-expenses/recurring-expenses.component').then(m => m.RecurringExpensesComponent),
       },
 
       // Installments

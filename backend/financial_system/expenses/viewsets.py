@@ -1235,13 +1235,17 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         s.is_valid(raise_exception=True)
         return behavior.create({**dict(s.validated_data), 'tenant_id': request.user.tenant_id})
 
-    @action(detail=False, methods=['delete', 'patch'],
+    @action(detail=False, methods=['delete', 'patch', 'put'],
             url_path=r'recurring-templates/(?P<tpl_id>[0-9]+)')
     def recurring_template_detail(self, request, tpl_id=None):
-        """DELETE: excluir, PATCH: toggle is_active"""
+        """DELETE: excluir, PATCH: toggle is_active, PUT: editar"""
         behavior = RecurringExpenseBehavior(request.user.tenant_id)
         if request.method == 'DELETE':
             return behavior.delete(int(tpl_id))
+        if request.method == 'PUT':
+            s = serializer.CreateRecurringExpenseInputSerializer(data=request.data)
+            s.is_valid(raise_exception=True)
+            return behavior.update(int(tpl_id), dict(s.validated_data))
         return behavior.toggle_active(int(tpl_id))
 
     @action(detail=False, methods=['post'], url_path='recurring-templates/generate-month')

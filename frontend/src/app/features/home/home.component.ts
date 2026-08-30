@@ -2,7 +2,6 @@ import {
   Component, OnInit, OnDestroy, AfterViewInit,
   ElementRef, ViewChild, inject, signal, computed, effect
 } from '@angular/core';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DatePipe, SlicePipe } from '@angular/common';
@@ -11,9 +10,8 @@ import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
 import { HomeService, InstallmentGroup } from '../../core/services/home.service';
 import { CategoryService } from '../../core/services/category.service';
 import { AnalyticsService, MonthlyAnalytics, CategoryAnalytics, ConsolidatedSummary } from '../../core/services/analytics.service';
-import { OpenInvoice, Expense, ExpenseCategory, CreditCard } from '../../core/models';
-import { ExpenseService, RecurringExpenseTemplate, GenerateMonthResult } from '../../core/services/expense.service';
-import { CardService } from '../../core/services/card.service';
+import { OpenInvoice, Expense, ExpenseCategory } from '../../core/models';
+import { ExpenseService, RecurringExpenseTemplate } from '../../core/services/expense.service';
 import * as d3 from 'd3';
 import { SharedDebtService, SharedDebtHomeSummary, SharedDebtEntry } from '../../core/services/shared-debt.service';
 
@@ -33,7 +31,7 @@ const EMPTY_CONSOLIDATED: ConsolidatedSummary = {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CurrencyPipe, ReactiveFormsModule, RouterLink, FormsModule, SlicePipe, DatePipe],
+  imports: [CurrencyPipe, RouterLink, FormsModule, SlicePipe, DatePipe],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss'],
 })
@@ -44,31 +42,8 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   private analyticsService = inject(AnalyticsService);
   private sharedDebtService = inject(SharedDebtService);
   private expSvc = inject(ExpenseService);
-  private cardService = inject(CardService);
-  private fb = inject(FormBuilder);
 
   recurringTemplates = signal<RecurringExpenseTemplate[]>([]);
-  showRecurringSection = signal(false);
-  showRecurringForm = signal(false);
-  savingRecurring = signal(false);
-  recurringError = signal('');
-  generateResult = signal<GenerateMonthResult | null>(null);
-  recurringForm = this.fb.group({
-    description: ['', Validators.required],
-    amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
-    day_of_month: [1, [Validators.required, Validators.min(1), Validators.max(28)]],
-    payment_method: ['dinheiro' as 'dinheiro' | 'cartao', Validators.required],
-    credit_card_id: [null as number | null],
-    category_id: [null as number | null],
-  });
-
-  /** Cartoes do usuario, para o gasto fixo pago no cartao. */
-  creditCards = signal<CreditCard[]>([]);
-
-  /** cartao => credit_card_id obrigatorio, espelhando a regra do backend. */
-  get recurringIsCartao(): boolean {
-    return this.recurringForm.value.payment_method === 'cartao';
-  }
   private destroy$         = new Subject<void>();
   private searchSubject    = new Subject<string>();
 
@@ -130,7 +105,6 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   // ────────────────────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.categoryService.list().subscribe({ next: cats => this.categories.set(cats) });
-    this.cardService.list().subscribe({ next: cards => this.creditCards.set(cards) });
 
     this.searchSubject.pipe(
       debounceTime(400),
@@ -477,46 +451,12 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  saveRecurring(): void {
-    if (this.recurringForm.invalid) { this.recurringForm.markAllAsTouched(); return; }
-    if (this.recurringIsCartao && !this.recurringForm.value.credit_card_id) {
-      this.recurringError.set('Selecione o cartao para um gasto fixo pago no cartao.');
-      return;
-    }
-    this.recurringError.set('');
-    this.savingRecurring.set(true);
-    const v = this.recurringForm.getRawValue();
-    this.expSvc.createRecurringTemplate({
-      description: v.description!,
-      amount: v.amount!,
-      day_of_month: v.day_of_month ?? 1,
-      payment_method: v.payment_method! as 'dinheiro' | 'cartao',
-      credit_card_id: v.payment_method === 'cartao' ? v.credit_card_id : null,
-      category_id: v.category_id,
-    }).subscribe({
-      next: () => {
-        this.savingRecurring.set(false);
-        this.showRecurringForm.set(false);
-        this.recurringForm.reset({ description: '', amount: null, day_of_month: 1, payment_method: 'dinheiro', credit_card_id: null, category_id: null });
-        this.loadRecurringTemplates();
-      },
-      error: err => { this.savingRecurring.set(false); this.recurringError.set(err?.error?.detail ?? 'Erro.'); },
-    });
-  }
-
   deleteRecurring(id: number): void {
     this.expSvc.deleteRecurringTemplate(id).subscribe({ next: () => this.loadRecurringTemplates() });
   }
 
   toggleRecurring(id: number): void {
     this.expSvc.toggleRecurringTemplate(id).subscribe({ next: () => this.loadRecurringTemplates() });
-  }
-
-  generateCurrentMonth(): void {
-    const now = new Date();
-    this.expSvc.generateMonthRecurring(now.getMonth() + 1, now.getFullYear()).subscribe({
-      next: res => { this.generateResult.set(res); this.loadDashboard(); },
-    });
   }
 
 }

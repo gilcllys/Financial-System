@@ -1,0 +1,230 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-header__title">Gastos Fixos</h1>
+    <p class="page-header__subtitle">
+      Cadastre o que se repete todo mês. Ao gerar os lançamentos, eles viram despesas reais
+      e aparecem no Histórico &mdash; e na fatura do cartão, quando houver um atribuído.
+    </p>
+  </div>
+  <div class="page-header__actions">
+    <button class="btn btn--primary btn--sm" type="button" (click)="openCreate()">+ Novo Gasto Fixo</button>
+  </div>
+</div>
+
+<!-- Resumo -->
+<div class="kpi-grid kpi-grid--3">
+  <div class="kpi-clean-card">
+    <div class="kpi-clean-card__top">
+      <span class="kpi-clean-card__label">CUSTO FIXO MENSAL</span>
+    </div>
+    <span class="kpi-clean-card__value mono">{{ fmtCur(monthlyTotal()) }}</span>
+    <span class="kpi-clean-card__hint">{{ activeTemplates().length }} ativo(s)</span>
+  </div>
+  <div class="kpi-clean-card">
+    <div class="kpi-clean-card__top">
+      <span class="kpi-clean-card__label">NO CARTÃO</span>
+    </div>
+    <span class="kpi-clean-card__value mono">{{ fmtCur(cardTotal()) }}</span>
+    <span class="kpi-clean-card__hint">entra na fatura</span>
+  </div>
+  <div class="kpi-clean-card">
+    <div class="kpi-clean-card__top">
+      <span class="kpi-clean-card__label">EM DINHEIRO</span>
+    </div>
+    <span class="kpi-clean-card__value mono">{{ fmtCur(cashTotal()) }}</span>
+    <span class="kpi-clean-card__hint">só no histórico</span>
+  </div>
+</div>
+
+<!-- Gerar lancamentos do mes -->
+<div class="card generate-card">
+  <div class="card__header">
+    <span class="card__title">Gerar lançamentos do mês</span>
+  </div>
+  <div class="card__body">
+    <p class="generate-card__help">
+      Cria uma despesa real para cada gasto fixo ativo. Rodar duas vezes no mesmo mês
+      não duplica: o que já existe é ignorado.
+    </p>
+    <div class="generate-card__controls">
+      <button class="btn btn--ghost btn--sm" type="button" (click)="shiftMonth(-1)" aria-label="Mês anterior">&lsaquo;</button>
+      <span class="generate-card__target">{{ targetLabel() }}</span>
+      <button class="btn btn--ghost btn--sm" type="button" (click)="shiftMonth(1)" aria-label="Próximo mês">&rsaquo;</button>
+      <button class="btn btn--primary btn--sm" type="button" (click)="generate()" [disabled]="generating() || activeTemplates().length === 0">
+        @if (generating()) { <span class="spinner"></span> }
+        Gerar lançamentos
+      </button>
+    </div>
+
+    @if (generateResult(); as res) {
+      <div class="generate-result">
+        @if (res.created.length) {
+          <div class="generate-result__block generate-result__block--ok">
+            <strong>{{ res.created.length }} lançamento(s) criado(s)</strong>
+            <span>{{ res.created.join(', ') }}</span>
+            <a routerLink="/history" class="btn-link">Ver no histórico</a>
+          </div>
+        }
+        @if (res.skipped.length) {
+          <div class="generate-result__block">
+            <strong>{{ res.skipped.length }} já existia(m)</strong>
+            <span>{{ res.skipped.join(', ') }}</span>
+          </div>
+        }
+        @if (res.skipped_invalid?.length) {
+          <div class="generate-result__block generate-result__block--warn">
+            <strong>{{ res.skipped_invalid?.length }} ignorado(s) por falta de cartão</strong>
+            <span>{{ res.skipped_invalid?.join(', ') }} &mdash; edite e atribua um cartão.</span>
+          </div>
+        }
+        @if (!res.created.length && !res.skipped.length && !res.skipped_invalid?.length) {
+          <div class="generate-result__block">Nenhum gasto fixo ativo para gerar.</div>
+        }
+      </div>
+    }
+  </div>
+</div>
+
+@if (invalidTemplates().length) {
+  <div class="form-error-box" style="margin-bottom: var(--space-base)">
+    {{ invalidTemplates().length }} gasto(s) fixo(s) estão marcados como cartão mas sem cartão atribuído.
+    Eles não serão gerados até que você edite e escolha o cartão.
+  </div>
+}
+
+<!-- Formulario -->
+@if (showForm()) {
+  <div class="card form-card">
+    <div class="card__header">
+      <span class="card__title">{{ editingId() === null ? 'Cadastrar Gasto Fixo' : 'Editar Gasto Fixo' }}</span>
+      <button class="btn btn--ghost btn--sm" type="button" (click)="closeForm()">Fechar</button>
+    </div>
+    <div class="card__body">
+      <form [formGroup]="form" (ngSubmit)="save()" novalidate class="form-body">
+        <div class="form-row">
+          <div class="form-group" style="flex:2">
+            <label class="form-label" for="rec-desc">Descrição</label>
+            <input id="rec-desc" class="form-input" type="text" formControlName="description" placeholder="Ex: Netflix, Aluguel"/>
+          </div>
+          <div class="form-group" style="flex:1">
+            <label class="form-label" for="rec-amount">Valor (R$)</label>
+            <input id="rec-amount" class="form-input" type="number" step="0.01" formControlName="amount"/>
+          </div>
+          <div class="form-group" style="width:110px">
+            <label class="form-label" for="rec-day">Dia do mês</label>
+            <input id="rec-day" class="form-input" type="number" min="1" max="28" formControlName="day_of_month"/>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Forma de pagamento</label>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="radio" formControlName="payment_method" value="dinheiro"/> Dinheiro
+              </label>
+              <label class="radio-option">
+                <input type="radio" formControlName="payment_method" value="cartao"/> Cartão
+              </label>
+            </div>
+          </div>
+          @if (isCartao) {
+            <div class="form-group" style="flex:1">
+              <label class="form-label" for="rec-card">Cartão</label>
+              <select id="rec-card" class="form-select" formControlName="credit_card_id">
+                <option [ngValue]="null">Selecione o cartão</option>
+                @for (card of creditCards(); track card.id) {
+                  <option [ngValue]="card.id">{{ card.name }}</option>
+                }
+              </select>
+            </div>
+          }
+          <div class="form-group" style="flex:1">
+            <label class="form-label" for="rec-cat">Categoria</label>
+            <select id="rec-cat" class="form-select" formControlName="category_id">
+              <option [ngValue]="null">Sem categoria</option>
+              @for (cat of categories(); track cat.id) {
+                <option [ngValue]="cat.id">{{ cat.name }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        @if (error()) { <div class="form-error-box">{{ error() }}</div> }
+        <div class="form-actions">
+          <button class="btn btn--primary btn--sm" type="submit" [disabled]="saving()">
+            @if (saving()) { <span class="spinner"></span> }
+            {{ editingId() === null ? 'Salvar gasto fixo' : 'Salvar alterações' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- Lista -->
+<div class="card">
+  <div class="card__header">
+    <span class="card__title">Cadastrados</span>
+  </div>
+  <div class="card__body">
+    @if (loading()) {
+      <p class="empty-msg">Carregando...</p>
+    } @else if (templates().length === 0) {
+      <p class="empty-msg">Nenhum gasto fixo cadastrado. Clique em &ldquo;Novo Gasto Fixo&rdquo; para começar.</p>
+    } @else {
+      <div class="data-table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Descrição</th>
+              <th>Categoria</th>
+              <th>Pagamento</th>
+              <th>Dia</th>
+              <th class="text-right">Valor</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (t of templates(); track t.id) {
+              <tr [class.row--paused]="!t.is_active">
+                <td class="cell--strong">{{ t.description }}</td>
+                <td>
+                  @if (t.category_name) {
+                    <span class="badge badge--primary">{{ t.category_name }}</span>
+                  } @else {
+                    <span class="text-muted">Sem categoria</span>
+                  }
+                </td>
+                <td>
+                  @if (t.payment_method === 'cartao') {
+                    @if (t.credit_card_name) {
+                      <span class="badge">{{ t.credit_card_name }}</span>
+                    } @else {
+                      <span class="badge badge--danger">Cartão não definido</span>
+                    }
+                  } @else {
+                    <span class="text-muted">Dinheiro</span>
+                  }
+                </td>
+                <td class="mono text-muted">dia {{ t.day_of_month }}</td>
+                <td class="text-right mono">{{ fmtCur(absAmount(t)) }}</td>
+                <td>
+                  <span [class]="t.is_active ? 'badge badge--success' : 'badge badge--muted'">
+                    {{ t.is_active ? 'Ativo' : 'Pausado' }}
+                  </span>
+                </td>
+                <td class="cell--actions">
+                  <button class="btn btn--secondary btn--sm" type="button" (click)="openEdit(t)">Editar</button>
+                  <button class="btn btn--secondary btn--sm" type="button" (click)="toggle(t)">
+                    {{ t.is_active ? 'Pausar' : 'Ativar' }}
+                  </button>
+                  <button class="btn btn--danger btn--sm" type="button" (click)="remove(t)">Excluir</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>
