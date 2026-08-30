@@ -63,6 +63,7 @@ pip-delete-this-arg.txt
 # Media & Static files
 /media/               # User uploaded files (often handled by cloud storage in production)
 /static_root/         # Collected static files (often served by web server in production)
+backend/financial_system/staticfiles/  # collectstatic output (gerado ao rodar testes/build do backend)
 
 # Django specific
 *.pot                 # gettext translation files

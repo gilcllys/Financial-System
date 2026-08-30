@@ -63,7 +63,10 @@ describe('CardExpensesComponent [caracterizacao]', () => {
   let cardSvc: any;
   let sharedSvc: any;
 
-  function setup(opts: { invoiceData?: any; chartExpenses?: any[]; sharedEntries?: any[] } = {}) {
+  function setup(opts: {
+    invoiceData?: any; chartExpenses?: any[]; sharedEntries?: any[];
+    sharedEntriesFake?: (params: any) => any;
+  } = {}) {
     cardSvc = {
       get: jasmine.createSpy('get').and.returnValue(of({ id: 1, name: 'Bradesco' })),
       getAllCardExpenses: jasmine.createSpy('getAllCardExpenses').and.returnValue(of([])),
@@ -80,9 +83,18 @@ describe('CardExpensesComponent [caracterizacao]', () => {
       ),
     };
     sharedSvc = {
-      listEntries: jasmine.createSpy('listEntries').and.returnValue(
-        of({ results: opts.sharedEntries ?? [], count: (opts.sharedEntries ?? []).length }),
+      listEntries: jasmine.createSpy('listEntries').and.callFake((params: any) =>
+        opts.sharedEntriesFake
+          ? opts.sharedEntriesFake(params)
+          : of({
+              results: opts.sharedEntries ?? [],
+              count: (opts.sharedEntries ?? []).length,
+              next: null,
+              previous: null,
+            }),
       ),
+      updateEntry: jasmine.createSpy('updateEntry').and.returnValue(of({})),
+      deleteEntry: jasmine.createSpy('deleteEntry').and.returnValue(of(null)),
     };
 
     TestBed.configureTestingModule({
@@ -235,4 +247,59 @@ describe('CardExpensesComponent [caracterizacao]', () => {
       expect(c.currentPage()).toBe(1);
     });
   });
+  describe('sharedEntries: carregamento pelo periodo da fatura (bug do corte silencioso de paginacao)', () => {
+    it('busca por start_date/end_date do periodo da invoice selecionada, sem depender de month/year', () => {
+      setup({ sharedEntries: [sharedEntry({ id: 1 })] });
+      const params = sharedSvc.listEntries.calls.mostRecent().args[0];
+      expect(params.credit_card).toBe(1);
+      expect(params.start_date).toBe('2026-07-23');
+      expect(params.end_date).toBe('2026-08-21');
+      expect(params.month).toBeUndefined();
+      expect(params.year).toBeUndefined();
+    });
+
+    it('busca TODAS as paginas do periodo, sem perder lancamentos antigos empurrados para a pagina 2', () => {
+      const newer = sharedEntry({ id: 45, date: '2026-08-17', description: 'Milhas Livelo' });
+      const older = sharedEntry({ id: 10, date: '2026-07-24', description: 'Pet Love do Pitoco' });
+
+      const f = setup({
+        sharedEntriesFake: (params: any) =>
+          of((params.page ?? 1) === 1
+            ? { results: [newer], count: 2, next: 'http://x/shared-entries/?page=2', previous: null }
+            : { results: [older], count: 2, next: null, previous: null }),
+      });
+
+      const descriptions = f.componentInstance.filteredSharedEntries()
+        .map((e: any) => e.description).sort();
+      expect(descriptions).toEqual(['Milhas Livelo', 'Pet Love do Pitoco']);
+    });
+
+    it('recarrega pelo periodo da fatura (nao lista tudo) apos excluir um compartilhado', () => {
+      const f = setup({ sharedEntries: [] });
+      sharedSvc.listEntries.calls.reset();
+      spyOn(window, 'confirm').and.returnValue(true);
+
+      f.componentInstance.deleteSharedEntry({
+        sharedEntry: sharedEntry({ id: 99, description: 'Teste' }),
+      } as any);
+
+      const params = sharedSvc.listEntries.calls.mostRecent().args[0];
+      expect(params.start_date).toBe('2026-07-23');
+      expect(params.end_date).toBe('2026-08-21');
+    });
+
+    it('ao trocar de fatura (selectInvoice), busca os compartilhados do novo periodo', () => {
+      const f = setup({ sharedEntries: [] });
+      sharedSvc.listEntries.calls.reset();
+
+      f.componentInstance.selectInvoice(
+        invoice({ invoice_month: 8, invoice_year: 2026, period_start: '2026-06-23', period_end: '2026-07-22' }),
+      );
+
+      const params = sharedSvc.listEntries.calls.mostRecent().args[0];
+      expect(params.start_date).toBe('2026-06-23');
+      expect(params.end_date).toBe('2026-07-22');
+    });
+  });
 });
+
