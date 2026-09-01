@@ -1,10 +1,7 @@
-import calendar
 import re
 from datetime import date
 
 from django.db import transaction
-from django.db.models import Count, Q, Sum
-from django.db.models.functions import Abs, ExtractDay, ExtractMonth
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
@@ -12,23 +9,8 @@ from rest_framework.response import Response
 
 from expenses import models, serializer
 from expenses.behaviors import CreateExpenseBehavior, RecurringExpenseBehavior
+from expenses.analytics_behaviors import ExpenseAnalyticsBehavior
 from catalog.models import ExpenseCategory
-
-# Nomes dos meses em português (índice 0 não utilizado)
-_MONTH_NAMES = [
-    '',
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
-]
-
-
-def _apply_payment_method_filter(qs, params, model):
-    payment_method = params.get('payment_method')
-    if payment_method is not None:
-        valid_choices = {choice[0] for choice in model.PAYMENT_METHOD_CHOICES}
-        if payment_method in valid_choices:
-            qs = qs.filter(payment_method=payment_method)
-    return qs
 
 
 class ExpensePagination(PageNumberPagination):
@@ -678,552 +660,51 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='analytics/monthly')
     def analytics_monthly(self, request):
-        """
-        GET /api/expenses/expenses/analytics/monthly/?year=2026
-
-        Retorna os 12 meses do ano com totais de receitas, despesas,
-        saldo e quantidade de lançamentos.
-
-        Query params:
-          - year           (int, default=ano atual)
-          - payment_method (str, opcional) "dinheiro" | "cartao"
-        """
-        from decimal import Decimal
-        from debts.models import SharedDebtMember, SharedEntry
-
-        today = date.today()
-        params = request.query_params
-        try:
-            year = int(params.get('year', today.year))
-            if year <= 0:
-                raise ValueError
-        except (ValueError, TypeError):
-            year = today.year
-
-        tenant = request.user.tenant_id
-
-        qs = models.Expense.objects.filter(tenant_id=tenant, date__year=year)
-        qs = _apply_payment_method_filter(qs, params, models.Expense)
-
-        rows = (
-            qs
-            .annotate(month_num=ExtractMonth('date'))
-            .values('month_num')
-            .annotate(
-                income=Sum('amount', filter=Q(amount__gt=0)),
-                expenses_total=Sum(Abs('amount'), filter=Q(amount__lt=0)),
-                cash_total=Sum(Abs('amount'), filter=Q(amount__lt=0, payment_method='dinheiro')),
-                card_total=Sum(Abs('amount'), filter=Q(amount__lt=0, payment_method='cartao')),
-                count=Count('id'),
-            )
-            .order_by('month_num')
+        """GET analytics/monthly."""
+        data = ExpenseAnalyticsBehavior(request.user.tenant_id).analytics_monthly(
+            request.query_params
         )
-        month_map = {row['month_num']: row for row in rows}
-
-        # ── Shared my_portion per month ───────────────────────────────────
-        my_member_ids = list(
-            SharedDebtMember.objects
-            .filter(tenant_id=tenant)
-            .values_list('id', flat=True)
-        )
-        shared_entries = (
-            SharedEntry.objects
-            .filter(participants__member_id__in=my_member_ids, date__year=year)
-            .prefetch_related('participants')
-            .distinct()
-        )
-        shared_by_month: dict[int, float] = {}
-        for entry in shared_entries:
-            pc = entry.participants.count()
-            if pc > 0:
-                m = entry.date.month
-                shared_by_month[m] = shared_by_month.get(m, 0.0) + float(entry.amount / Decimal(pc))
-
-        result = []
-        for m in range(1, 13):
-            row = month_map.get(m, {})
-            income        = float(row.get('income') or 0)
-            cash_exp      = float(row.get('cash_total') or 0)
-            card_exp      = float(row.get('card_total') or 0)
-            shared_exp    = round(shared_by_month.get(m, 0.0), 2)
-            total_exp     = round(cash_exp + card_exp + shared_exp, 2)
-            result.append({
-                'month':            m,
-                'month_name':       _MONTH_NAMES[m],
-                'income':           round(income, 2),
-                'expenses':         total_exp,
-                'cash_expenses':    round(cash_exp, 2),
-                'card_expenses':    round(card_exp, 2),
-                'shared_my_portion': shared_exp,
-                'balance':          round(income - total_exp, 2),
-                'count':            row.get('count', 0),
-            })
-
-        return Response(result, status=status.HTTP_200_OK)
+        return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='analytics/by-category')
     def analytics_by_category(self, request):
-        """
-        GET /api/expenses/expenses/analytics/by-category/?month=6&year=2026
-
-        Retorna despesas agrupadas por categoria (somente lançamentos com
-        amount < 0), ordenadas por total decrescente.
-
-        Query params:
-          - month          (int 1-12, opcional)
-          - year           (int, opcional)
-          - payment_method (str, opcional) "dinheiro" | "cartao"
-        """
-        params = request.query_params
-        qs = models.Expense.objects.filter(
-            tenant_id=request.user.tenant_id,
-            amount__lt=0,
+        """GET analytics/by-category."""
+        data = ExpenseAnalyticsBehavior(request.user.tenant_id).analytics_by_category(
+            request.query_params
         )
-        qs = _apply_payment_method_filter(qs, params, models.Expense)
-
-        raw_month = params.get('month')
-        if raw_month is not None:
-            try:
-                month = int(raw_month)
-                if 1 <= month <= 12:
-                    qs = qs.filter(date__month=month)
-            except (ValueError, TypeError):
-                pass
-
-        raw_year = params.get('year')
-        if raw_year is not None:
-            try:
-                year = int(raw_year)
-                if year > 0:
-                    qs = qs.filter(date__year=year)
-            except (ValueError, TypeError):
-                pass
-
-        rows = (
-            qs
-            .values('category_id', 'category__name')
-            .annotate(
-                total=Sum(Abs('amount')),
-                count=Count('id'),
-            )
-            .order_by('-total')
-        )
-
-        grand_total = sum(float(row['total'] or 0) for row in rows)
-
-        result = []
-        for row in rows:
-            total = float(row['total'] or 0)
-            result.append({
-                'category_id': row['category_id'],
-                'category_name': row['category__name'],
-                'total': round(total, 2),
-                'count': row['count'],
-                'percentage': round((total / grand_total * 100) if grand_total else 0, 2),
-            })
-
-        return Response(result, status=status.HTTP_200_OK)
+        return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='analytics/by-card')
     def analytics_by_card(self, request):
-        """
-        GET /api/expenses/expenses/analytics/by-card/?month=6&year=2026
-
-        Retorna despesas agrupadas por cartão de crédito (payment_method='cartao'
-        e credit_card_id IS NOT NULL), ordenadas por total decrescente.
-
-        Query params:
-          - month (int 1-12, opcional)
-          - year  (int, opcional)
-        """
-        params = request.query_params
-        qs = models.Expense.objects.filter(
-            tenant_id=request.user.tenant_id,
-            payment_method='cartao',
-            credit_card_id__isnull=False,
+        """GET analytics/by-card."""
+        data = ExpenseAnalyticsBehavior(request.user.tenant_id).analytics_by_card(
+            request.query_params
         )
-
-        raw_month = params.get('month')
-        if raw_month is not None:
-            try:
-                month = int(raw_month)
-                if 1 <= month <= 12:
-                    qs = qs.filter(date__month=month)
-            except (ValueError, TypeError):
-                pass
-
-        raw_year = params.get('year')
-        if raw_year is not None:
-            try:
-                year = int(raw_year)
-                if year > 0:
-                    qs = qs.filter(date__year=year)
-            except (ValueError, TypeError):
-                pass
-
-        rows = (
-            qs
-            .values('credit_card_id', 'credit_card__name', 'credit_card__last_four_digits')
-            .annotate(
-                total=Sum(Abs('amount')),
-                count=Count('id'),
-            )
-            .order_by('-total')
-        )
-
-        grand_total = sum(float(row['total'] or 0) for row in rows)
-
-        result = []
-        for row in rows:
-            total = float(row['total'] or 0)
-            result.append({
-                'card_id': row['credit_card_id'],
-                'card_name': row['credit_card__name'],
-                'last_four_digits': row['credit_card__last_four_digits'],
-                'total': round(total, 2),
-                'count': row['count'],
-                'percentage': round((total / grand_total * 100) if grand_total else 0, 2),
-            })
-
-        return Response(result, status=status.HTTP_200_OK)
+        return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='analytics/daily')
     def analytics_daily(self, request):
-        """
-        GET /api/expenses/expenses/analytics/daily/?month=6&year=2026
-
-        Retorna o movimento diário do mês — todos os dias aparecem, mesmo
-        sem lançamentos (total=0, count=0).
-
-        O campo `total` é a soma de abs(amount) de todos os lançamentos do
-        dia (receitas e despesas somadas em valor absoluto).
-
-        Query params:
-          - month          (int 1-12, default=mês atual)
-          - year           (int, default=ano atual)
-          - payment_method (str, opcional) "dinheiro" | "cartao"
-        """
-        today = date.today()
-        params = request.query_params
-
-        try:
-            month = int(params.get('month', today.month))
-            if not (1 <= month <= 12):
-                raise ValueError
-        except (ValueError, TypeError):
-            month = today.month
-
-        try:
-            year = int(params.get('year', today.year))
-            if year <= 0:
-                raise ValueError
-        except (ValueError, TypeError):
-            year = today.year
-
-        qs = models.Expense.objects.filter(
-            tenant_id=request.user.tenant_id,
-            date__year=year,
-            date__month=month,
+        """GET analytics/daily."""
+        data = ExpenseAnalyticsBehavior(request.user.tenant_id).analytics_daily(
+            request.query_params
         )
-        qs = _apply_payment_method_filter(qs, params, models.Expense)
-
-        rows = (
-            qs
-            .values('date')
-            .annotate(
-                total=Sum(Abs('amount')),
-                count=Count('id'),
-            )
-        )
-
-        # Indexa por date para lookup O(1)
-        day_map = {row['date']: row for row in rows}
-
-        _, days_in_month = calendar.monthrange(year, month)
-
-        result = []
-        for day in range(1, days_in_month + 1):
-            current_date = date(year, month, day)
-            row = day_map.get(current_date, {})
-            result.append({
-                'day': day,
-                'date': current_date.isoformat(),
-                'total': round(float(row.get('total') or 0), 2),
-                'count': row.get('count', 0),
-            })
-
-        return Response(result, status=status.HTTP_200_OK)
-
+        return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='consolidated-summary')
     def consolidated_summary(self, request):
-        """
-        GET /api/expenses/expenses/consolidated-summary/?month=8&year=2026
-
-        Resumo financeiro consolidado com as 3 fontes reais de gasto:
-
-          1. Receitas do mês (Expense, amount > 0, filtro mês/ano calendário)
-          2. Gastos em dinheiro (Expense, payment_method='dinheiro', amount < 0)
-          3. Faturas abertas de cartão (período real da fatura, NÃO mês calendário)
-          4. Minha parte em dívidas compartilhadas (SharedEntry onde sou participante)
-
-        total_expenses = cash_expenses + card_invoices + shared_my_portion
-        balance        = income - total_expenses
-        """
-        from datetime import date as date_cls
-        from decimal import Decimal
-
-        from cards.behaviors import _compute_invoice_period, _current_invoice_month
-        from cards.models import CreditCard
-        from debts.models import SharedDebtMember, SharedEntry
-
-        today  = date_cls.today()
-        params = request.query_params
-        tenant = request.user.tenant_id
-
-        try:
-            month = int(params.get('month', today.month))
-            if not (1 <= month <= 12):
-                raise ValueError
-        except (ValueError, TypeError):
-            month = today.month
-
-        try:
-            year = int(params.get('year', today.year))
-            if year <= 0:
-                raise ValueError
-        except (ValueError, TypeError):
-            year = today.year
-
-        base_qs = models.Expense.objects.filter(
-            tenant_id=tenant,
-            date__year=year,
-            date__month=month,
+        """GET consolidated-summary."""
+        data = ExpenseAnalyticsBehavior(request.user.tenant_id).consolidated_summary(
+            request.query_params
         )
-
-        # ── 1. Receitas do mês ────────────────────────────────────────────────
-        income_agg = base_qs.aggregate(
-            income=Sum('amount', filter=Q(amount__gt=0)),
-            income_count=Count('id', filter=Q(amount__gt=0)),
-        )
-        income = round(float(income_agg['income'] or 0), 2)
-
-        # ── 2. Gastos em dinheiro (mês calendário) ────────────────────────────
-        cash_agg = (
-            base_qs
-            .filter(payment_method='dinheiro', amount__lt=0)
-            .aggregate(total=Sum(Abs('amount')), count=Count('id'))
-        )
-        cash_expenses = round(float(cash_agg['total'] or 0), 2)
-        cash_count    = cash_agg['count'] or 0
-
-        # ── 3. Faturas abertas de cartão (período real da fatura) ─────────────
-        cards = CreditCard.objects.filter(tenant_id=tenant)
-        card_invoices_total = 0.0
-        card_invoices_count = 0
-        card_invoices_detail = []
-
-        for card in cards:
-            inv_month, inv_year = _current_invoice_month(card)
-            period_start, period_end, due = _compute_invoice_period(
-                card, inv_month, inv_year
-            )
-            agg = (
-                models.Expense.objects
-                .filter(
-                    tenant_id=tenant,
-                    credit_card_id=card.id,
-                    date__gte=period_start,
-                    date__lte=period_end,
-                )
-                .aggregate(total=Sum(Abs('amount')), count=Count('id'))
-            )
-            total = round(float(agg['total'] or 0), 2)
-            cnt   = agg['count'] or 0
-            card_invoices_total += total
-            card_invoices_count += cnt
-            card_invoices_detail.append({
-                'card_id':         card.id,
-                'card_name':       card.name,
-                'last_four_digits': card.last_four_digits,
-                'invoice_month':   inv_month,
-                'invoice_year':    inv_year,
-                'due_date':        due.isoformat(),
-                'total':           total,
-                'count':           cnt,
-            })
-
-        card_invoices_total = round(card_invoices_total, 2)
-
-        # ── 4. Minha parte em dívidas compartilhadas (mês calendário) ─────────
-        my_member_ids = list(
-            SharedDebtMember.objects
-            .filter(tenant_id=tenant)
-            .values_list('id', flat=True)
-        )
-
-        entries_qs = (
-            SharedEntry.objects
-            .filter(
-                participants__member_id__in=my_member_ids,
-                date__year=year,
-                date__month=month,
-            )
-            .prefetch_related('participants')
-            .distinct()
-        )
-
-        shared_my_portion = Decimal('0')
-        shared_count = 0
-        for entry in entries_qs:
-            participant_count = entry.participants.count()
-            if participant_count > 0:
-                shared_my_portion += entry.amount / Decimal(participant_count)
-                shared_count += 1
-
-        shared_my_portion = round(float(shared_my_portion), 2)
-
-        # ── 5. Totais consolidados ─────────────────────────────────────────────
-        total_expenses = round(cash_expenses + card_invoices_total + shared_my_portion, 2)
-        balance        = round(income - total_expenses, 2)
-
-        return Response({
-            'month': month,
-            'year':  year,
-            # Receita
-            'income':       income,
-            # Gastos em dinheiro
-            'cash_expenses': cash_expenses,
-            'cash_count':    cash_count,
-            # Faturas de cartão (período real)
-            'card_invoices':        card_invoices_total,
-            'card_invoices_count':  card_invoices_count,
-            'card_invoices_detail': card_invoices_detail,
-            # Dívidas compartilhadas (minha parte)
-            'shared_my_portion': shared_my_portion,
-            'shared_count':      shared_count,
-            # Consolidado
-            'total_expenses': total_expenses,
-            'balance':        balance,
-        }, status=status.HTTP_200_OK)
+        return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='home-charts')
     def home_charts(self, request):
-        """
-        GET /api/expenses/expenses/home-charts/?month=6&year=2026
-
-        Endpoint otimizado para a tela Home/Gastos.
-        Retorna em UMA requisição:
-          - summary: total_income, total_expenses, balance, count
-          - by_category: gastos agrupados por categoria (doughnut)
-          - daily: gasto por dia do mês (bar chart)
-          - weekly: gasto agrupado por semana 1-4 (line chart)
-
-        Query params:
-          - month          (int 1-12, default=mês atual)
-          - year           (int, default=ano atual)
-          - payment_method (str, opcional) "dinheiro" | "cartao"
-
-        Usa apenas 2 queries ao banco (category group + daily group).
-        """
-        import calendar as cal_module
-
-        today = date.today()
-        params = request.query_params
-
-        try:
-            month = int(params.get('month', today.month))
-            if not (1 <= month <= 12):
-                raise ValueError
-        except (ValueError, TypeError):
-            month = today.month
-
-        try:
-            year = int(params.get('year', today.year))
-            if year <= 0:
-                raise ValueError
-        except (ValueError, TypeError):
-            year = today.year
-
-        tenant = request.user.tenant_id
-        base_qs = models.Expense.objects.filter(
-            tenant_id=tenant,
-            date__year=year,
-            date__month=month,
+        """GET home-charts."""
+        data = ExpenseAnalyticsBehavior(request.user.tenant_id).home_charts(
+            request.query_params
         )
-        base_qs = _apply_payment_method_filter(base_qs, params, models.Expense)
-
-        # ── Query 1: agrupamento por categoria (apenas despesas) ──────────
-        cat_rows = (
-            base_qs
-            .filter(amount__lt=0)
-            .values('category_id', 'category__name')
-            .annotate(total=Sum(Abs('amount')), count=Count('id'))
-            .order_by('-total')
-        )
-        cat_grand = sum(float(r['total'] or 0) for r in cat_rows)
-        by_category = [
-            {
-                'category_id': r['category_id'],
-                'category_name': r['category__name'] or 'Sem categoria',
-                'total': round(float(r['total'] or 0), 2),
-                'count': r['count'],
-                'percentage': round(
-                    float(r['total'] or 0) / cat_grand * 100 if cat_grand else 0, 2
-                ),
-            }
-            for r in cat_rows
-        ]
-
-        # ── Query 2: agrupamento por dia ───────────────────────────────────
-        day_rows = (
-            base_qs
-            .filter(amount__lt=0)
-            .annotate(day_num=ExtractDay('date'))
-            .values('day_num')
-            .annotate(total=Sum(Abs('amount')), count=Count('id'))
-            .order_by('day_num')
-        )
-        day_map = {r['day_num']: r for r in day_rows}
-
-        _, days_in_month = cal_module.monthrange(year, month)
-
-        daily = []
-        weeks = [0.0, 0.0, 0.0, 0.0]
-        for day in range(1, days_in_month + 1):
-            row = day_map.get(day, {})
-            total = round(float(row.get('total') or 0), 2)
-            daily.append({'day': day, 'total': total, 'count': row.get('count', 0)})
-            w = min((day - 1) // 7, 3)
-            weeks[w] += total
-
-        weekly = [
-            {'week': i + 1, 'label': f'Semana {i + 1}', 'total': round(weeks[i], 2)}
-            for i in range(4)
-        ]
-
-        # ── Summary: income / expenses / balance ───────────────────────────
-        agg = base_qs.aggregate(
-            income=Sum('amount', filter=Q(amount__gt=0)),
-            expenses=Sum(Abs('amount'), filter=Q(amount__lt=0)),
-            count=Count('id'),
-        )
-        income   = round(float(agg['income']   or 0), 2)
-        expenses = round(float(agg['expenses'] or 0), 2)
-
-        return Response({
-            'month': month,
-            'year': year,
-            'summary': {
-                'income':   income,
-                'expenses': expenses,
-                'balance':  round(income - expenses, 2),
-                'count':    agg['count'] or 0,
-            },
-            'by_category': by_category,
-            'daily':  daily,
-            'weekly': weekly,
-        }, status=status.HTTP_200_OK)
+        return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get', 'post'], url_path='recurring-templates')
     def recurring_templates(self, request):
