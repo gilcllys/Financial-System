@@ -5,13 +5,7 @@ from django.db.models import Count, Sum
 from django.db.models.functions import Abs
 from rest_framework import status
 from rest_framework.response import Response
-
-_MONTH_NAMES = [
-    '',
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
-]
-
+from catalog.constants import _MONTH_NAMES
 
 def _effective_closing_date(year, month, closing_day):
     """Return the effective closing date, moving weekends back to Friday."""

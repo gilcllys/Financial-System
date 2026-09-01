@@ -4,11 +4,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from savings.models import SavingsDeposit, SavingsGoal
+from catalog.constants import _MONTH_NAMES
 from savings import serializer as ser
-
-_MONTH_NAMES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-                'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
-
 
 class SavingsGoalViewSet(viewsets.ModelViewSet):
     serializer_class = ser.SavingsGoalSerializer
