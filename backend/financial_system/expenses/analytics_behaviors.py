@@ -217,7 +217,14 @@ class ExpenseAnalyticsBehavior:
         return result
 
     def analytics_daily(self, params):
-        """Retorna o movimento diario do mes, incluindo receitas em abs(amount)."""
+        """
+        Retorna o gasto diario do mes.
+
+        Receita (amount > 0) fica de fora: o consumidor deste endpoint e o
+        grafico de "gastos diarios" da tela de Analytics, onde um salario
+        entrando como abs(amount) virava um pico de gasto. Mesmo criterio ja
+        usado pela chave `daily` de home_charts.
+        """
         today = date.today()
         month = self._parse_month(params, today.month)
         year = self._parse_year(params, today.year)
@@ -226,6 +233,7 @@ class ExpenseAnalyticsBehavior:
             tenant_id=self.tenant_id,
             date__year=year,
             date__month=month,
+            amount__lt=0,
         )
         qs = _apply_payment_method_filter(qs, params, models.Expense)
 

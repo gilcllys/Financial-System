@@ -145,23 +145,40 @@ class AnalyticsDailyCharacterizationTests(AnalyticsCharacterizationBase):
         self.assertEqual(len(resp.data), 31)
         self.assertEqual(resp.data[0]['date'], '2026-03-01')
 
-    def test_COMPORTAMENTO_ATUAL_daily_soma_receita_junto_com_despesa(self):
+    def test_daily_exclui_receita_do_total(self):
         """
-        Divergencia conhecida: /analytics/daily/ NAO filtra amount < 0, entao a
-        receita entra no total do dia. Ja /home-charts/ (chave `daily`) exclui.
-        Ver AnalyticsHomeChartsCharacterizationTests para o contraste.
+        A receita nao entra no grafico de gastos diarios.
 
-        Este teste grava o comportamento atual para que a refatoracao nao o
-        altere por acidente -- se a intencao for corrigir, faca isso de forma
-        explicita e atualize este teste.
+        Antes este teste era
+        `test_COMPORTAMENTO_ATUAL_daily_soma_receita_junto_com_despesa` e
+        gravava a receita virando pico de gasto. Agora bate com o criterio da
+        chave `daily` de /home-charts/ -- ver
+        HomeChartsCharacterizationTests.test_daily_do_home_exclui_receita.
         """
         self._expense('Salario', '5000.00', date(2026, 3, 1))
         self._expense('Cinema', '-100.00', date(2026, 3, 2))
 
         resp = self.client.get('/api/expenses/expenses/analytics/daily/?year=2026&month=3')
 
-        self.assertEqual(resp.data[0]['total'], 5000.0)
+        self.assertEqual(resp.data[0]['total'], 0.0)
+        self.assertEqual(resp.data[0]['count'], 0)
         self.assertEqual(resp.data[1]['total'], 100.0)
+
+    def test_daily_bate_com_o_daily_do_home_charts(self):
+        """Trava de regressao: as duas telas nao podem divergir de novo."""
+        self._expense('Salario', '5000.00', date(2026, 3, 1))
+        self._expense('Cinema', '-100.00', date(2026, 3, 2))
+        self._expense('Mercado', '-250.00', date(2026, 3, 5))
+
+        daily = self.client.get(
+            '/api/expenses/expenses/analytics/daily/?year=2026&month=3').data
+        home = self.client.get(
+            '/api/expenses/expenses/home-charts/?year=2026&month=3').data['daily']
+
+        self.assertEqual(
+            [d['total'] for d in daily],
+            [h['total'] for h in home],
+        )
 
 
 class AnalyticsByCardCharacterizationTests(AnalyticsCharacterizationBase):
@@ -223,8 +240,8 @@ class HomeChartsCharacterizationTests(AnalyticsCharacterizationBase):
         self.assertEqual(set(resp.data['summary'].keys()),
                          {'income', 'expenses', 'balance', 'count'})
 
-    def test_COMPORTAMENTO_ATUAL_daily_do_home_exclui_receita(self):
-        """Contraste deliberado com /analytics/daily/, que inclui a receita."""
+    def test_daily_do_home_exclui_receita(self):
+        """Mesmo criterio de /analytics/daily/ desde a correcao da divergencia."""
         self._expense('Salario', '5000.00', date(2026, 3, 1))
         self._expense('Cinema', '-100.00', date(2026, 3, 2))
 
