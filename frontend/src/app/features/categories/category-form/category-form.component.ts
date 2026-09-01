@@ -21,6 +21,7 @@ export class CategoryFormComponent implements OnInit {
   errorMessage = signal('');
   isEdit = signal(false);
   editId = signal<number | null>(null);
+  isSystem = signal(false);
 
   form = this.fb.group({
     name: ['', [Validators.required, Validators.minLength(2)]],
@@ -34,13 +35,25 @@ export class CategoryFormComponent implements OnInit {
       this.editId.set(+id);
       this.loading.set(true);
       this.categoryService.get(+id).subscribe({
-        next: cat => { this.form.patchValue(cat); this.loading.set(false); },
+        next: cat => {
+          this.form.patchValue(cat);
+          // Categorias do sistema sao globais: aparecem para todos os tenants e
+          // nao pertencem a ninguem. O backend rejeita o PUT com 403; aqui o
+          // acesso direto pela URL e bloqueado antes do usuario digitar.
+          if (cat.tenant_id === 'system') {
+            this.isSystem.set(true);
+            this.form.disable();
+            this.errorMessage.set('Categorias do sistema não podem ser editadas.');
+          }
+          this.loading.set(false);
+        },
         error: () => { this.errorMessage.set('Erro ao carregar categoria.'); this.loading.set(false); },
       });
     }
   }
 
   submit(): void {
+    if (this.isSystem()) return;
     if (this.form.invalid) { this.form.markAllAsTouched(); return; }
     this.saving.set(true);
     const payload = this.form.getRawValue() as { name: string; description: string };
