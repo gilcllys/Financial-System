@@ -92,7 +92,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   private categorySvc = inject(CategoryService);
   private auth       = inject(AuthService);
   private d3         = inject(D3ChartService);
-  readonly myTenantId: string | null = (this.auth.userProfile as any).sub ?? null;
+  readonly myTenantId: string | null = this.auth.userProfile.sub ?? null;
   private destroy$   = new Subject<void>();
 
   @ViewChild('dailyChartEl')   dailyEl?:   ElementRef<HTMLDivElement>;

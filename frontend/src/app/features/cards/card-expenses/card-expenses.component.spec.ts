@@ -66,6 +66,7 @@ describe('CardExpensesComponent [caracterizacao]', () => {
   function setup(opts: {
     invoiceData?: any; chartExpenses?: any[]; sharedEntries?: any[];
     sharedEntriesFake?: (params: any) => any;
+    userProfile?: { name?: string; email?: string; sub?: string };
   } = {}) {
     cardSvc = {
       get: jasmine.createSpy('get').and.returnValue(of({ id: 1, name: 'Bradesco' })),
@@ -105,7 +106,7 @@ describe('CardExpensesComponent [caracterizacao]', () => {
         { provide: SharedDebtService, useValue: sharedSvc },
         { provide: ExpenseService, useValue: { delete: () => of(null) } },
         { provide: CategoryService, useValue: { list: () => of([]) } },
-        { provide: AuthService, useValue: { userProfile: { sub: 'tenant-1' } } },
+        { provide: AuthService, useValue: { userProfile: opts.userProfile ?? { sub: 'tenant-1' } } },
         {
           provide: D3ChartService,
           useValue: {
@@ -150,6 +151,21 @@ describe('CardExpensesComponent [caracterizacao]', () => {
         }),
       });
       expect(f.componentInstance.expensesTotal()).toBe(777);
+    });
+  });
+
+  describe('myTenantId', () => {
+    it('usa o sub do perfil quando presente', () => {
+      const c = setup().componentInstance;
+      expect(c.myTenantId).toBe('tenant-1');
+      expect(c.iPaid(sharedEntry({ paid_by_tenant_id: 'tenant-1' }))).toBeTrue();
+    });
+
+    it('vira null (sem quebrar) quando o perfil nao tem sub', () => {
+      const c = setup({ userProfile: {} }).componentInstance;
+      expect(c.myTenantId).toBeNull();
+      // Nao pode dar match acidental com uma entrada sem dono.
+      expect(c.iPaid(sharedEntry({ paid_by_tenant_id: 'tenant-1' }))).toBeFalse();
     });
   });
 
