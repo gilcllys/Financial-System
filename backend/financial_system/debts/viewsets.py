@@ -146,7 +146,10 @@ class SharedEntryViewSet(viewsets.ModelViewSet):
         qs = (
             SharedEntry.objects
             .filter(shared_debt__members__tenant_id=self.request.user.tenant_id)
-            .select_related('paid_by', 'shared_debt', 'credit_card')
+            .select_related('paid_by', 'shared_debt', 'credit_card')
+            # participants e members alimentam get_participant_count no
+            # serializer; sem prefetch cada linha da pagina custava 2 queries.
+            .prefetch_related('participants', 'shared_debt__members')
             .distinct()
             .order_by('-date', '-id')
         )

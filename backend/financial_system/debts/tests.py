@@ -758,3 +758,135 @@ class SharedEntryUpdateEndpointTests(TestCase):
         self.assertEqual(entry.amount, Decimal('300.00'))
         pids = set(SharedEntryParticipant.objects.filter(entry=entry).values_list('member_id', flat=True))
         self.assertEqual(pids, {self.member_member.id})
+
+
+# ---------------------------------------------------------------------------
+# [SEC-A01] IDOR de categoria + N+1 do participant_count
+# ---------------------------------------------------------------------------
+
+class SharedEntryCategoryOwnershipTests(TestCase):
+    """
+    A categoria de um lancamento precisa ser do proprio tenant ou global.
+
+    O cartao ja tinha essa guarda; a categoria nao tinha. Como o
+    SharedEntrySerializer expoe `category_name`, apontar para a categoria de
+    outro tenant vazava o nome dela.
+    """
+
+    def setUp(self):
+        from catalog.models import ExpenseCategory
+
+        self.user = _make_user(tenant_id='owner-1')
+        self.group = SharedDebt.objects.create(name='G', owner_tenant_id='owner-1')
+        self.me = SharedDebtMember.objects.create(
+            shared_debt=self.group, tenant_id='owner-1', display_name='Owner'
+        )
+        self.minha = ExpenseCategory.objects.create(
+            tenant_id='owner-1', name='Minha')
+        self.global_ = ExpenseCategory.objects.create(
+            tenant_id='system', name='Global')
+        self.alheia = ExpenseCategory.objects.create(
+            tenant_id='outro-tenant', name='Alheia')
+
+    def _data(self, **overrides):
+        data = {
+            'description': 'Compra',
+            'amount': Decimal('50.00'),
+            'date': __import__('datetime').date(2026, 8, 17),
+            'paid_by': self.me.id,
+            'participant_ids': [],
+            'payment_method': 'dinheiro',
+            'credit_card_id': None,
+            'category_id': None,
+        }
+        data.update(overrides)
+        return data
+
+    def test_categoria_propria_e_aceita(self):
+        resp = CreateSharedEntryBehavior(
+            self.group, self.user, self._data(category_id=self.minha.id)
+        ).run()
+        self.assertEqual(resp.status_code, 201)
+
+    def test_categoria_global_e_aceita(self):
+        resp = CreateSharedEntryBehavior(
+            self.group, self.user, self._data(category_id=self.global_.id)
+        ).run()
+        self.assertEqual(resp.status_code, 201)
+
+    def test_categoria_de_outro_tenant_e_rejeitada(self):
+        resp = CreateSharedEntryBehavior(
+            self.group, self.user, self._data(category_id=self.alheia.id)
+        ).run()
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(SharedEntry.objects.count(), 0)
+
+    def test_sem_categoria_continua_valido(self):
+        resp = CreateSharedEntryBehavior(self.group, self.user, self._data()).run()
+        self.assertEqual(resp.status_code, 201)
+
+    def test_update_para_categoria_de_outro_tenant_e_rejeitado(self):
+        CreateSharedEntryBehavior(
+            self.group, self.user, self._data(category_id=self.minha.id)
+        ).run()
+        entry = SharedEntry.objects.get()
+
+        resp = UpdateSharedEntryBehavior(
+            entry, self.user, {'category_id': self.alheia.id}, partial=True
+        ).run()
+
+        self.assertEqual(resp.status_code, 400)
+        entry.refresh_from_db()
+        self.assertEqual(entry.category_id, self.minha.id)
+
+    def test_update_para_categoria_propria_funciona(self):
+        CreateSharedEntryBehavior(self.group, self.user, self._data()).run()
+        entry = SharedEntry.objects.get()
+
+        resp = UpdateSharedEntryBehavior(
+            entry, self.user, {'category_id': self.minha.id}, partial=True
+        ).run()
+
+        self.assertEqual(resp.status_code, 200)
+        entry.refresh_from_db()
+        self.assertEqual(entry.category_id, self.minha.id)
+
+
+class SharedEntryListQueryCountTests(TestCase):
+    """
+    Trava de regressao do N+1: get_participant_count lia participants e
+    members por linha. Sem prefetch, o custo cresce com o numero de itens.
+    """
+
+    def setUp(self):
+        from rest_framework.test import APIClient
+
+        self.group = SharedDebt.objects.create(name='G', owner_tenant_id='owner-1')
+        self.me = SharedDebtMember.objects.create(
+            shared_debt=self.group, tenant_id='owner-1', display_name='Owner'
+        )
+        for i in range(5):
+            SharedEntry.objects.create(
+                shared_debt=self.group,
+                paid_by=self.me,
+                description=f'Compra {i}',
+                amount=Decimal('10.00'),
+                date=__import__('datetime').date(2026, 8, 17),
+                created_by_tenant_id='owner-1',
+            )
+
+        from financial_system.authentication import KeycloakPrincipal
+        self.client = APIClient()
+        self.client.force_authenticate(user=KeycloakPrincipal({
+            'sub': 'owner-1', 'email': 'o@example.com',
+            'given_name': 'O', 'family_name': 'W',
+        }))
+
+    def test_numero_de_queries_nao_cresce_com_a_quantidade_de_lancamentos(self):
+        # 4 = count da paginacao + entries + prefetch de participants +
+        # prefetch de members. Sem o prefetch seriam 2 queries extras por
+        # linha, ou seja 12 com os 5 lancamentos deste cenario.
+        with self.assertNumQueries(4):
+            resp = self.client.get('/api/debts/shared-entries/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['count'], 5)

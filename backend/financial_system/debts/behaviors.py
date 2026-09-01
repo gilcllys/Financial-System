@@ -12,6 +12,7 @@ from rest_framework.response import Response
 
 from cards.models import CreditCard
 from catalog.constants import _MONTH_NAMES as SHARED_MONTH_NAMES
+from catalog.models import ExpenseCategory
 from debts.models import (
     SharedDebt,
     SharedDebtInvite,
@@ -187,6 +188,21 @@ class JoinSharedDebtBehavior:
         )
 
 
+def _category_available_to_tenant(category_id, tenant_id) -> bool:
+    """
+    True quando a categoria pode ser usada por este tenant.
+
+    Mesmo criterio do get_queryset do catalog: vale a categoria do proprio
+    tenant ou uma global ('system'). Sem esta checagem daria para apontar o
+    lancamento para a categoria de outro tenant, cujo nome vaza pelo campo
+    `category_name` do SharedEntrySerializer.
+    """
+    return ExpenseCategory.objects.filter(
+        id=category_id,
+        tenant_id__in=['system', tenant_id],
+    ).exists()
+
+
 def _payer_belongs_to_tenant(paid_by_id, tenant_id) -> bool:
     """
     True quando quem pagou é o próprio usuário autenticado.
@@ -287,6 +303,18 @@ class CreateSharedEntryBehavior:
         # de outro tenant.
         if self.payment_method == 'dinheiro':
             self.credit_card_id = None
+
+        # [SEC-A01] IDOR: categoria precisa ser do tenant ou global.
+        if self.category_id is not None and not _category_available_to_tenant(
+            self.category_id, self.user.tenant_id
+        ):
+            return Response(
+                {
+                    'success': False,
+                    'message': 'A categoria informada não pertence ao usuário autenticado.',
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         total = self.total_installments
         group_id = uuid.uuid4() if total > 1 else None
@@ -440,22 +468,36 @@ class UpdateSharedEntryBehavior:
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        with transaction.atomic():
-            # Update scalar fields.
-            if 'description' in data or not self.partial:
-                entry.description = data.get('description', entry.description)
-            if 'amount' in data or not self.partial:
-                entry.amount = data.get('amount', entry.amount)
-            if 'date' in data or not self.partial:
-                entry.date = data.get('date', entry.date)
-            entry.paid_by_id = paid_by_id
-            entry.payment_method = payment_method
-            entry.credit_card_id = credit_card_id
-            if 'category_id' in data or not self.partial:
-                entry.category_id = data.get('category_id', entry.category_id if self.partial else None)
-            if 'paid' in data:
-                entry.paid = data['paid']
-            entry.save()
+        # [SEC-A01] IDOR: categoria precisa ser do tenant ou global.
+        next_category_id = data.get(
+            'category_id', entry.category_id if self.partial else None)
+        if next_category_id is not None and not _category_available_to_tenant(
+            next_category_id, self.user.tenant_id
+        ):
+            return Response(
+                {
+                    'success': False,
+                    'message': 'A categoria informada não pertence ao usuário autenticado.',
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            # Update scalar fields.
+            if 'description' in data or not self.partial:
+                entry.description = data.get('description', entry.description)
+            if 'amount' in data or not self.partial:
+                entry.amount = data.get('amount', entry.amount)
+            if 'date' in data or not self.partial:
+                entry.date = data.get('date', entry.date)
+            entry.paid_by_id = paid_by_id
+            entry.payment_method = payment_method
+            entry.credit_card_id = credit_card_id
+            if 'category_id' in data or not self.partial:
+                entry.category_id = next_category_id
+            if 'paid' in data:
+                entry.paid = data['paid']
+            entry.save()
 
             # Re-sync participants only when requested.
             if replace_participants:
