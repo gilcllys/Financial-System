@@ -26,9 +26,11 @@ class SharedEntrySerializer(serializers.ModelSerializer):
     credit_card_name = serializers.SerializerMethodField()
 
     def get_participant_count(self, obj):
-        count = obj.participants.count()
+        # len() em vez de .count() para aproveitar o prefetch_related do
+        # viewset: .count() dispara query nova mesmo com o cache carregado.
+        count = len(obj.participants.all())
         if count == 0:
-            count = obj.shared_debt.members.count()
+            count = len(obj.shared_debt.members.all())
         return max(count, 1)
 
     def get_credit_card_name(self, obj):
