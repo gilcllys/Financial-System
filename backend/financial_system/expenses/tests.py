@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
-from django.test import SimpleTestCase, RequestFactory
+from datetime import date as real_date
+from django.test import SimpleTestCase, RequestFactory, TestCase
 from rest_framework.request import Request
 from expenses.viewsets import ExpensePagination, ExpenseViewSet
 from expenses.serializer import DeleteInstallmentsInputSerializer
@@ -570,3 +571,56 @@ class CreateExpenseCardValidationTests(SimpleTestCase):
         })
         behavior._validate_payment()
         self.assertIsNone(behavior.credit_card_id)
+
+
+class ExpenseDeleteEndpointTests(TestCase):
+    """
+    Trava do comportamento de delete antes de remover o perform_destroy.
+
+    O get_queryset ja filtra por tenant, entao a despesa alheia nunca chega ao
+    perform_destroy: o get_object() levanta 404 antes. Estes testes provam que
+    o 404 vem do queryset, nao da guarda.
+    """
+
+    TENANT = 'tenant-exp-del-1'
+    OTHER_TENANT = 'tenant-exp-del-2'
+    URL = '/api/expenses/expenses/'
+
+    def setUp(self):
+        from rest_framework.test import APIClient
+        from financial_system.authentication import KeycloakPrincipal
+
+        self.client = APIClient()
+        self.client.force_authenticate(user=KeycloakPrincipal({
+            'sub': self.TENANT, 'email': 'e@example.com',
+            'given_name': 'E', 'family_name': 'D',
+        }))
+
+    def _expense(self, description='Compra', tenant=None):
+        from catalog.models import ExpenseCategory
+        from expenses.models import Expense as ExpenseModel
+        category, _ = ExpenseCategory.objects.get_or_create(
+            tenant_id=tenant or self.TENANT, name='Geral')
+        return ExpenseModel.objects.create(
+            tenant_id=tenant or self.TENANT,
+            description=description,
+            amount=Decimal('-50.00'),
+            date=real_date(2026, 3, 10),
+            payment_method='dinheiro',
+            category=category,
+            quantity=1,
+        )
+
+    def test_delete_da_propria_despesa_funciona(self):
+        from expenses.models import Expense as ExpenseModel
+        exp = self._expense()
+        resp = self.client.delete(f'{self.URL}{exp.id}/')
+        self.assertEqual(resp.status_code, 204)
+        self.assertFalse(ExpenseModel.objects.filter(id=exp.id).exists())
+
+    def test_delete_de_despesa_de_outro_tenant_retorna_404(self):
+        from expenses.models import Expense as ExpenseModel
+        alheia = self._expense('Alheia', tenant=self.OTHER_TENANT)
+        resp = self.client.delete(f'{self.URL}{alheia.id}/')
+        self.assertEqual(resp.status_code, 404)
+        self.assertTrue(ExpenseModel.objects.filter(id=alheia.id).exists())

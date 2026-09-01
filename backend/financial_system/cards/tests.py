@@ -115,3 +115,48 @@ class InvoiceCreditSignTests(TestCase):
         self.assertEqual(len(by_category), 1)
         self.assertEqual(by_category[0]['total'], 100.00)
         self.assertEqual(by_category[0]['percentage'], 100.00)
+
+
+class CreditCardDeleteEndpointTests(TestCase):
+    """
+    Trava do comportamento de delete antes de remover o perform_destroy.
+
+    O get_queryset ja filtra por tenant, entao o cartao alheio nunca chega ao
+    perform_destroy: o get_object() levanta 404 antes. Estes testes provam que
+    o 404 vem do queryset, nao da guarda.
+    """
+
+    TENANT = 'tenant-cards-1'
+    OTHER_TENANT = 'tenant-cards-2'
+    URL = '/api/cards/credit-cards/'
+
+    def setUp(self):
+        from rest_framework.test import APIClient
+        from financial_system.authentication import KeycloakPrincipal
+
+        self.client = APIClient()
+        self.client.force_authenticate(user=KeycloakPrincipal({
+            'sub': self.TENANT, 'email': 'c@example.com',
+            'given_name': 'C', 'family_name': 'D',
+        }))
+
+    def _card(self, name='Cartao', tenant=None):
+        return CreditCard.objects.create(
+            tenant_id=tenant or self.TENANT,
+            name=name,
+            due_day=10,
+            closing_day=3,
+            last_four_digits='1234',
+        )
+
+    def test_delete_do_proprio_cartao_funciona(self):
+        card = self._card()
+        resp = self.client.delete(f'{self.URL}{card.id}/')
+        self.assertEqual(resp.status_code, 204)
+        self.assertFalse(CreditCard.objects.filter(id=card.id).exists())
+
+    def test_delete_de_cartao_de_outro_tenant_retorna_404(self):
+        alheio = self._card('Alheio', tenant=self.OTHER_TENANT)
+        resp = self.client.delete(f'{self.URL}{alheio.id}/')
+        self.assertEqual(resp.status_code, 404)
+        self.assertTrue(CreditCard.objects.filter(id=alheio.id).exists())
