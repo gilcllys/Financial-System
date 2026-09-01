@@ -193,15 +193,24 @@ class SavingsGoalCreateCharacterizationTests(SavingsCharacterizationBase):
         self.assertEqual(resp.status_code, 201)
         self.assertIsNone(SavingsGoal.objects.get(name='Sem meta').target_amount)
 
-    def test_COMPORTAMENTO_ATUAL_target_amount_negativo_e_aceito(self):
-        """Nao ha validacao de meta negativa hoje -- gravado para nao mudar por acidente."""
+    def test_target_amount_negativo_e_rejeitado(self):
+        """Meta negativa nao faz sentido de negocio e e rejeitada com 400."""
         resp = self.client.post(self.GOALS_URL,
                                 {'name': 'Meta negativa', 'target_amount': '-50.00'},
                                 format='json')
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('target_amount', resp.data)
+        self.assertFalse(SavingsGoal.objects.filter(name='Meta negativa').exists())
+
+    def test_target_amount_zero_e_aceito(self):
+        """Zero e valido (meta ainda nao definida em valor), so negativo e barrado."""
+        resp = self.client.post(self.GOALS_URL,
+                                {'name': 'Meta zero', 'target_amount': '0.00'},
+                                format='json')
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(
-            SavingsGoal.objects.get(name='Meta negativa').target_amount,
-            Decimal('-50.00'),
+            SavingsGoal.objects.get(name='Meta zero').target_amount,
+            Decimal('0.00'),
         )
 
 
@@ -250,10 +259,10 @@ class SavingsGoalUpdateDeleteCharacterizationTests(SavingsCharacterizationBase):
 
         self.assertEqual(SavingsDeposit.objects.count(), 0)
 
-    def test_COMPORTAMENTO_ATUAL_delete_de_outro_tenant_retorna_404_e_nao_403(self):
+    def test_delete_de_cofrinho_de_outro_tenant_retorna_404(self):
         """
-        `destroy` tem uma checagem explicita que devolveria 403, mas ela e codigo
-        morto: `get_object()` ja filtra por tenant no queryset e levanta 404 antes.
+        `get_object()` filtra por tenant no queryset e levanta 404 antes de
+        qualquer checagem no corpo do `destroy`.
         """
         alheio = self._goal('Alheio', tenant=self.OTHER_TENANT)
 
@@ -528,10 +537,10 @@ class SavingsDepositUpdateDeleteCharacterizationTests(SavingsCharacterizationBas
         deposito.refresh_from_db()
         self.assertEqual(deposito.amount, Decimal('175.00'))
 
-    def test_COMPORTAMENTO_ATUAL_patch_aceita_valor_zero(self):
+    def test_patch_rejeita_valor_zero(self):
         """
-        `update` usa o ModelSerializer, que NAO tem a regra `validate_amount`
-        do serializer de entrada -- entao 0 passa no PATCH mas nao no POST.
+        A regra de valor nao-zero agora e compartilhada entre POST e PATCH,
+        entao 0 e rejeitado nos dois caminhos (antes passava so no PATCH).
         """
         goal = self._goal()
         deposito = self._deposit(goal, '100.00')
@@ -539,15 +548,16 @@ class SavingsDepositUpdateDeleteCharacterizationTests(SavingsCharacterizationBas
         resp = self.client.patch(f'{self.DEPOSITS_URL}{deposito.id}/',
                                  {'amount': '0.00'}, format='json')
 
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('amount', resp.data)
         deposito.refresh_from_db()
-        self.assertEqual(deposito.amount, Decimal('0.00'))
+        self.assertEqual(deposito.amount, Decimal('100.00'))
 
-    def test_COMPORTAMENTO_ATUAL_patch_permite_apontar_para_cofrinho_de_outro_tenant(self):
+    def test_patch_nao_permite_apontar_para_cofrinho_de_outro_tenant(self):
         """
-        Vazamento conhecido: o campo `goal` do ModelSerializer usa o queryset
-        completo de SavingsGoal, sem filtro de tenant. Gravado como divergencia
-        -- corrigir de forma explicita em fase futura (nao por acidente).
+        O campo `goal` do serializer e restrito aos cofrinhos do tenant
+        autenticado, entao apontar para cofrinho alheio e rejeitado com 400
+        e o aporte permanece no cofrinho original.
         """
         meu = self._goal('Viagem')
         alheio = self._goal('Alheio', tenant=self.OTHER_TENANT)
@@ -556,10 +566,24 @@ class SavingsDepositUpdateDeleteCharacterizationTests(SavingsCharacterizationBas
         resp = self.client.patch(f'{self.DEPOSITS_URL}{deposito.id}/',
                                  {'goal': alheio.id}, format='json')
 
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('goal', resp.data)
+        deposito.refresh_from_db()
+        self.assertEqual(deposito.goal_id, meu.id)
+        self.assertEqual(deposito.tenant_id, self.TENANT)
+
+    def test_patch_permite_mover_aporte_entre_cofrinhos_do_proprio_tenant(self):
+        """Movimentacao legitima entre cofrinhos proprios continua funcionando."""
+        origem = self._goal('Viagem')
+        destino = self._goal('Reserva')
+        deposito = self._deposit(origem, '100.00')
+
+        resp = self.client.patch(f'{self.DEPOSITS_URL}{deposito.id}/',
+                                 {'goal': destino.id}, format='json')
+
         self.assertEqual(resp.status_code, 200)
         deposito.refresh_from_db()
-        self.assertEqual(deposito.goal_id, alheio.id)
-        self.assertEqual(deposito.tenant_id, self.TENANT)
+        self.assertEqual(deposito.goal_id, destino.id)
 
     def test_patch_em_aporte_de_outro_tenant_retorna_404(self):
         alheio = self._goal('Alheio', tenant=self.OTHER_TENANT)
@@ -589,8 +613,8 @@ class SavingsDepositUpdateDeleteCharacterizationTests(SavingsCharacterizationBas
 
         self.assertTrue(SavingsGoal.objects.filter(id=goal.id).exists())
 
-    def test_COMPORTAMENTO_ATUAL_delete_de_outro_tenant_retorna_404_e_nao_403(self):
-        """Mesma situacao de SavingsGoalViewSet.destroy: o 403 e codigo morto."""
+    def test_delete_de_aporte_de_outro_tenant_retorna_404(self):
+        """Mesma situacao de SavingsGoalViewSet: o queryset filtrado ja barra com 404."""
         alheio = self._goal('Alheio', tenant=self.OTHER_TENANT)
         deposito = self._deposit(alheio, '999.00')
 
