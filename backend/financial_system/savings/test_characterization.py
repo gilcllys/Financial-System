@@ -543,11 +543,11 @@ class SavingsDepositUpdateDeleteCharacterizationTests(SavingsCharacterizationBas
         deposito.refresh_from_db()
         self.assertEqual(deposito.amount, Decimal('0.00'))
 
-    def test_COMPORTAMENTO_ATUAL_patch_permite_apontar_para_cofrinho_de_outro_tenant(self):
+    def test_patch_nao_permite_apontar_para_cofrinho_de_outro_tenant(self):
         """
-        Vazamento conhecido: o campo `goal` do ModelSerializer usa o queryset
-        completo de SavingsGoal, sem filtro de tenant. Gravado como divergencia
-        -- corrigir de forma explicita em fase futura (nao por acidente).
+        O campo `goal` do serializer e restrito aos cofrinhos do tenant
+        autenticado, entao apontar para cofrinho alheio e rejeitado com 400
+        e o aporte permanece no cofrinho original.
         """
         meu = self._goal('Viagem')
         alheio = self._goal('Alheio', tenant=self.OTHER_TENANT)
@@ -556,10 +556,24 @@ class SavingsDepositUpdateDeleteCharacterizationTests(SavingsCharacterizationBas
         resp = self.client.patch(f'{self.DEPOSITS_URL}{deposito.id}/',
                                  {'goal': alheio.id}, format='json')
 
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('goal', resp.data)
+        deposito.refresh_from_db()
+        self.assertEqual(deposito.goal_id, meu.id)
+        self.assertEqual(deposito.tenant_id, self.TENANT)
+
+    def test_patch_permite_mover_aporte_entre_cofrinhos_do_proprio_tenant(self):
+        """Movimentacao legitima entre cofrinhos proprios continua funcionando."""
+        origem = self._goal('Viagem')
+        destino = self._goal('Reserva')
+        deposito = self._deposit(origem, '100.00')
+
+        resp = self.client.patch(f'{self.DEPOSITS_URL}{deposito.id}/',
+                                 {'goal': destino.id}, format='json')
+
         self.assertEqual(resp.status_code, 200)
         deposito.refresh_from_db()
-        self.assertEqual(deposito.goal_id, alheio.id)
-        self.assertEqual(deposito.tenant_id, self.TENANT)
+        self.assertEqual(deposito.goal_id, destino.id)
 
     def test_patch_em_aporte_de_outro_tenant_retorna_404(self):
         alheio = self._goal('Alheio', tenant=self.OTHER_TENANT)

@@ -30,6 +30,22 @@ class SavingsDepositSerializer(serializers.ModelSerializer):
         fields = ['id', 'goal', 'goal_name', 'amount', 'date', 'description', 'created_at']
         read_only_fields = ['id', 'created_at']
 
+    def get_fields(self):
+        """
+        Restringe o campo `goal` aos cofrinhos do tenant autenticado.
+
+        Sem isso o ModelSerializer usa SavingsGoal.objects.all() e permite,
+        via PATCH, repontar um aporte proprio para o cofrinho de OUTRO tenant.
+        """
+        fields = super().get_fields()
+        request = self.context.get('request')
+        tenant_id = getattr(getattr(request, 'user', None), 'tenant_id', None)
+        if tenant_id is not None:
+            fields['goal'].queryset = SavingsGoal.objects.filter(tenant_id=tenant_id)
+        else:
+            fields['goal'].queryset = SavingsGoal.objects.none()
+        return fields
+
 
 class CreateGoalInputSerializer(serializers.Serializer):
     name = serializers.CharField(required=True, max_length=120)
