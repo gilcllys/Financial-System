@@ -6,13 +6,7 @@ from django.db.models import Count, Q, Sum
 from django.db.models.functions import Abs, ExtractDay, ExtractMonth
 
 from expenses import models
-
-# Nomes dos meses em portugues (indice 0 nao utilizado)
-_MONTH_NAMES = [
-    '',
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
-]
+from catalog.constants import _MONTH_NAMES
 
 
 def _apply_payment_method_filter(qs, params, model):

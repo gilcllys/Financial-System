@@ -11,6 +11,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 from cards.models import CreditCard
+from catalog.constants import _MONTH_NAMES as SHARED_MONTH_NAMES
 from debts.models import (
     SharedDebt,
     SharedDebtInvite,
@@ -691,8 +692,7 @@ class MonthlyHistoryBehavior:
     ordenada do mais recente ao mais antigo.
     """
 
-    _MONTH_NAMES = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho',
-                    'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+    _MONTH_NAMES = SHARED_MONTH_NAMES
 
     def __init__(self, shared_debt, user):
         self.shared_debt = shared_debt
