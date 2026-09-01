@@ -114,26 +114,35 @@ class CatalogUpdateCharacterizationTests(CatalogCharacterizationBase):
         alheia.refresh_from_db()
         self.assertEqual(alheia.name, 'Alheia')
 
-    def test_COMPORTAMENTO_ATUAL_update_de_categoria_do_sistema_a_sequestra(self):
+    def test_update_de_categoria_do_sistema_e_bloqueado(self):
         """
-        DIVERGENCIA (impacto entre tenants): o PATCH numa categoria 'system'
-        e aceito e o `perform_update` grava `tenant_id` do autenticado.
+        A categoria 'system' e global e aparece no get_queryset de todos os
+        tenants. Editar uma delas gravaria o tenant do autenticado, fazendo a
+        categoria sumir para todos os outros -- por isso retorna 403.
 
-        A categoria global vira propriedade de quem editou e DESAPARECE para
-        todos os outros tenants. O `perform_destroy` protege o delete, mas nao
-        existe guarda equivalente no update.
-
-        Teste grava o comportamento atual de proposito. Ver PR de correcao.
+        Antes da correcao este teste era
+        `test_COMPORTAMENTO_ATUAL_update_de_categoria_do_sistema_a_sequestra`
+        e gravava o sequestro como comportamento aceito.
         """
         sistema = self._category('Global', tenant=self.SYSTEM)
 
         resp = self.client.patch(
             f'{self.URL}{sistema.id}/', {'name': 'Sequestrada'}, format='json')
 
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 403)
         sistema.refresh_from_db()
-        self.assertEqual(sistema.tenant_id, self.TENANT)
-        self.assertEqual(sistema.name, 'Sequestrada')
+        self.assertEqual(sistema.tenant_id, self.SYSTEM)
+        self.assertEqual(sistema.name, 'Global')
+
+    def test_categoria_do_sistema_continua_visivel_apos_tentativa_de_update(self):
+        """Garante que o bloqueio nao deixou a categoria em estado quebrado."""
+        sistema = self._category('Global', tenant=self.SYSTEM)
+        self.client.patch(
+            f'{self.URL}{sistema.id}/', {'name': 'Sequestrada'}, format='json')
+
+        resp = self.client.get(self.URL)
+
+        self.assertEqual([c['name'] for c in resp.data], ['Global'])
 
 
 class CatalogDeleteCharacterizationTests(CatalogCharacterizationBase):
