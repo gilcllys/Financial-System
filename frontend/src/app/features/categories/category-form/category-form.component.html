@@ -36,11 +36,13 @@
       }
 
       <div class="form-actions">
-        <a routerLink="/categories" class="btn btn--secondary">Cancelar</a>
-        <button type="submit" class="btn btn--primary" [disabled]="saving()">
-          @if (saving()) { <span class="spinner"></span> } Salvar
-        </button>
-      </div>
+        <a routerLink="/categories" class="btn btn--secondary">{{ isSystem() ? 'Voltar' : 'Cancelar' }}</a>
+        @if (!isSystem()) {
+          <button type="submit" class="btn btn--primary" [disabled]="saving()">
+            @if (saving()) { <span class="spinner"></span> } Salvar
+          </button>
+        }
+      </div>
     </form>
   </div>
 }

@@ -135,17 +135,11 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     # Custom actions — CRUD helpers
     # ------------------------------------------------------------------
 
-    def perform_create(self, serializer):
-        """Injeta tenant_id do usuário autenticado ao criar via POST padrão."""
-        serializer.save(tenant_id=self.request.user.tenant_id)
-
-    def perform_destroy(self, instance):
-        if instance.tenant_id != self.request.user.tenant_id:
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied("Você não tem permissão para excluir este recurso.")
-        instance.delete()
-
-    @action(detail=False, methods=['post'], url_path='create-expense')
+    def perform_create(self, serializer):
+        """Injeta tenant_id do usuário autenticado ao criar via POST padrão."""
+        serializer.save(tenant_id=self.request.user.tenant_id)
+
+    @action(detail=False, methods=['post'], url_path='create-expense')
     def create_expense(self, request):
         s = serializer.CreateExpenseInputSerializer(data=request.data)
         s.is_valid(raise_exception=True)
