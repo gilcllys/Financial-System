@@ -273,6 +273,7 @@ class RecurringExpenseBehavior:
     def generate_month(self, month: int, year: int) -> Response:
         import calendar as cal_mod
         from datetime import date as date_cls
+        from django.db import IntegrityError, transaction
         from expenses.models import RecurringExpenseTemplate, Expense
         templates = RecurringExpenseTemplate.objects.filter(tenant_id=self.tenant_id, is_active=True)
         created, skipped, skipped_invalid = [], [], []
@@ -284,25 +285,37 @@ class RecurringExpenseBehavior:
             last_day = cal_mod.monthrange(year, month)[1]
             day = min(tpl.day_of_month, last_day)
             entry_date = date_cls(year, month, day)
+            # A trava e pela FK, nao pela descricao: renomear o template ou a
+            # despesa nao duplica mais, e um gasto manual homonimo nao impede
+            # mais o gasto fixo de ser gerado.
             already = Expense.objects.filter(
-                tenant_id=self.tenant_id,
-                description=tpl.description,
+                recurring_template=tpl,
                 date__year=year,
                 date__month=month,
             ).exists()
             if already:
                 skipped.append(tpl.description)
                 continue
-            Expense.objects.create(
-                tenant_id=self.tenant_id,
-                category_id=tpl.category_id,
-                description=tpl.description,
-                quantity=1,
-                amount=-abs(tpl.amount),  # gasto fixo e sempre despesa
-                date=entry_date,
-                payment_method=tpl.payment_method,
-                credit_card_id=tpl.credit_card_id,
-            )
+            try:
+                # savepoint proprio: sem ele um IntegrityError aborta a
+                # transacao inteira e os templates seguintes nao seriam gerados.
+                with transaction.atomic():
+                    Expense.objects.create(
+                        tenant_id=self.tenant_id,
+                        category_id=tpl.category_id,
+                        description=tpl.description,
+                        quantity=1,
+                        amount=-abs(tpl.amount),  # gasto fixo e sempre despesa
+                        date=entry_date,
+                        payment_method=tpl.payment_method,
+                        credit_card_id=tpl.credit_card_id,
+                        recurring_template=tpl,
+                    )
+            except IntegrityError:
+                # Corrida entre dois cliques simultaneos: a constraint do banco
+                # e a autoridade final. Perder a corrida e sucesso, nao erro.
+                skipped.append(tpl.description)
+                continue
             created.append(tpl.description)
         return Response({
             'created': created,

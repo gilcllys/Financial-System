@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models.functions import ExtractMonth, ExtractYear
 from financial_system.base_model import BaseModel
 
 
@@ -63,6 +64,20 @@ class Expense(BaseModel):
         db_index=True,
         null=False,
     )
+    recurring_template = models.ForeignKey(
+        to='expenses.RecurringExpenseTemplate',
+        db_column='recurring_template_id',
+        db_index=True,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='generated_expenses',
+        help_text=(
+            'Template que gerou esta despesa. Nulo quando a despesa foi criada '
+            'manualmente. Usa SET_NULL porque a despesa e historico financeiro '
+            'real e deve sobreviver a exclusao do template.'
+        ),
+    )
 
     class Meta:
         db_table = 'expenses'
@@ -73,6 +88,17 @@ class Expense(BaseModel):
             models.Index(fields=['tenant_id', 'date'], name='expenses_tenant_date_idx'),
             # Filtros por cartão: tenant + credit_card (fatura, analytics by-card)
             models.Index(fields=['tenant_id', 'credit_card'], name='expenses_tenant_card_idx'),
+        ]
+        constraints = [
+            # Um template so pode gerar UMA despesa por mes/ano. Despesas manuais
+            # tem recurring_template NULL e NULL nunca conflita em UNIQUE, entao
+            # elas permanecem livres para repetir a vontade.
+            models.UniqueConstraint(
+                'recurring_template',
+                ExtractYear('date'),
+                ExtractMonth('date'),
+                name='uniq_expense_per_template_month',
+            ),
         ]
 
 

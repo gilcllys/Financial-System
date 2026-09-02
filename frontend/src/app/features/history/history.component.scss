@@ -111,12 +111,27 @@
   padding: 3px 9px;
 }
 
+.recurring-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--rounded-pill);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 9px;
+}
+
 .chip--card { background: #eff4ff; color: #0052ff; }
 .chip--cash { background: #edfaf3; color: #05b169; }
 .group-chip { background: #f5f3ff; color: #6d28d9; }
 .installment-badge {
   background: #fff7ed;
   color: #c2410c;
+  margin-left: 8px;
+}
+
+.recurring-badge {
+  background: #eef2ff;
+  color: #4338ca;
   margin-left: 8px;
 }
 
