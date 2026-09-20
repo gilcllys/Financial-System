@@ -8,11 +8,18 @@ class ExpenseSerializer(serializers.ModelSerializer):
     # Nome da categoria para exibição, espelhando o contrato de shared_entries.
     # Sem isso o front só recebe o id e não consegue renderizar a categoria.
     category_name = serializers.CharField(source='category.name', read_only=True)
+    # Origem da despesa: permite ao front distinguir gasto fixo de lancamento
+    # manual sem inferir pela descricao (que o usuario pode editar).
+    recurring_template_id = serializers.IntegerField(read_only=True)
+    is_recurring = serializers.SerializerMethodField()
 
     class Meta:
         model = Expense
         fields = '__all__'
-        read_only_fields = ['tenant_id']
+        read_only_fields = ['tenant_id', 'recurring_template']
+
+    def get_is_recurring(self, obj) -> bool:
+        return obj.recurring_template_id is not None
 
     def to_internal_value(self, data):
         # Aceita category_id no payload (PUT/PATCH) mapeando para o campo category

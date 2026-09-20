@@ -105,7 +105,12 @@
         <tbody>
           @for (expense of individualExpenses(); track expense.id) {
             <tr>
-              <td><strong>{{ expense.description }}</strong></td>
+              <td>
+                <strong>{{ expense.description }}</strong>
+                @if (expense.is_recurring) {
+                  <span class="recurring-badge" title="Gerado automaticamente a partir de um gasto fixo">Fixo</span>
+                }
+              </td>
               <td class="mono text-muted">{{ formatDate(expense.date) }}</td>
               <td>{{ categoryName(expense) }}</td>
               <td><span class="chip" [class.chip--card]="expense.payment_method === 'cartao'" [class.chip--cash]="expense.payment_method === 'dinheiro'">{{ paymentLabel(expense.payment_method) }}</span></td>

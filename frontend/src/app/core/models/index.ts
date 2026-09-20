@@ -26,7 +26,12 @@ export interface Expense {
   date: string;           // ISO date string YYYY-MM-DD
   created_at: string;
   updated_at: string;
-}
+
+  /** Template que gerou a despesa; null quando foi lancada manualmente. */
+  recurring_template_id?: number | null;
+  /** Atalho para recurring_template_id !== null, calculado no backend. */
+  is_recurring?: boolean;
+}
 
 export interface CreateExpensePayload {
   category_id: number;

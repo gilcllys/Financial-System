@@ -16,7 +16,10 @@ on:
 #
 # Required GitHub Secrets    (Settings → Secrets → Actions)
 #   DOCKER_HUB_TOKEN
-#   EC2_SSH_KEY
+#   EC2_SSH_KEY   -> usado pelo step de deploy
+#   SSH_EC2_KEY   -> usado pelos steps de limpeza de disco
+#   NOTE: os dois guardam a MESMA chave SSH do EC2. Ao rotacionar a chave,
+#         atualize AMBOS, ou metade do pipeline para de funcionar.
 #   SECRET_KEY, DB_PASSWORD
 # ─────────────────────────────────────────────────────────────
 
@@ -47,6 +50,7 @@ jobs:
           check "${{ vars.EC2_HOST }}"        EC2_HOST
           check "${{ vars.EC2_USER }}"        EC2_USER
           check "${{ secrets.EC2_SSH_KEY }}"  EC2_SSH_KEY
+          check "${{ secrets.SSH_EC2_KEY }}"  SSH_EC2_KEY
 
           echo ""
           echo "🔍 Validating application variables..."
@@ -98,7 +102,88 @@ jobs:
           push: true
           tags: ${{ vars.DOCKER_HUB_USERNAME }}/financial-frontend:latest
 
+      - name: Free disk space on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ vars.EC2_HOST }}
+          username: ${{ vars.EC2_USER }}
+          key: ${{ secrets.SSH_EC2_KEY }}
+          script: |
+            set -u
+
+            # ───────────────────────────────────────────────────────────────
+            # REGRAS DE SEGURANCA — nao alterar sem entender o impacto:
+            #
+            #  NUNCA usar 'docker system prune -a'
+            #    Apaga imagens COM tag que nenhum container referencia. Isso
+            #    inclui a :latest recem-baixada e as :rollback. Ja aconteceu
+            #    de o container rodar uma imagem antiga enquanto a :latest
+            #    nova nao era usada por ninguem — o -a a apagaria.
+            #
+            #  NUNCA usar 'docker volume prune'
+            #    Apagaria main_pgdata-global-alpine = perda do banco.
+            #
+            #  NUNCA usar 'docker container prune'
+            #    Nao e necessario; o compose ja recria o que precisa.
+            #
+            #  'docker image prune -f' (SEM -a) remove apenas imagens orfas
+            #  (<none>), que sao o lixo deixado pelos deploys anteriores.
+            #  Containers rodando e volumes nao sao afetados.
+            # ───────────────────────────────────────────────────────────────
+
+            echo "💾 Disco antes:"
+            df -h / | tail -1
+
+            echo ""
+            echo "🏷️  Protegendo as imagens que estao em producao (rollback)..."
+            # Sem tag, a imagem que serve producao vira <none> quando o deploy
+            # a substitui e some na proxima limpeza. Com a tag :rollback ela
+            # sobrevive e da um ponto de retorno. A tag anterior e sobrescrita,
+            # entao guardamos no maximo 1 imagem extra por servico.
+            for svc in backend frontend; do
+              cid=$(docker ps -q -f name="main-${svc}-1")
+              if [ -n "$cid" ]; then
+                img=$(docker inspect -f '{{.Image}}' "$cid")
+                docker tag "$img" "financial-${svc}:rollback"
+                echo "   financial-${svc}:rollback -> ${img}"
+              else
+                echo "   (main-${svc}-1 nao esta rodando, nada a proteger)"
+              fi
+            done
+
+            echo ""
+            echo "🧹 Removendo imagens orfas de deploys antigos..."
+            docker image prune -f
+
+            echo ""
+            echo "🧹 Cache de pacotes (regenerado por apt update)..."
+            sudo apt-get clean || true
+            sudo rm -rf /var/lib/apt/lists/* || true
+
+            echo "🧹 Logs..."
+            sudo journalctl --vacuum-time=7d >/dev/null 2>&1 || true
+            sudo find /var/log -type f \( -name '*.gz' -o -name '*.[0-9]' -o -name '*.old' \) -delete 2>/dev/null || true
+            # O agente SSM grava sem rotacao e passa de 20 MB sozinho.
+            sudo find /var/log/amazon/ssm -name '*.log' -size +20M -exec truncate -s 0 {} \; 2>/dev/null || true
+
+            echo ""
+            echo "💾 Disco depois:"
+            df -h / | tail -1
+
+            # Guarda: melhor abortar aqui do que o pull falhar no meio e
+            # deixar a stack inconsistente.
+            AVAIL_MB=$(df -Pm / | awk 'NR==2{print $4}')
+            if [ "$AVAIL_MB" -lt 1500 ]; then
+              echo ""
+              echo "🚨 Espaco insuficiente: ${AVAIL_MB} MB livres (minimo 1500 MB)."
+              echo "   Abortando ANTES do pull para nao deixar o deploy pela metade."
+              docker system df
+              exit 1
+            fi
+            echo "✅ ${AVAIL_MB} MB livres — espaco suficiente para o deploy."
+
       - name: Deploy via SSH
+        id: deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ vars.EC2_HOST }}
@@ -134,3 +219,33 @@ jobs:
             sudo nginx -t && sudo systemctl reload nginx
 
             echo "✅ Deploy finished successfully!"
+
+      - name: Post-deploy cleanup on EC2
+        if: always() && steps.deploy.outcome != 'skipped'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ vars.EC2_HOST }}
+          username: ${{ vars.EC2_USER }}
+          key: ${{ secrets.SSH_EC2_KEY }}
+          script: |
+            set -u
+
+            # As imagens que este deploy acabou de substituir viraram <none>
+            # agora. Remove-las aqui e o que impede o acumulo: cada deploy
+            # deixava ~330 MB para tras e o disco chegou a 99%.
+            # As :rollback tem tag, entao sobrevivem a esta limpeza.
+            echo "🧹 Removendo imagens substituidas por este deploy..."
+            docker image prune -f
+
+            echo ""
+            echo "🔎 Containers (devem seguir de pe):"
+            docker ps --format 'table {{.Names}}\t{{.Status}}'
+
+            echo ""
+            echo "🔎 Volumes (devem seguir intactos):"
+            docker volume ls
+
+            echo ""
+            echo "💾 Disco final:"
+            df -h / | tail -1
+            docker system df
