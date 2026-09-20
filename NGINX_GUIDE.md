@@ -163,10 +163,10 @@ location /api/ {
 ```nginx
 server {
     listen 443 ssl;
-    server_name meusite.com;
+    server_name gilcllys.party *.gilcllys.party;
 
-    ssl_certificate     /etc/ssl/certs/fullchain.pem;
-    ssl_certificate_key /etc/ssl/private/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/gilcllys.party/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/gilcllys.party/privkey.pem;
 
     ssl_protocols     TLSv1.2 TLSv1.3;
     ssl_ciphers       HIGH:!aNULL:!MD5;
@@ -176,7 +176,7 @@ server {
 # Forçar HTTPS
 server {
     listen 80;
-    server_name meusite.com;
+    server_name gilcllys.party *.gilcllys.party;
     return 301 https://$host$request_uri;
 }
 ```
@@ -245,14 +245,19 @@ add_header Content-Security-Policy
 Internet
   │
   ├─ :80   → Nginx (host EC2) → redirect 301 HTTPS
-  ├─ :443  → Nginx → Keycloak (IAM)      → localhost:8080  (Docker)
-  └─ :4200 → Nginx → /api/*              → Django/Gunicorn → localhost:8000  (Docker)
-                   → /*                  → Angular/Nginx   → localhost:3000  (Docker)
+  ├─ :443  → Nginx → auth.gilcllys.party (Keycloak IAM)       → localhost:8080  (Docker)
+  └─ :443  → Nginx → financeiro.gilcllys.party → /api/*       → Django/Gunicorn → localhost:8000  (Docker)
+                                               → /*           → Angular/Nginx   → localhost:3000  (Docker)
 ```
 
 O **Nginx roda direto no host EC2** (não em Docker) e age como proxy reverso único para os dois projetos rodando na mesma máquina.
 
-**Certificados SSL** ficam no projeto IAM:
+**Certificados SSL** (Let's Encrypt / Certbot para `gilcllys.party`):
+```
+/etc/letsencrypt/live/gilcllys.party/fullchain.pem
+/etc/letsencrypt/live/gilcllys.party/privkey.pem
+```
+ou no diretório do projeto IAM:
 ```
 /home/ubuntu/identity-and-access-management/certs/fullchain.pem
 /home/ubuntu/identity-and-access-management/certs/privkey.pem
@@ -270,16 +275,17 @@ O **Nginx roda direto no host EC2** (não em Docker) e age como proxy reverso ú
 # :80 → força HTTPS
 server {
     listen 80;
+    server_name financeiro.gilcllys.party auth.gilcllys.party;
     return 301 https://$host$request_uri;
 }
 
-# :4200 → Financial System
+# :443 (ou :4200) → Financial System
 server {
-    listen 4200 ssl;
-    server_name ec2-54-147-150-5.compute-1.amazonaws.com;
+    listen 443 ssl;
+    server_name financeiro.gilcllys.party;
 
-    ssl_certificate     /home/ubuntu/.../certs/fullchain.pem;
-    ssl_certificate_key /home/ubuntu/.../certs/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/gilcllys.party/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/gilcllys.party/privkey.pem;
 
     # Backend Django (Docker porta 8000)
     location /api/ {
@@ -298,6 +304,11 @@ server {
 # :443 → Keycloak
 server {
     listen 443 ssl;
+    server_name auth.gilcllys.party;
+
+    ssl_certificate     /etc/letsencrypt/live/gilcllys.party/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/gilcllys.party/privkey.pem;
+
     location / {
         proxy_pass http://localhost:8080;
     }
@@ -321,8 +332,8 @@ tail -f /var/log/nginx/access.log
 tail -f /var/log/nginx/error.log
 
 # Testar headers de fora
-curl -I https://meusite.com
-curl -v https://meusite.com/api/
+curl -I https://financeiro.gilcllys.party
+curl -v https://financeiro.gilcllys.party/api/
 ```
 
 ---

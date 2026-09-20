@@ -1,8 +1,8 @@
 export const environment = {
   production: true,
-  apiBaseUrl: 'https://ec2-54-147-150-5.compute-1.amazonaws.com:4200',
+  apiBaseUrl: 'https://financeiro.gilcllys.party',
   keycloak: {
-    url: 'https://ec2-54-147-150-5.compute-1.amazonaws.com',
+    url: 'https://auth.gilcllys.party',
     realm: 'projetos-pessoais',
     clientId: 'financial-frontend',
   },
