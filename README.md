@@ -37,7 +37,7 @@ O ecossistema tem **4 peças principais**:
 
 4. **Keycloak externo**
    - hospedado fora do `docker-compose`
-   - URL atual: `https://ec2-54-147-150-5.compute-1.amazonaws.com`
+   - URL atual: `https://auth.gilcllys.party`
 
 ### Como eles conversam
 
@@ -111,15 +111,15 @@ sequenceDiagram
 
 ## ☁️ Arquitetura em produção (EC2 + Nginx)
 
-Em produção o sistema roda em uma **AWS EC2** (`ec2-54-147-150-5.compute-1.amazonaws.com`) com **Nginx no host** como reverse proxy. Todos os serviços rodam em containers Docker expostos apenas em `127.0.0.1` — nenhuma porta de container é acessível diretamente da internet; tudo passa pelo Nginx.
+Em produção o sistema roda em uma **AWS EC2** sob o domínio `gilcllys.party` com **Nginx no host** como reverse proxy. Todos os serviços rodam em containers Docker expostos apenas em `127.0.0.1` — nenhuma porta de container é acessível diretamente da internet; tudo passa pelo Nginx.
 
 ### Portas expostas pelo Nginx
 
-| Porta | Destino | Uso |
-|-------|---------|-----|
-| `:80` | redirect 301 → HTTPS | — |
-| `:443` | Keycloak `127.0.0.1:8080` | Login / OIDC |
-| `:4200` | Angular `:3000` + Django `:8000` | Financial System (SPA + API) |
+| Porta | Domínio / Host | Destino | Uso |
+|-------|----------------|---------|-----|
+| `:80` | `*.gilcllys.party` | redirect 301 → HTTPS | Redirecionamento HTTP → HTTPS |
+| `:443` | `auth.gilcllys.party` | Keycloak `127.0.0.1:8080` | Login / OIDC |
+| `:443` (ou `:4200`) | `financeiro.gilcllys.party` | Angular `:3000` + Django `:8000` | Financial System (SPA + API) |
 
 ### Roteamento por header no `:4200`
 
@@ -157,8 +157,8 @@ graph TB
             PG["🗄️ PostgreSQL :5432 (interno)"]
         end
     end
-    USER -- ":443" --> NGINX
-    USER -- ":4200 (/, /api/)" --> NGINX
+    USER -- ":443 (auth.gilcllys.party)" --> NGINX
+    USER -- ":443 / :4200 (financeiro.gilcllys.party)" --> NGINX
     NGINX -- ":8080" --> KC
     NGINX -- "/api/ + header → :8000" --> BE
     NGINX -- "/ (default) → :3000" --> FE
@@ -180,13 +180,13 @@ O client `financial-backend` possui o mapper de audiência `financial-backend-au
 
 ```bash
 TOKEN=$(curl -sk -X POST \
-  "https://ec2-54-147-150-5.compute-1.amazonaws.com/realms/projetos-pessoais/protocol/openid-connect/token" \
+  "https://auth.gilcllys.party/realms/projetos-pessoais/protocol/openid-connect/token" \
   -d "client_id=financial-backend" -d "client_secret=<CLIENT_SECRET>" \
   -d "grant_type=password" -d "username=<email>" -d "password=<senha>" \
   | jq -r .access_token)
 
 curl -sk -H "Authorization: Bearer $TOKEN" -H "X-Backend-Route: backend" \
-  "https://ec2-54-147-150-5.compute-1.amazonaws.com:4200/api/debts/shared-debts/"
+  "https://financeiro.gilcllys.party/api/debts/shared-debts/"
 ```
 
 > O `client_secret` vive apenas no Keycloak e **nunca** é versionado.
@@ -217,12 +217,12 @@ Depois disso:
 
 ## 🔌 Serviços e portas
 
-| Serviço | URL local | Tecnologia |
+| Serviço | URL local / Produção | Tecnologia |
 |---|---|---|
-| Frontend | http://localhost:4200 | Angular + Nginx |
-| Backend API | http://localhost:8000 | Django + Gunicorn |
+| Frontend | http://localhost:4200 / https://financeiro.gilcllys.party | Angular + Nginx |
+| Backend API | http://localhost:8000 / https://financeiro.gilcllys.party/api | Django + Gunicorn |
 | Banco de dados | (interno) | PostgreSQL 16 |
-| Keycloak | https://ec2-54-147-150-5.compute-1.amazonaws.com | Keycloak (EC2 externo) |
+| Keycloak | https://auth.gilcllys.party | Keycloak (EC2 externo) |
 
 ---
 
@@ -265,7 +265,7 @@ DB_PASSWORD=postgres
 DB_HOST=db
 DB_PORT=5432
 DB_SSL_MODE=disable
-KEYCLOAK_SERVER_URL=https://ec2-54-147-150-5.compute-1.amazonaws.com
+KEYCLOAK_SERVER_URL=https://auth.gilcllys.party
 KEYCLOAK_REALM=projetos-pessoais
 KEYCLOAK_CLIENT_ID=financial-frontend
 KEYCLOAK_VERIFY_SSL=True

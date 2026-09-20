@@ -323,9 +323,9 @@ O frontend, no estado atual, usa **configuração estática de build** em `src/e
 ```ts
 export const environment = {
   production: true,
-  apiBaseUrl: 'http://localhost:8000',
+  apiBaseUrl: 'https://financeiro.gilcllys.party',
   keycloak: {
-    url: 'https://ec2-54-147-150-5.compute-1.amazonaws.com',
+    url: 'https://auth.gilcllys.party',
     realm: 'projetos-pessoais',
     clientId: 'financial-frontend',
   },
@@ -337,8 +337,8 @@ export const environment = {
 | Campo | Valor atual | Uso |
 |---|---|---|
 | `production` | `true` | Flag de ambiente no build atual |
-| `apiBaseUrl` | `http://localhost:8000` | Base da API consumida pelos services |
-| `keycloak.url` | `https://ec2-54-147-150-5.compute-1.amazonaws.com` | URL do provedor OIDC |
+| `apiBaseUrl` | `https://financeiro.gilcllys.party` | Base da API consumida pelos services |
+| `keycloak.url` | `https://auth.gilcllys.party` | URL do provedor OIDC |
 | `keycloak.realm` | `projetos-pessoais` | Realm usado no login |
 | `keycloak.clientId` | `financial-frontend` | Cliente público do SPA |
 

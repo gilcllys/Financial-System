@@ -36,7 +36,7 @@ services:
       - ./backend/.env
     environment:
       # Keycloak hospedado no EC2 (acessível tanto pelo backend quanto pelo browser)
-      KEYCLOAK_SERVER_URL: https://ec2-54-147-150-5.compute-1.amazonaws.com
+      KEYCLOAK_SERVER_URL: https://auth.gilcllys.party
       KEYCLOAK_REALM: projetos-pessoais
       KEYCLOAK_CLIENT_ID: financial-backend
       DB_HOST: db
