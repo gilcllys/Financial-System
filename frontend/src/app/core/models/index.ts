@@ -166,6 +166,7 @@ export interface InvoiceSharedGroupBreakdown {
   group_id: number;
   group_name: string;
   total: number;
+  my_portion?: number;
   participants: InvoiceSharedParticipant[];
 }
 
@@ -194,20 +195,29 @@ export interface InvoiceExpensesResponse {
 }
 
 // ─── Home Dashboard Models ─────────────────────────────────────────────────────
-
-export interface OpenInvoice {
-  card_id: number;
-  card_name: string;
-  last_four_digits: string;
-  invoice_month: number;
-  invoice_year: number;
-  invoice_name: string;
-  period_start: string;
-  period_end: string;
-  due_date: string;
-  days_to_close: number;
-  total: number;
-  expenses_total: number;
-  shared_total: number;
-  count: number;
-}
+
+export interface OpenInvoiceSharedGroup {
+  group_id: number;
+  group_name: string;
+  total: number;       // valor cheio do grupo que caiu neste cartão
+  my_portion: number;  // minha parte no rateio
+}
+
+export interface OpenInvoice {
+  card_id: number;
+  card_name: string;
+  last_four_digits: string;
+  invoice_month: number;
+  invoice_year: number;
+  invoice_name: string;
+  period_start: string;
+  period_end: string;
+  due_date: string;
+  days_to_close: number;
+  total: number;              // BRUTO: expenses_total + shared_gross_total (o que o banco cobra)
+  expenses_total: number;     // só despesas individuais
+  shared_total: number;       // só minha parte nas dívidas compartilhadas
+  shared_gross_total: number; // valor cheio das dívidas compartilhadas pagas neste cartão
+  shared_groups: OpenInvoiceSharedGroup[];
+  count: number;
+}

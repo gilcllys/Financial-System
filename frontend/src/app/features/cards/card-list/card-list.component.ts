@@ -2,7 +2,7 @@
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { CardService } from '../../../core/services/card.service';
-import { CreditCard, Expense, Invoice } from '../../../core/models';
+import { CreditCard, Expense, Invoice, InvoiceExpensesResponse } from '../../../core/models';
 
 const CARD_GRADIENTS = [
   'background: linear-gradient(135deg, #1a2a4a 0%, #2d4a7a 100%)',  // dark blue - Itau
@@ -76,10 +76,16 @@ export class CardListComponent implements OnInit {
     cards.forEach(card => {
       this.cardSvc.getInvoiceExpenses(card.id, m, y, undefined, 1, 200).subscribe({
         next: res => {
-          this.invoiceTotals.update(t => ({ ...t, [card.id]: res.summary.total }));
+          this.invoiceTotals.update(t => ({ ...t, [card.id]: this.grossTotal(res) }));
         },
       });
     });
+  }
+
+  /** Valor bruto da fatura (o que o banco cobra): individual + valor cheio do compartilhado. */
+  private grossTotal(res: InvoiceExpensesResponse): number {
+    const s = res.summary;
+    return (s.expenses_total ?? s.total) + (s.shared_breakdown?.total ?? 0);
   }
 
   selectCard(card: CreditCard, useCurrentInvoice = false): void {
@@ -110,7 +116,7 @@ export class CardListComponent implements OnInit {
     this.cardSvc.getInvoiceExpenses(id, this.invoiceMonth(), this.invoiceYear(), undefined, 1, 50).subscribe({
       next: res => {
         this.invoiceExpenses.set(res.expenses);
-        this.invoiceTotals.update(t => ({ ...t, [id]: res.summary.total }));
+        this.invoiceTotals.update(t => ({ ...t, [id]: this.grossTotal(res) }));
         this.loadingInvoice.set(false);
       },
       error: () => this.loadingInvoice.set(false),

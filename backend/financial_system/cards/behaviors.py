@@ -79,6 +79,89 @@ def _compute_invoice_period(card, invoice_month, invoice_year):
     return period_start, period_end, due
 
 
+def _sorted_participants(rows):
+    return [
+        {**row, 'amount': round(row['amount'], 2)}
+        for row in sorted(
+            rows.values(),
+            key=lambda item: (not item['is_current_user'], item['name'].lower()),
+        )
+    ]
+
+
+def _shared_invoice_breakdown(card, period_start, period_end):
+    """
+    Dívidas compartilhadas pagas pelo dono do cartão, NESTE cartão, dentro do
+    período da fatura (mesmo range usado para as despesas individuais).
+
+    O banco cobra o valor cheio (`total`); `my_total` é apenas a parte do
+    usuário no rateio. `groups` traz o mesmo recorte por grupo.
+    """
+    from debts.models import SharedEntry
+
+    entries = SharedEntry.objects.filter(
+        credit_card_id=card.id,
+        date__gte=period_start,
+        date__lte=period_end,
+        paid_by__tenant_id=card.tenant_id,
+    ).prefetch_related('participants__member', 'shared_debt__members')
+
+    my_total = 0.0
+    gross_total = 0.0
+    participants = {}
+    groups = {}
+    for entry in entries:
+        amount = abs(float(entry.amount))
+        members = [p.member for p in entry.participants.all()]
+        if not members:
+            members = list(entry.shared_debt.members.all())
+        portion = amount / (len(members) or 1)
+        gross_total += amount
+        my_total += portion
+
+        group = groups.setdefault(
+            entry.shared_debt_id,
+            {
+                'group_id': entry.shared_debt_id,
+                'group_name': entry.shared_debt.name,
+                'total': 0.0,
+                'my_portion': 0.0,
+                'participants': {},
+            },
+        )
+        group['total'] += amount
+        group['my_portion'] += portion
+
+        for member in members:
+            for bucket in (participants, group['participants']):
+                row = bucket.setdefault(
+                    member.id,
+                    {
+                        'member_id': member.id,
+                        'name': member.display_name,
+                        'amount': 0.0,
+                        'is_current_user': member.tenant_id == card.tenant_id,
+                    },
+                )
+                row['amount'] += portion
+
+    return {
+        'total': round(gross_total, 2),
+        'my_total': round(my_total, 2),
+        'participants': _sorted_participants(participants),
+        'groups': [
+            {
+                'group_id': g['group_id'],
+                'group_name': g['group_name'],
+                'total': round(g['total'], 2),
+                'my_portion': round(g['my_portion'], 2),
+                'participants': _sorted_participants(g['participants']),
+            }
+            for g in sorted(groups.values(), key=lambda g: g['group_name'].lower())
+        ],
+    }
+
+
 class InvoicesBehavior:
     """
     Lista as faturas de um cartão de crédito.
@@ -226,85 +309,12 @@ class InvoiceExpensesBehavior:
 
 
         # Shared debts paid on this card in the invoice period.
-        from debts.models import SharedEntry as _SharedEntry
-        _shared_entries = _SharedEntry.objects.filter(
-            credit_card_id=self.card.id,
-            date__gte=period_start,
-            date__lte=period_end,
-            paid_by__tenant_id=self.card.tenant_id,
-        ).prefetch_related('participants__member', 'shared_debt__members')
-        _shared_my_total = 0.0
-        _shared_gross_total = 0.0
-        _shared_participants = {}
-        _shared_groups = {}
-        for _e in _shared_entries:
-            _amount = abs(float(_e.amount))
-            _members = [p.member for p in _e.participants.all()]
-            if not _members:
-                _members = list(_e.shared_debt.members.all())
-            _p = len(_members) or 1
-            _portion = _amount / _p
-            _shared_gross_total += _amount
-            _shared_my_total += _portion
-
-            _group_row = _shared_groups.setdefault(
-                _e.shared_debt_id,
-                {
-                    'group_id': _e.shared_debt_id,
-                    'group_name': _e.shared_debt.name,
-                    'total': 0.0,
-                    'participants': {},
-                },
-            )
-            _group_row['total'] += _amount
-
-            for _member in _members:
-                _row = _shared_participants.setdefault(
-                    _member.id,
-                    {
-                        'member_id': _member.id,
-                        'name': _member.display_name,
-                        'amount': 0.0,
-                        'is_current_user': _member.tenant_id == self.card.tenant_id,
-                    },
-                )
-                _row['amount'] += _portion
-
-                _group_participant_row = _group_row['participants'].setdefault(
-                    _member.id,
-                    {
-                        'member_id': _member.id,
-                        'name': _member.display_name,
-                        'amount': 0.0,
-                        'is_current_user': _member.tenant_id == self.card.tenant_id,
-                    },
-                )
-                _group_participant_row['amount'] += _portion
-        _shared_my_total = round(_shared_my_total, 2)
+        _shared = _shared_invoice_breakdown(self.card, period_start, period_end)
+        _shared_my_total = _shared['my_total']
         _shared_breakdown = {
-            'total': round(_shared_gross_total, 2),
-            'participants': [
-                {**row, 'amount': round(row['amount'], 2)}
-                for row in sorted(
-                    _shared_participants.values(),
-                    key=lambda item: (not item['is_current_user'], item['name'].lower()),
-                )
-            ],
-            'groups': [
-                {
-                    'group_id': group['group_id'],
-                    'group_name': group['group_name'],
-                    'total': round(group['total'], 2),
-                    'participants': [
-                        {**p, 'amount': round(p['amount'], 2)}
-                        for p in sorted(
-                            group['participants'].values(),
-                            key=lambda item: (not item['is_current_user'], item['name'].lower()),
-                        )
-                    ],
-                }
-                for group in sorted(_shared_groups.values(), key=lambda g: g['group_name'].lower())
-            ],
+            'total': _shared['total'],
+            'participants': _shared['participants'],
+            'groups': _shared['groups'],
         }
         _expenses_total = grand_total
         _composite_total = round(_expenses_total + _shared_my_total, 2)
@@ -340,9 +350,13 @@ class OpenInvoicesBehavior:
     """
     Retorna a fatura corrente (aberta) de cada cartão do tenant,
     com o total de gastos do período e a data de fechamento/vencimento.
-
-    Endpoint: GET /api/cards/credit-cards/open-invoices/
-    """
+
+    `total` é o valor BRUTO que o banco cobra: despesas individuais +
+    valor cheio das dívidas compartilhadas pagas neste cartão no período.
+    `shared_total` é só a parte do usuário nesse rateio.
+
+    Endpoint: GET /api/cards/credit-cards/open-invoices/
+    """
 
     def __init__(self, tenant_id: str):
         self.tenant_id = tenant_id
@@ -372,21 +386,35 @@ class OpenInvoicesBehavior:
             )
 
             days_to_close = (period_end - date.today()).days
-
-            result.append({
-                'card_id': card.id,
-                'card_name': card.name,
-                'last_four_digits': card.last_four_digits,
-                'invoice_month': invoice_month,
-                'invoice_year': invoice_year,
-                'invoice_name': f'{_MONTH_NAMES[invoice_month]} {invoice_year}',
-                'period_start': period_start.isoformat(),
-                'period_end': period_end.isoformat(),
-                'due_date': due.isoformat(),
-                'days_to_close': days_to_close,
-                'total': round(-float(agg['total'] or 0), 2),
-                'count': agg['count'] or 0,
-            })
+            expenses_total = round(-float(agg['total'] or 0), 2)
+            shared = _shared_invoice_breakdown(card, period_start, period_end)
+
+            result.append({
+                'card_id': card.id,
+                'card_name': card.name,
+                'last_four_digits': card.last_four_digits,
+                'invoice_month': invoice_month,
+                'invoice_year': invoice_year,
+                'invoice_name': f'{_MONTH_NAMES[invoice_month]} {invoice_year}',
+                'period_start': period_start.isoformat(),
+                'period_end': period_end.isoformat(),
+                'due_date': due.isoformat(),
+                'days_to_close': days_to_close,
+                'total': round(expenses_total + shared['total'], 2),
+                'expenses_total': expenses_total,
+                'shared_total': shared['my_total'],
+                'shared_gross_total': shared['total'],
+                'shared_groups': [
+                    {
+                        'group_id': g['group_id'],
+                        'group_name': g['group_name'],
+                        'total': g['total'],
+                        'my_portion': g['my_portion'],
+                    }
+                    for g in shared['groups']
+                ],
+                'count': agg['count'] or 0,
+            })
 
         result.sort(key=lambda x: x['days_to_close'])
         return Response(result, status=status.HTTP_200_OK)
