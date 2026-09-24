@@ -85,8 +85,46 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
 
   totalPages    = computed(() => Math.ceil(this.totalCount() / this.pageSize));
   pageNumbers   = computed(() => Array.from({ length: this.totalPages() }, (_, i) => i + 1));
-  totalInvoices = computed(() => this.openInvoices().reduce((s, i) => s + i.total, 0));
-  maxCategory   = computed(() => Math.max(...this.byCategory().map(c => c.total), 1));
+  /** Soma BRUTA das faturas abertas (individual + valor cheio do compartilhado) — o que o banco cobra. */
+  totalInvoices = computed(() => this.openInvoices().reduce((s, i) => s + i.total, 0));
+  maxCategory   = computed(() => Math.max(...this.byCategory().map(c => c.total), 1));
+
+  // ── Home v2: KPIs centrados no cartão ─────────────────────────────────────
+  /** Saldo = Receitas − Faturas abertas (bruto) − gastos em dinheiro fora do cartão. */
+  balance = computed(() =>
+    this.consolidated().income - this.totalInvoices() - this.consolidated().cash_expenses
+  );
+
+  nextDueDate = computed<string | null>(() => {
+    const dates = this.openInvoices().map(i => i.due_date).filter(Boolean).sort();
+    return dates[0] ?? null;
+  });
+
+  invoicesKpiSub = computed(() => {
+    const n = this.openInvoices().length;
+    if (n === 0) return 'Nenhum cartão cadastrado';
+    const cards = `${n} ${n === 1 ? 'cartão' : 'cartões'}`;
+    const due = this.nextDueDate();
+    return due ? `${cards} · próx. vencimento ${this.ddmm(due)}` : cards;
+  });
+
+  /** Para cada grupo compartilhado, em quais faturas abertas (cartões) ele caiu. */
+  groupCards = computed(() => {
+    const map = new Map<number, { label: string; total: number; my_portion: number }[]>();
+    for (const inv of this.openInvoices()) {
+      for (const g of inv.shared_groups ?? []) {
+        const list = map.get(g.group_id) ?? [];
+        list.push({ label: `${inv.card_name} •••• ${inv.last_four_digits}`, total: g.total, my_portion: g.my_portion });
+        map.set(g.group_id, list);
+      }
+    }
+    return map;
+  });
+
+  activeRecurring = computed(() => this.recurringTemplates().filter(t => t.is_active));
+  totalRecurringMonthly = computed(() =>
+    this.activeRecurring().reduce((s, t) => s + Number(t.amount), 0)
+  );
 
   /** Parcelas ativas (ainda não quitadas) — máximo 4 no preview */
   activeInstallments = computed(() =>
@@ -114,7 +152,8 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
 
     this.loadDashboard();
     this.loadTable();
-  }
+    this.loadRecurringTemplates();
+  }
 
   ngAfterViewInit(): void { }
 
@@ -266,6 +305,26 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     if (days <= 7) return 'badge--yellow';
     return 'badge--green';
   }
+
+  /** 'YYYY-MM-DD' → 'dd/MM' sem depender de timezone. */
+  ddmm(iso: string): string {
+    return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+  }
+
+  /** % da fatura que é gasto individual (restante = compartilhado) — largura da barra dividida. */
+  individualPct(inv: OpenInvoice): number {
+    if (inv.total <= 0) return 100;
+    return Math.round((inv.expenses_total / inv.total) * 100);
+  }
+
+  cardsForGroup(groupId: number): { label: string; total: number; my_portion: number }[] {
+    return this.groupCards().get(groupId) ?? [];
+  }
+
+  recurringMeta(t: RecurringExpenseTemplate): string {
+    const pay = t.payment_method === 'cartao' ? (t.credit_card_name ?? 'Cartão não definido') : 'Dinheiro';
+    return `${t.category_name ?? 'Sem categoria'} · ${pay} · dia ${t.day_of_month}`;
+  }
 
   @ViewChild('lineChartEl') lineChartEl!: ElementRef<HTMLDivElement>;
   @ViewChild('compChartEl') compChartEl!: ElementRef<HTMLDivElement>;
@@ -445,20 +504,12 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
   }
 
-  loadRecurringTemplates(): void {
-    this.expSvc.listRecurringTemplates().subscribe({
-      next: tpls => this.recurringTemplates.set(tpls),
-    });
-  }
-
-  deleteRecurring(id: number): void {
-    this.expSvc.deleteRecurringTemplate(id).subscribe({ next: () => this.loadRecurringTemplates() });
-  }
-
-  toggleRecurring(id: number): void {
-    this.expSvc.toggleRecurringTemplate(id).subscribe({ next: () => this.loadRecurringTemplates() });
-  }
-
-}
+  loadRecurringTemplates(): void {
+    this.expSvc.listRecurringTemplates().subscribe({
+      next: tpls => this.recurringTemplates.set(tpls),
+    });
+  }
+
+}
 
 

@@ -8,11 +8,13 @@ from django.test import SimpleTestCase, TestCase
 
 from cards.behaviors import (
     InvoiceExpensesBehavior,
+    OpenInvoicesBehavior,
     _compute_invoice_period,
     _current_invoice_month,
 )
 from cards.models import CreditCard
 from catalog.models import ExpenseCategory
+from debts.models import SharedDebt, SharedDebtMember, SharedEntry, SharedEntryParticipant
 from expenses.models import Expense
 
 
@@ -115,6 +117,106 @@ class InvoiceCreditSignTests(TestCase):
         self.assertEqual(len(by_category), 1)
         self.assertEqual(by_category[0]['total'], 100.00)
         self.assertEqual(by_category[0]['percentage'], 100.00)
+
+
+# ---------------------------------------------------------------------------
+# Faturas abertas (Home): compartilhado entra no MESMO range da fatura
+# ---------------------------------------------------------------------------
+
+
+class _FixedToday(real_date):
+    """2026-08-10: fatura corrente do cartão (fecha dia 21) é Setembro/2026,
+    período 22/07 → 21/08."""
+
+    @classmethod
+    def today(cls):
+        return cls(2026, 8, 10)
+
+
+class OpenInvoicesSharedTests(TestCase):
+    TENANT = 'tenant-open-inv'
+    OTHER = 'tenant-other'
+
+    def setUp(self):
+        self.card = CreditCard.objects.create(
+            tenant_id=self.TENANT, name='Nubank',
+            due_day=1, closing_day=21, last_four_digits='1234',
+        )
+        self.category = ExpenseCategory.objects.create(
+            tenant_id=self.TENANT, name='Diversos'
+        )
+        self.group = SharedDebt.objects.create(name='Casa', owner_tenant_id=self.TENANT)
+        self.me = SharedDebtMember.objects.create(
+            shared_debt=self.group, tenant_id=self.TENANT, display_name='Eu'
+        )
+        self.other = SharedDebtMember.objects.create(
+            shared_debt=self.group, tenant_id=self.OTHER, display_name='Ana'
+        )
+
+    def _expense(self, amount, day):
+        return Expense.objects.create(
+            tenant_id=self.TENANT, category=self.category, credit_card=self.card,
+            description='Gasto', quantity=1, amount=Decimal(amount),
+            date=real_date(2026, 8, day), payment_method='cartao',
+        )
+
+    def _shared(self, amount, entry_date, paid_by=None, card=True):
+        entry = SharedEntry.objects.create(
+            shared_debt=self.group, paid_by=paid_by or self.me,
+            description='Compartilhado', amount=Decimal(amount), date=entry_date,
+            payment_method='cartao', credit_card=self.card if card else None,
+            created_by_tenant_id=self.TENANT,
+        )
+        for m in (self.me, self.other):
+            SharedEntryParticipant.objects.create(entry=entry, member=m)
+        return entry
+
+    def _run(self):
+        with patch('cards.behaviors.date', _FixedToday):
+            rows = OpenInvoicesBehavior(self.TENANT).run().data
+        self.assertEqual(len(rows), 1)
+        return rows[0]
+
+    def test_period_matches_invoice_window(self):
+        row = self._run()
+        self.assertEqual(row['invoice_month'], 9)
+        self.assertEqual(row['period_start'], '2026-07-22')
+        self.assertEqual(row['period_end'], '2026-08-21')
+
+    def test_total_is_gross_individual_plus_full_shared(self):
+        self._expense('-100.00', 10)
+        self._shared('200.00', real_date(2026, 8, 10))
+
+        row = self._run()
+
+        self.assertEqual(row['expenses_total'], 100.00)
+        self.assertEqual(row['shared_gross_total'], 200.00)
+        self.assertEqual(row['shared_total'], 100.00)   # minha metade
+        self.assertEqual(row['total'], 300.00)          # o que o banco cobra
+        self.assertEqual(row['shared_groups'], [{
+            'group_id': self.group.id, 'group_name': 'Casa',
+            'total': 200.00, 'my_portion': 100.00,
+        }])
+
+    def test_shared_outside_invoice_window_is_excluded(self):
+        self._shared('999.00', real_date(2026, 7, 21))   # fechamento anterior
+        self._shared('999.00', real_date(2026, 8, 22))   # já é da próxima fatura
+        self._shared('50.00', real_date(2026, 7, 22))    # primeiro dia do período
+
+        row = self._run()
+
+        self.assertEqual(row['shared_gross_total'], 50.00)
+        self.assertEqual(row['total'], 50.00)
+
+    def test_shared_paid_by_someone_else_or_in_cash_is_excluded(self):
+        self._shared('80.00', real_date(2026, 8, 5), paid_by=self.other)
+        self._shared('70.00', real_date(2026, 8, 5), card=False)
+
+        row = self._run()
+
+        self.assertEqual(row['shared_gross_total'], 0.0)
+        self.assertEqual(row['shared_groups'], [])
+        self.assertEqual(row['total'], 0.0)
 
 
 class CreditCardDeleteEndpointTests(TestCase):

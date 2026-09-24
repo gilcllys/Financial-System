@@ -1,8 +1,8 @@
 <!-- ?? Page Header ?? -->
 <div class="home-header">
   <div>
-    <h1 class="home-header__title">{{ currentMonthName }} {{ currentYear }}</h1>
-    <p class="home-header__subtitle">Aqui está o panorama geral do seu controle financeiro este mês.</p>
+    <h1 class="home-header__title">Início</h1>
+    <p class="home-header__subtitle">{{ currentMonthName }} {{ currentYear }} · Suas faturas abertas em um só lugar.</p>
   </div>
   <div class="home-header__actions">
     <a routerLink="/recurring-expenses" class="btn btn--secondary btn--sm">Gastos Fixos</a>
@@ -23,206 +23,180 @@
     <div class="kpi-clean-card__value kpi-clean-card__value--green">
       {{ formatCurrency(consolidated().income) }}
     </div>
+    <p class="kpi-clean-card__sub">Entradas de {{ currentMonthName }}</p>
   </div>
 
-  <!-- DESPESAS -->
+  <!-- FATURAS ABERTAS (bruto: o que o banco cobra) -->
   <div class="kpi-clean-card">
     <div class="kpi-clean-card__top">
-      <span class="kpi-clean-card__label">DESPESAS</span>
+      <span class="kpi-clean-card__label">FATURAS ABERTAS</span>
       <span class="kpi-clean-card__icon kpi-clean-card__icon--red">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
-      </span>
-    </div>
-    <div class="kpi-clean-card__value kpi-clean-card__value--red">
-      {{ formatCurrency(consolidated().total_expenses) }}
-    </div>
-  </div>
-
-  <!-- SALDO ATUAL -->
-  <div class="kpi-clean-card">
-    <div class="kpi-clean-card__top">
-      <span class="kpi-clean-card__label">SALDO ATUAL</span>
-      <span class="kpi-clean-card__icon kpi-clean-card__icon--blue">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
       </span>
     </div>
-    <div class="kpi-clean-card__value" [class.kpi-clean-card__value--red]="consolidated().balance < 0">
-      {{ consolidated().balance < 0 ? "-" : "" }}{{ formatCurrency(Math.abs(consolidated().balance)) }}
+    <div class="kpi-clean-card__value kpi-clean-card__value--red">
+      {{ formatCurrency(totalInvoices()) }}
     </div>
+    <p class="kpi-clean-card__sub">{{ invoicesKpiSub() }}</p>
+  </div>
+
+  <!-- SALDO = Receitas − Faturas − Dinheiro -->
+  <div class="kpi-clean-card">
+    <div class="kpi-clean-card__top">
+      <span class="kpi-clean-card__label">SALDO</span>
+      <span class="kpi-clean-card__icon kpi-clean-card__icon--blue">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
+      </span>
+    </div>
+    <div class="kpi-clean-card__value" [class.kpi-clean-card__value--red]="balance() < 0">
+      {{ balance() < 0 ? "-" : "" }}{{ formatCurrency(Math.abs(balance())) }}
+    </div>
+    <p class="kpi-clean-card__sub">Fora do cartão (dinheiro): {{ formatCurrency(consolidated().cash_expenses) }}</p>
   </div>
 </div>
 
-<!-- —— Posição nos Grupos —— -->
-@if (sharedDebts().length > 0) {
-  <div class="card group-position-card" style="margin-bottom: var(--space-base)">
-    <div class="card__header">
-      <div class="card__header-title">
-        <span class="card__icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        </span>
-        <span class="card__title">Posição nos Grupos</span>
-      </div>
-      <a routerLink="/shared-debts" class="card__link">Ver todos os grupos &gt;</a>
-    </div>
-    <div class="card__body">
-      @for (g of sharedDebts().slice(0, 2); track g.id) {
-        <div class="group-row">
-          <div class="group-row__left">
-            <div class="group-row__avatar">{{ g.name.substring(0,2).toUpperCase() }}</div>
-            <div>
-              <h4 class="group-row__name">{{ g.name }}</h4>
-              <span class="group-row__sub">Última atualização há 2 dias</span>
-            </div>
-          </div>
-          <div class="group-row__right">
-            <div class="group-row__val-block">
-              <span class="group-row__val-label">Total do Grupo</span>
-              <span class="mono group-row__val">{{ formatCurrency(g.total_amount) }}</span>
-            </div>
-            <div class="group-row__val-block">
-              <span class="group-row__val-label">Sua Parte</span>
-              <span class="mono group-row__val group-row__val--blue">{{ formatCurrency(g.my_portion) }}</span>
-            </div>
-          </div>
-        </div>
-      }
-    </div>
-  </div>
-}
-
-<!-- ?? Gastos Fixos Section ?? -->
-<div class="card fixed-expenses-card" style="margin-bottom: var(--space-base)">
+<!-- ?? Faturas Abertas (full-width, uma linha por cartão) ?? -->
+<div class="card invoices-card" style="margin-bottom: var(--space-base)">
   <div class="card__header">
     <div class="card__header-title">
       <span class="card__icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
       </span>
-      <span class="card__title">Gastos Fixos</span>
+      <div>
+        <span class="card__title">Faturas Abertas</span>
+        <p class="card__subtitle">Despesas do mês = soma de todas as faturas em aberto</p>
+      </div>
     </div>
-    <a routerLink="/recurring-expenses" class="card__link btn-link">Gerenciar</a>
+    <a routerLink="/cards" class="card__link">Ver todos os cartões &rsaquo;</a>
   </div>
   <div class="card__body">
-    @if (recurringTemplates().length === 0) {
-      <p class="empty-msg">Nenhum gasto fixo cadastrado. <a routerLink="/recurring-expenses" class="btn-link">Cadastrar agora</a></p>
-    } @else {
-      <div class="data-table-wrapper">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Descrição</th>
-              <th>Categoria</th>
-              <th>Dia</th>
-              <th class="text-right">Valor</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (t of recurringTemplates(); track t.id) {
-              <tr [style.opacity]="t.is_active ? '1' : '0.5'">
-                <td style="font-weight:500">{{ t.description }}</td>
-                <td>
-                  @if (t.category_name) {
-                    <span class="badge badge--primary">{{ t.category_name }}</span>
-                  } @else {
-                    <span class="text-muted">?</span>
-                  }
-                </td>
-                <td class="mono text-muted">dia {{ t.day_of_month }}</td>
-                <td class="text-right mono">R$ {{ t.amount }}</td>
-                <td>
-                  <span [class]="t.is_active ? 'badge badge--success' : 'badge badge--muted'">
-                    {{ t.is_active ? "Ativo" : "Pausado" }}
-                  </span>
-                </td>
-                <td style="display:flex;gap:4px;justify-content:flex-end">
-                  <button class="btn btn--secondary btn--sm" type="button" (click)="toggleRecurring(t.id)"
-                    [title]="t.is_active ? 'Pausar' : 'Ativar'">{{ t.is_active ? '?' : '?' }}</button>
-                  <button class="btn btn--danger btn--sm" type="button" (click)="deleteRecurring(t.id)">Excluir</button>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
+    @if (openInvoices().length === 0) {
+      <p class="empty-msg">Nenhum cartão cadastrado. <a routerLink="/cards/new" class="btn-link">Cadastrar cartão</a></p>
+    }
+    @for (inv of openInvoices(); track inv.card_id) {
+      <a [routerLink]="['/cards', inv.card_id, 'expenses']" class="invoice-row">
+        <div class="invoice-row__top">
+          <div class="invoice-row__icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+          </div>
+          <div class="invoice-row__info">
+            <p class="invoice-row__name">{{ inv.card_name }} &bull;&bull;&bull;&bull; {{ inv.last_four_digits }}</p>
+            <p class="invoice-row__meta">
+              Vence {{ ddmm(inv.due_date) }}
+              @if (inv.shared_groups.length > 0) {
+                · {{ inv.shared_groups.length }} {{ inv.shared_groups.length === 1 ? 'grupo compartilhado' : 'grupos compartilhados' }}
+              } @else {
+                · só individual
+              }
+            </p>
+          </div>
+          <span class="badge" [class]="daysClass(inv.days_to_close)">{{ daysLabel(inv.days_to_close) }}</span>
+          <p class="invoice-row__total mono">{{ formatCurrency(inv.total) }}</p>
+        </div>
+        <div class="split-bar" role="img" [attr.aria-label]="'Individual ' + individualPct(inv) + '%'">
+          <span class="split-bar__ind" [style.width.%]="individualPct(inv)"></span>
+          @if (inv.shared_gross_total > 0) { <span class="split-bar__shared"></span> }
+        </div>
+        <p class="invoice-row__legend">
+          <span class="dot dot--blue"></span>Individual <span class="mono">{{ formatCurrency(inv.expenses_total) }}</span>
+          @if (inv.shared_gross_total > 0) {
+            <span class="invoice-row__legend-sep">·</span>
+            <span class="dot dot--green"></span>Compartilhado <span class="mono">{{ formatCurrency(inv.shared_gross_total) }}</span>
+            <span class="text-muted">(sua parte {{ formatCurrency(inv.shared_total) }})</span>
+          } @else {
+            <span class="invoice-row__legend-sep">·</span><span class="text-muted">Sem gastos compartilhados</span>
+          }
+        </p>
+      </a>
+    }
+    @if (openInvoices().length > 0) {
+      <div class="invoice-total-row">
+        <span>Total em Faturas</span>
+        <strong class="mono value--down">{{ formatCurrency(totalInvoices()) }}</strong>
       </div>
     }
   </div>
 </div>
 
-<!-- ?? 2-Column Grid Row 1 (Faturas Abertas & Gastos Compartilhados) ?? -->
+<!-- ?? 2-Column Grid Row 1 (Gastos Fixos & Gastos Compartilhados) ?? -->
 <div class="grid-2col">
-  <!-- Faturas Abertas -->
+  <!-- Gastos Fixos -->
   <div class="card">
     <div class="card__header">
       <div class="card__header-title">
         <span class="card__icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
         </span>
-        <span class="card__title">Faturas Abertas</span>
+        <span class="card__title">Gastos Fixos</span>
       </div>
-      <a routerLink="/cards" class="card__link">Ver Detalhes</a>
+      <a routerLink="/recurring-expenses" class="card__link">Gerenciar &rsaquo;</a>
     </div>
     <div class="card__body">
-      @if (openInvoices().length === 0) {
-        <p class="empty-msg">Nenhum cartão cadastrado.</p>
+      @if (activeRecurring().length === 0) {
+        <p class="empty-msg">Nenhum gasto fixo ativo. <a routerLink="/recurring-expenses" class="btn-link">Cadastrar agora</a></p>
       }
-      @for (inv of openInvoices(); track inv.card_id) {
-        <a [routerLink]="['/cards', inv.card_id, 'expenses']" class="invoice-item">
-          <div class="invoice-item__icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+      @for (t of activeRecurring().slice(0, 5); track t.id) {
+        <div class="list-row">
+          <div class="list-row__icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
           </div>
-          <div class="invoice-item__info">
-            <p class="invoice-item__name">{{ inv.card_name }} {{ inv.last_four_digits }}</p>
-            <p class="invoice-item__closing">
-              <span class="badge" [class]="daysClass(inv.days_to_close)">
-                {{ daysLabel(inv.days_to_close) }}
-              </span>
-            </p>
+          <div class="list-row__info">
+            <p class="list-row__title">{{ t.description }}</p>
+            <p class="list-row__sub">{{ recurringMeta(t) }}</p>
           </div>
-          <div class="invoice-item__value">
-            <p class="invoice-item__total mono">{{ formatCurrency(inv.total) }}</p>
-          </div>
-        </a>
+          <span class="list-row__value mono">{{ formatCurrency(+t.amount) }}</span>
+        </div>
       }
-      @if (openInvoices().length > 0) {
+      @if (activeRecurring().length > 0) {
         <div class="invoice-total-row">
-          <span>Total em Faturas</span>
-          <strong class="mono">{{ formatCurrency(totalInvoices()) }}</strong>
+          <span>Total mensal · {{ activeRecurring().length }} {{ activeRecurring().length === 1 ? 'ativo' : 'ativos' }}</span>
+          <strong class="mono">{{ formatCurrency(totalRecurringMonthly()) }}</strong>
         </div>
       }
     </div>
   </div>
 
-  <!-- Gastos Compartilhados -->
+  <!-- Gastos Compartilhados: por grupo, sua parte e em qual cartão caiu -->
   <div class="card">
     <div class="card__header">
       <div class="card__header-title">
         <span class="card__icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         </span>
-        <span class="card__title">Gastos Compartilhados</span>
+        <div>
+          <span class="card__title">Gastos Compartilhados</span>
+          <p class="card__subtitle">Por grupo: total, sua parte e em qual cartão caiu</p>
+        </div>
       </div>
-      <a routerLink="/shared-debts" class="card__link">Dividir Outro</a>
+      <a routerLink="/shared-debts" class="card__link">Ver grupos &rsaquo;</a>
     </div>
     <div class="card__body">
       @if (sharedDebts().length === 0) {
         <p class="empty-msg">Nenhum gasto compartilhado ativo.</p>
       }
-      @for (group of sharedDebts().slice(0, 2); track group.id) {
-        <a [routerLink]="['/shared-debts', group.id]" class="shared-item">
-          <div class="shared-item__avatar">{{ group.name.substring(0, 2).toUpperCase() }}</div>
-          <div class="shared-item__info">
-            <p class="shared-item__name">{{ group.name }}</p>
-            <p class="shared-item__portion-sub">Sua parte: {{ formatCurrency(group.my_portion) }}</p>
+      @for (group of sharedDebts().slice(0, 3); track group.id) {
+        <a [routerLink]="['/shared-debts', group.id]" class="group-item">
+          <div class="group-item__top">
+            <div class="group-item__avatar">{{ group.name.substring(0, 2).toUpperCase() }}</div>
+            <div class="group-item__info">
+              <p class="group-item__name">{{ group.name }}</p>
+              <p class="group-item__sub">Total do grupo <span class="mono">{{ formatCurrency(group.total_amount) }}</span></p>
+            </div>
+            <div class="group-item__portion">
+              <span class="group-item__portion-label">Sua parte</span>
+              <span class="group-item__portion-value mono">{{ formatCurrency(group.my_portion) }}</span>
+            </div>
           </div>
-          <div class="shared-item__values">
-            <p class="shared-item__total mono">{{ formatCurrency(group.total_amount) }}</p>
-          </div>
+          @for (c of cardsForGroup(group.id); track c.label) {
+            <p class="group-item__card"><span class="dot dot--green"></span>Caiu no {{ c.label }} · <span class="mono">{{ formatCurrency(c.total) }}</span> nesta fatura</p>
+          } @empty {
+            <p class="group-item__card group-item__card--none">Nenhum lançamento em fatura aberta</p>
+          }
         </a>
       }
       @if (sharedDebts().length > 0) {
         <div class="invoice-total-row">
-          <span>Total a Receber/Pagar</span>
+          <span>Sua parte no mês</span>
           <strong class="mono text-blue">{{ formatCurrency(consolidated().shared_my_portion) }}</strong>
         </div>
       }
