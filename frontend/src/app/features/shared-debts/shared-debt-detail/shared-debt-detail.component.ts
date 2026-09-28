@@ -710,17 +710,17 @@ export class SharedDebtDetailComponent implements OnInit {
 
     return members.map(member => {
       const paidEntries = allEntries.filter(e => e.paid_by === member.id);
-      const totalSpent = paidEntries.reduce((s, e) => s + e.amount, 0);
+      const totalSpent = paidEntries.reduce((s, e) => s + Number(e.amount), 0);
 
       let catIdx = 0;
       const catMap = new Map<string, { name: string; total: number; color: string }>();
       for (const e of paidEntries) {
         const key = e.category_name ?? 'Sem categoria';
         if (!catMap.has(key)) catMap.set(key, { name: key, total: 0, color: catColors[catIdx++ % catColors.length] });
-        catMap.get(key)!.total += e.amount / (e.participant_count || 1);
+        catMap.get(key)!.total += Number(e.amount) / (e.participant_count || 1);
       }
 
-      const myPortion = paidEntries.reduce((s, e) => s + (e.amount / (e.participant_count || 1)), 0);
+      const myPortion = paidEntries.reduce((s, e) => s + (Number(e.amount) / (e.participant_count || 1)), 0);
       const bal = this.balances();
       const settlement = bal?.settlement.find(s => s.from_member_id === member.id);
       const owes = settlement?.amount ?? 0;

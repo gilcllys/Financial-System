@@ -49,7 +49,7 @@ export class CardListComponent implements OnInit {
   );
 
   invoiceTotal = computed(() =>
-    this.invoiceExpenses().reduce((s, e) => s + e.amount, 0)
+    this.invoiceExpenses().reduce((s, e) => s + Number(e.amount), 0)
   );
 
   private readonly installmentRe = /parcela\s+(\d+)\/(\d+)/i;
