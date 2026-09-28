@@ -20,6 +20,7 @@ from debts.behaviors import (
     RecurringTemplateBehavior,
     UpdateSharedEntryBehavior,
 )
+from debts.by_person import ByPersonBehavior
 from debts.models import SharedDebt, SharedEntry
 
 
@@ -128,6 +129,31 @@ class SharedDebtViewSet(viewsets.ModelViewSet):
         members_qs = shared_debt.members.all().order_by('id')
         data = serializer.SharedDebtMemberSerializer(members_qs, many=True).data
         return Response(data)
+
+    @action(detail=True, methods=['get'], url_path='by-person')
+    def by_person(self, request, pk=None):
+        """
+        Aba "Por pessoa": quanto cada membro deve, por fatura fechada
+        (?mode=closed&month=&year=) ou previsão das faturas abertas (?mode=open).
+        """
+        shared_debt = self.get_object()  # já filtra por membership
+
+        def _int(name, lo, hi):
+            raw = request.query_params.get(name)
+            if raw in (None, ''):
+                return None
+            try:
+                value = int(raw)
+            except (TypeError, ValueError):
+                return None
+            return value if lo <= value <= hi else None
+
+        return ByPersonBehavior(
+            shared_debt,
+            mode=request.query_params.get('mode', 'closed'),
+            month=_int('month', 1, 12),
+            year=_int('year', 2000, 2100),
+        ).run()
 
 
 
