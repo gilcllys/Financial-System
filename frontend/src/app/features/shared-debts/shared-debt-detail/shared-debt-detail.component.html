@@ -40,19 +40,19 @@
   <div class="tabs" role="tablist">
     <button class="tabs__tab" role="tab"
       [class.tabs__tab--active]="activeTab() === 'entries'"
-      (click)="activeTab.set('entries')"
+      (click)="selectTab('entries')"
       [attr.aria-selected]="activeTab() === 'entries'">
       Por lancamento
     </button>
     <button class="tabs__tab" role="tab"
       [class.tabs__tab--active]="activeTab() === 'installments'"
-      (click)="activeTab.set('installments')"
+      (click)="selectTab('installments')"
       [attr.aria-selected]="activeTab() === 'installments'">
       Por parcelamento
     </button>
     <button class="tabs__tab" role="tab"
       [class.tabs__tab--active]="activeTab() === 'byPerson'"
-      (click)="activeTab.set('byPerson')"
+      (click)="selectTab('byPerson')"
       [attr.aria-selected]="activeTab() === 'byPerson'">
       Por pessoa
     </button>
@@ -259,112 +259,206 @@
 
   <!-- TAB: Por pessoa -->
   @if (activeTab() === 'byPerson') {
-    <div class="by-person">
-      @for (person of perPerson(); track person.member.id) {
-        <div class="person-section">
-          <!-- Person header -->
-          <div class="person-header">
-            <div class="person-avatar" [style.background]="catColor($index)">
-              {{ initials(person.member.display_name) }}
-            </div>
-            <div class="person-header__info">
-              <span class="person-header__name">{{ person.member.display_name }}</span>
-            </div>
-            <div class="person-header__stats">
-              <span>Total gasto: <strong>{{ formatCurrency(person.totalSpent) }}</strong></span>
-              <span class="separator">&middot;</span>
-              <span>Minha parte: <strong class="value-red">{{ formatCurrency(person.myPortion) }}</strong></span>
-              @if (person.owes > 0 && !person.isMe) {
-                <span class="separator">&middot;</span>
-                <span>Deve: <strong class="value-red">{{ formatCurrency(person.owes) }}</strong></span>
+    <div class="bp">
+
+      <!-- Toolbar -->
+      <div class="bp-toolbar">
+        <div class="bp-segment" role="tablist" aria-label="Modo de visualizacao">
+          <button type="button" role="tab" class="bp-segment__btn" [class.bp-segment__btn--active]="bpMode() === 'closed'" [attr.aria-selected]="bpMode() === 'closed'" (click)="bpSetMode('closed')">Faturas fechadas</button>
+          <button type="button" role="tab" class="bp-segment__btn" [class.bp-segment__btn--active]="bpMode() === 'open'" [attr.aria-selected]="bpMode() === 'open'" (click)="bpSetMode('open')">Em aberto</button>
+        </div>
+        @if (bpMode() === 'closed') {
+          <select class="form-select bp-toolbar__month" [value]="bpMonthKey()" (change)="bpSetMonth($any($event.target).value)" aria-label="Mes de fechamento">
+            @for (o of bpMonthOptions; track o.label) {
+              <option [value]="o.year + '-' + o.month">{{ o.label }}</option>
+            }
+          </select>
+          <span class="bp-toolbar__hint">Faturas que fecharam neste mes &middot; so lancamentos dentro do periodo de cada fatura</span>
+        } @else if (bpData(); as d) {
+          <span class="bp-toolbar__hint">Hoje, {{ bpFormatToday() }} &middot; {{ bpOpenCount() }} fatura(s) em aberto</span>
+        }
+      </div>
+
+      @if (bpLoading()) {
+        <div class="loading-wrapper"><span class="spinner"></span> Calculando...</div>
+      } @else if (bpData(); as d) {
+
+        @if (d.mode === 'open') {
+          <div class="bp-alert bp-alert--info" role="status">
+            <strong>Previsao:</strong> estas faturas ainda nao fecharam. Novos lancamentos ate o fechamento mudam os valores &mdash; o acerto so e gerado depois que cada fatura fechar.
+          </div>
+        }
+
+        @if (d.blocks.length === 0 && d.mode === 'closed') {
+          <div class="empty-state">
+            <div class="empty-state__icon">&#128203;</div>
+            <p class="empty-state__title">Nenhuma fatura fechou em {{ d.month_name }} com gastos deste grupo.</p>
+          </div>
+        } @else {
+
+          <!-- Cabecalho de colunas -->
+          <div class="bp-head">
+            <span class="bp-head__label">{{ d.mode === 'closed' ? 'Fatura fechada ? cartao de quem pagou' : 'Fatura em aberto ? cartao de quem vai pagar' }}</span>
+            <div class="bp-head__members">
+              @for (m of d.members; track m.id) {
+                <div class="bp-head__member" [class.bp-head__member--me]="bpIsMe(m)">
+                  <span class="bp-avatar" aria-hidden="true">{{ initials(m.display_name) }}</span>
+                  <span class="bp-head__name">{{ m.display_name }}</span>
+                </div>
               }
             </div>
           </div>
 
-          <!-- Entries by this person -->
-          @if (person.entries.length === 0) {
-            <div class="person-empty">
-              <p>Nenhum gasto registrado por este membro</p>
-              <p class="text-muted" style="font-size:13px">Os gastos do grupo divididos com ele aparecerao listados aqui.</p>
-            </div>
-          } @else {
-            <div class="table-wrap">
-              <table class="entries-table" aria-label="Gastos de {{ person.member.display_name }}">
-                <thead>
-                  <tr>
-                    <th>DIVIDIDO COM</th>
-                    <th>DESCRICAO</th>
-                    <th>METODO</th>
-                    <th>CATEGORIA</th>
-                    <th class="text-right">TOTAL</th>
-                    <th class="text-right">MINHA PARTE</th>
-                    <th class="text-center">PAGO</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (e of person.entries; track e.id) {
-                    <tr>
-                      <td class="col-divided">
-                        @for (m of members(); track m.id) {
-                          @if (m.id !== e.paid_by) {
-                            <span class="member-chip member-chip--sm">{{ m.display_name }}</span>
-                          }
-                        }
-                      </td>
-                      <td class="col-desc">
-                        <span class="entry-name">{{ e.description }}</span>
-                        @if (e.total_installments > 1) {
-                          <span class="badge-parcela">{{ e.installment_number }}/{{ e.total_installments }}</span>
-                        }
-                      </td>
-                      <td>
-                        @if (e.payment_method === 'cartao') {
-                          <span class="chip chip--card">Cartao</span>
-                        } @else {
-                          <span class="chip chip--cash">Dinheiro</span>
-                        }
-                      </td>
-                      <td>
-                        @if (e.category_name) {
-                          <span class="cat-chip">{{ e.category_name }}</span>
-                        } @else {
-                          <span class="text-muted">-</span>
-                        }
-                      </td>
-                      <td class="text-right mono">{{ formatCurrency(e.amount) }}</td>
-                      <td class="text-right value-red mono">{{ formatCurrency(myPortion(e)) }}</td>
-                      <td class="col-paid text-center">
-                        <button class="badge-paid" [class.badge-paid--yes]="e.paid" (click)="togglePaid(e)">{{ e.paid ? 'Sim' : 'Nao' }}</button>
-                      </td>
-                    </tr>
+          <!-- Um card por bloco -->
+          @for (b of d.blocks; track bpKey(b)) {
+            <div class="bp-card" [class.bp-card--open]="b.status === 'open'">
+              <div class="bp-card__main">
+                <div class="bp-card__icon" [class.bp-card__icon--cash]="b.kind === 'cash'" aria-hidden="true">
+                  @if (b.kind === 'card') {
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                  } @else {
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
                   }
-                </tbody>
-              </table>
-            </div>
+                </div>
+                <div class="bp-card__info">
+                  @if (b.kind === 'card') {
+                    <div class="bp-card__title">Cartao de {{ b.owner_name }}</div>
+                    <div class="bp-card__sub">
+                      <span>{{ b.card_name }} &bull;&bull;&bull;&bull; {{ b.last_four_digits }} &middot; {{ b.invoice_name }}</span>
+                      @if (b.status === 'closed') {
+                        <span class="bp-badge bp-badge--gray">Fechada</span>
+                      } @else {
+                        <span class="bp-badge bp-badge--blue">Aberta</span>
+                        <span class="bp-badge" [class]="'bp-badge ' + bpDaysClass(b.days_to_close)">{{ bpDaysLabel(b.days_to_close) }}</span>
+                      }
+                    </div>
+                    <div class="bp-card__meta">Periodo {{ bpPeriod(b) }} &middot; fecha {{ formatDate(b.period_end!) }} &middot; vence {{ formatDate(b.due_date!) }}</div>
+                    <div class="bp-card__total">{{ b.status === 'open' ? 'Compartilhado ate agora' : 'Total compartilhado' }} <strong class="mono">{{ formatCurrency(b.total) }}</strong></div>
+                  } @else {
+                    <div class="bp-card__title">Dinheiro</div>
+                    <div class="bp-card__sub"><span class="bp-badge bp-badge--yellow">Sem fatura</span></div>
+                    <div class="bp-card__meta">Pago em dinheiro ou sem cartao cadastrado &middot; {{ d.month_name }}</div>
+                    <div class="bp-card__total">Total <strong class="mono">{{ formatCurrency(b.total) }}</strong></div>
+                  }
+                </div>
+                <div class="bp-card__cells">
+                  @for (m of d.members; track m.id) {
+                    <div class="bp-card__cell mono" [class.bp-card__cell--me]="bpIsMe(m)">
+                      @if (bpShare(b, m.id) > 0) { {{ formatCurrency(bpShare(b, m.id)) }} } @else { <span class="text-muted">&mdash;</span> }
+                    </div>
+                  }
+                </div>
+              </div>
 
-            <!-- Category summary chips -->
-            @if (person.categorySummary.length > 0) {
-              <div class="cat-summary-row">
-                <span class="text-muted" style="font-size:13px">Resumo por categoria:</span>
-                @for (cat of person.categorySummary; track cat.name) {
-                  <span class="cat-summary-chip" [style.background]="cat.color + '20'" [style.color]="cat.color">
-                    {{ cat.name }}: {{ formatCurrency(cat.total) }}
-                  </span>
+              <!-- Detalhes -->
+              @if (b.entries.length === 0) {
+                <div class="bp-card__details bp-card__details--empty">Nenhum lancamento compartilhado neste periodo ainda</div>
+              } @else {
+                <button type="button" class="bp-card__toggle" (click)="bpToggle(bpKey(b))" [attr.aria-expanded]="bpIsOpen(bpKey(b))">
+                  <span class="bp-card__chevron" aria-hidden="true">{{ bpIsOpen(bpKey(b)) ? '&#9662;' : '&#9656;' }}</span>
+                  Detalhes &middot; {{ b.entries.length }} lancamento(s) dentro do periodo
+                </button>
+                @if (bpIsOpen(bpKey(b))) {
+                  <div class="bp-card__details">
+                    <div class="bp-detail-row bp-detail-row--head">
+                      <span class="bp-detail-row__desc">Lancamento &middot; data &middot; dividido com</span>
+                      <div class="bp-detail-row__cells">
+                        @for (m of d.members; track m.id) { <span class="bp-detail-row__cell">{{ m.display_name }}</span> }
+                      </div>
+                    </div>
+                    @for (e of b.entries; track e.id) {
+                      <div class="bp-detail-row">
+                        <div class="bp-detail-row__desc">
+                          <span class="bp-detail-row__name">{{ e.description }}
+                            @if (e.total_installments > 1) { <span class="badge-parcela">{{ e.installment_number }}/{{ e.total_installments }}</span> }
+                          </span>
+                          <span class="bp-detail-row__meta">{{ formatDate(e.date) }} &middot; <span class="mono">{{ formatCurrency(e.amount) }}</span> &middot; {{ bpSplitLabel(e) }}@if (b.kind === 'cash') { &middot; pago por {{ e.paid_by_name }} }</span>
+                        </div>
+                        <div class="bp-detail-row__cells">
+                          @for (m of d.members; track m.id) {
+                            <span class="bp-detail-row__cell mono">@if (bpEntryShare(e, m.id) > 0) { {{ formatCurrency(bpEntryShare(e, m.id)) }} } @else { <span class="text-muted">&mdash;</span> }</span>
+                          }
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+              }
+            </div>
+          }
+
+          <!-- Total -->
+          <div class="bp-total" [class.bp-total--forecast]="d.mode === 'open'">
+            <div class="bp-total__row">
+              <span class="bp-total__label">Total &middot; parte de cada um</span>
+              <div class="bp-total__cells">
+                @for (m of d.members; track m.id) {
+                  <div class="bp-total__cell">
+                    <strong class="mono bp-total__value">{{ formatCurrency(bpTotal('share', m.id)) }}</strong>
+                    <span class="bp-badge bp-badge--gray">{{ bpPct(m.id) }}%</span>
+                  </div>
                 }
               </div>
-            }
-          }
-        </div>
-      }
-
-      <!-- Saldo total footer -->
-      @if (balances(); as bal) {
-        @if (bal.settlement.length > 0) {
-          <div class="person-footer">
-            @for (s of bal.settlement; track s.from_member_id) {
-              <span>Saldo devedor: <strong class="value-red">{{ formatCurrency(s.amount) }}</strong> para {{ s.to_name }}</span>
-            }
+            </div>
+            <div class="bp-total__row">
+              <span class="bp-total__label">{{ d.mode === 'open' ? 'Vai pagar ao banco' : 'Ja pagou' }}</span>
+              <div class="bp-total__cells">
+                @for (m of d.members; track m.id) { <div class="bp-total__cell mono">{{ formatCurrency(bpTotal('paid', m.id)) }}</div> }
+              </div>
+            </div>
+            <div class="bp-total__row bp-total__row--balance">
+              <span class="bp-total__label">{{ d.mode === 'open' ? 'Saldo previsto' : 'Saldo' }}</span>
+              <div class="bp-total__cells">
+                @for (m of d.members; track m.id) {
+                  <div class="bp-total__cell mono" [class.value-up]="bpTotal('balance', m.id) > 0" [class.value-red]="bpTotal('balance', m.id) < 0">
+                    {{ bpTotal('balance', m.id) > 0 ? '+ ' : '' }}{{ formatCurrency(bpTotal('balance', m.id)) }}
+                  </div>
+                }
+              </div>
+            </div>
           </div>
+
+          <!-- Acerto -->
+          @if (d.mode === 'closed') {
+            @if (d.settlement.length > 0) {
+              @for (s of d.settlement; track s.from_member_id + '-' + s.to_member_id) {
+                <div class="bp-settle">
+                  <span class="bp-avatar" aria-hidden="true">{{ initials(s.from_name) }}</span>
+                  <span><strong>{{ s.from_name }}</strong> paga <strong class="mono">{{ formatCurrency(s.amount) }}</strong> para</span>
+                  <span class="bp-avatar" aria-hidden="true">{{ initials(s.to_name) }}</span>
+                  <strong>{{ s.to_name }}</strong>
+                </div>
+              }
+            } @else {
+              <div class="bp-settle bp-settle--ok">Tudo certo &mdash; ninguem deve nada neste periodo.</div>
+            }
+          } @else {
+            <div class="bp-settle bp-settle--forecast">
+              <div class="bp-settle__row">
+                <span class="bp-settle__clock" aria-hidden="true">&#128339;</span>
+                <div>
+                  @if (d.settlement.length > 0) {
+                    @for (s of d.settlement; track s.from_member_id + '-' + s.to_member_id) {
+                      <div>Se as faturas fechassem hoje: <strong>{{ s.from_name }}</strong> pagaria <strong class="mono">{{ formatCurrency(s.amount) }}</strong> para <strong>{{ s.to_name }}</strong>.</div>
+                    }
+                  } @else {
+                    <div>Se as faturas fechassem hoje, ninguem deveria nada.</div>
+                  }
+                  <div class="bp-settle__sub">O acerto oficial so aparece em Faturas fechadas depois que cada fatura fechar.@if (d.next_closing; as nc) { Proximo fechamento: {{ nc.card_name }} em {{ formatDate(nc.date) }}. }</div>
+                </div>
+              </div>
+              <button type="button" class="btn btn--secondary btn--sm" disabled>Acerto apos o fechamento</button>
+            </div>
+          }
+
+          <!-- Nota final -->
+          @if (d.mode === 'closed') {
+            @if (d.outside && d.outside.count > 0) {
+              <p class="bp-note">Fora desta conta: {{ d.outside.count }} lancamento(s) ({{ formatCurrency(d.outside.total) }}) em faturas ainda abertas &mdash; entram quando as faturas fecharem.</p>
+            }
+          } @else {
+            <p class="bp-note">Gastos em dinheiro nao aparecem aqui: nao tem fatura e ja contam no mes em que foram pagos, em Faturas fechadas.</p>
+          }
         }
       }
     </div>
