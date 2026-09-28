@@ -141,6 +141,67 @@ export interface CreateRecurringTemplatePayload {
   day_of_month?: number;
 }
 
+export interface ByPersonMember {
+  id: number;
+  display_name: string;
+  tenant_id: string | null;
+}
+
+export interface ByPersonEntry {
+  id: number;
+  description: string;
+  date: string;
+  amount: number;
+  paid_by: number;
+  paid_by_name: string;
+  participant_ids: number[];
+  shares: Record<string, number>;
+  installment_number: number;
+  total_installments: number;
+}
+
+export interface ByPersonBlock {
+  kind: 'card' | 'cash';
+  status: 'closed' | 'open';
+  payer_member_id: number | null;
+  total: number;
+  shares: Record<string, number>;
+  entries: ByPersonEntry[];
+  card_id?: number;
+  card_name?: string;
+  last_four_digits?: string;
+  owner_member_id?: number;
+  owner_name?: string;
+  invoice_month?: number;
+  invoice_year?: number;
+  invoice_name?: string;
+  period_start?: string;
+  period_end?: string;
+  due_date?: string;
+  days_to_close?: number;
+}
+
+export interface ByPersonTotals {
+  grand_total: number;
+  share: Record<string, number>;
+  paid: Record<string, number>;
+  balance: Record<string, number>;
+}
+
+export interface ByPersonResponse {
+  mode: 'closed' | 'open';
+  month: number;
+  year: number;
+  month_name: string;
+  today: string;
+  members: ByPersonMember[];
+  blocks: ByPersonBlock[];
+  totals: ByPersonTotals;
+  settlement: SettlementLine[];
+  outside?: { count: number; total: number };
+  next_closing?: { card_name: string; last_four_digits: string; date: string } | null;
+}
+
 export interface PaginatedResponse<T> {
   count: number;
   next: string | null;
@@ -189,6 +250,13 @@ export class SharedDebtService {
 
   balances(id: number): Observable<BalancesResponse> {
     return this.http.get<BalancesResponse>(`${this.base}/shared-debts/${id}/balances/`);
+  }
+
+  byPerson(id: number, mode: 'closed' | 'open', month?: number, year?: number): Observable<ByPersonResponse> {
+    let params = new HttpParams().set('mode', mode);
+    if (month != null) params = params.set('month', month);
+    if (year  != null) params = params.set('year', year);
+    return this.http.get<ByPersonResponse>(`${this.base}/shared-debts/${id}/by-person/`, { params });
   }
 
   // ââ€â‚¬ââ€â‚¬ââ€â‚¬ Entries ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬

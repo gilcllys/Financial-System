@@ -18,6 +18,10 @@ import {
   MonthlyHistoryEntry,
   RecurringTemplate,
   PaginatedResponse,
+  ByPersonResponse,
+  ByPersonBlock,
+  ByPersonEntry,
+  ByPersonMember,
 } from '../../../core/services/shared-debt.service';
 
 
@@ -262,6 +266,7 @@ export class SharedDebtDetailComponent implements OnInit {
       }
     });
     this.svc.balances(this.groupId).subscribe({ next: b => this.balances.set(b) });
+    if (this.bpData()) this.loadByPerson();
   }
 
   private openEntryFromQuery(): void {
@@ -607,6 +612,11 @@ export class SharedDebtDetailComponent implements OnInit {
   // ── Tab & Installment view ──────────────────────────────────────────────
   activeTab = signal<'entries' | 'installments' | 'byPerson'>('entries');
 
+  selectTab(tab: 'entries' | 'installments' | 'byPerson'): void {
+    this.activeTab.set(tab);
+    if (tab === 'byPerson' && !this.bpData() && !this.bpLoading()) this.loadByPerson();
+  }
+
   installmentGroups = computed(() => {
     const all = this.entries();
     const myId = this.myTenantId;
@@ -702,45 +712,121 @@ export class SharedDebtDetailComponent implements OnInit {
     return !!(c?.invalid && c?.touched);
   }
 
-  // ── Per-person view ─────────────────────────────────────────────────────
-  perPerson = computed(() => {
-    const members = this.members();
-    const allEntries = this.entries();
-    const catColors = ['#0052ff','#05b169','#cf202f','#f4b000','#7c828a','#30b0c7','#ff6b35'];
+  // ── Per-person view (faturas fechadas / em aberto) ──────────────────────
+  bpMode = signal<'closed' | 'open'>('closed');
+  bpMonth = signal(new Date().getMonth() + 1);
+  bpYear = signal(new Date().getFullYear());
+  bpData = signal<ByPersonResponse | null>(null);
+  bpLoading = signal(false);
+  bpExpanded = signal<Set<string>>(new Set());
 
-    return members.map(member => {
-      const paidEntries = allEntries.filter(e => e.paid_by === member.id);
-      const totalSpent = paidEntries.reduce((s, e) => s + Number(e.amount), 0);
+  readonly bpMonthOptions = (() => {
+    const out: { month: number; year: number; label: string }[] = [];
+    const d = new Date();
+    for (let i = 0; i < 12; i++) {
+      const m = d.getMonth() + 1, y = d.getFullYear();
+      out.push({ month: m, year: y, label: `${this.MONTHS[m - 1].label} ${y}` });
+      d.setMonth(d.getMonth() - 1);
+    }
+    return out;
+  })();
 
-      let catIdx = 0;
-      const catMap = new Map<string, { name: string; total: number; color: string }>();
-      for (const e of paidEntries) {
-        const key = e.category_name ?? 'Sem categoria';
-        if (!catMap.has(key)) catMap.set(key, { name: key, total: 0, color: catColors[catIdx++ % catColors.length] });
-        catMap.get(key)!.total += Number(e.amount) / (e.participant_count || 1);
-      }
+  bpMonthKey = computed(() => `${this.bpYear()}-${this.bpMonth()}`);
 
-      const myPortion = paidEntries.reduce((s, e) => s + (Number(e.amount) / (e.participant_count || 1)), 0);
-      const bal = this.balances();
-      const settlement = bal?.settlement.find(s => s.from_member_id === member.id);
-      const owes = settlement?.amount ?? 0;
+  loadByPerson(): void {
+    this.bpLoading.set(true);
+    const mode = this.bpMode();
+    const closed = mode === 'closed';
+    this.svc.byPerson(this.groupId, mode, closed ? this.bpMonth() : undefined, closed ? this.bpYear() : undefined)
+      .subscribe({
+        next: d => { this.bpData.set(d); this.bpLoading.set(false); },
+        error: () => { this.bpData.set(null); this.bpLoading.set(false); },
+      });
+  }
 
-      return {
-        member,
-        isMe: member.tenant_id === this.myTenantId,
-        totalSpent,
-        myPortion,
-        owes,
-        entries: paidEntries,
-        categorySummary: Array.from(catMap.values()),
-      };
-    });
-  });
+  bpSetMode(mode: 'closed' | 'open'): void {
+    if (this.bpMode() === mode) return;
+    this.bpMode.set(mode);
+    this.bpExpanded.set(new Set());
+    this.loadByPerson();
+  }
+
+  bpSetMonth(key: string): void {
+    const [y, m] = key.split('-').map(Number);
+    this.bpYear.set(y);
+    this.bpMonth.set(m);
+    this.bpExpanded.set(new Set());
+    this.loadByPerson();
+  }
+
+  bpKey(block: ByPersonBlock): string {
+    return block.kind === 'cash' ? 'cash' : `card-${block.card_id}`;
+  }
+
+  bpToggle(key: string): void {
+    const next = new Set(this.bpExpanded());
+    if (next.has(key)) next.delete(key); else next.add(key);
+    this.bpExpanded.set(next);
+  }
+
+  bpIsOpen(key: string): boolean { return this.bpExpanded().has(key); }
+
+  bpShare(block: ByPersonBlock, memberId: number): number {
+    return Number(block.shares[String(memberId)] ?? 0);
+  }
+
+  bpEntryShare(entry: ByPersonEntry, memberId: number): number {
+    return Number(entry.shares[String(memberId)] ?? 0);
+  }
+
+  bpTotal(kind: 'share' | 'paid' | 'balance', memberId: number): number {
+    return Number(this.bpData()?.totals[kind][String(memberId)] ?? 0);
+  }
+
+  bpPct(memberId: number): number {
+    const gt = this.bpData()?.totals.grand_total ?? 0;
+    return gt > 0 ? Math.round((this.bpTotal('share', memberId) / gt) * 100) : 0;
+  }
+
+  bpDaysLabel(d: number | undefined): string {
+    if (d == null) return '';
+    if (d <= 0) return 'Fecha hoje';
+    return d === 1 ? 'Fecha em 1 dia' : `Fecha em ${d} dias`;
+  }
+
+  bpDaysClass(d: number | undefined): string {
+    if (d == null) return '';
+    return d <= 3 ? 'bp-badge--red' : d <= 7 ? 'bp-badge--yellow' : 'bp-badge--green';
+  }
+
+  bpPeriod(block: ByPersonBlock): string {
+    if (!block.period_start || !block.period_end) return '';
+    const f = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+    return `${f(block.period_start)} \u2013 ${f(block.period_end)}`;
+  }
+
+  bpSplitLabel(entry: ByPersonEntry): string {
+    const members = this.bpData()?.members ?? [];
+    if (entry.participant_ids.length >= members.length) return 'dividido entre todos';
+    const names = members.filter(m => entry.participant_ids.includes(m.id)).map(m => m.display_name);
+    return names.length === 1 ? `s\u00f3 ${names[0]}` : `dividido com ${names.join(', ')}`;
+  }
+
+  bpIsMe(member: ByPersonMember): boolean {
+    return !!member.tenant_id && member.tenant_id === this.myTenantId;
+  }
+
+  bpFormatToday(): string {
+    const t = this.bpData()?.today;
+    return t ? this.formatDate(t) : '';
+  }
+
+  bpOpenCount(): number {
+    return this.bpData()?.blocks.filter(b => b.kind === 'card').length ?? 0;
+  }
 
   initials(name: string): string {
     return (name ?? '?').split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase();
   }
 
-  catColors = ['#0052ff','#05b169','#cf202f','#f4b000','#7c828a','#30b0c7','#ff6b35'];
-  catColor(i: number): string { return this.catColors[i % this.catColors.length]; }
 }
