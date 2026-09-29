@@ -454,11 +454,8 @@ class BalancesBehavior:
         )
         for entry in entries:
             paid[entry.paid_by_id] = paid.get(entry.paid_by_id, Decimal('0')) + entry.amount
-            participant_ids = [p.member_id for p in entry.participants.all()]
-            if not participant_ids:
-                continue
-            share = entry.amount / Decimal(len(participant_ids))
-            for pid in participant_ids:
+            share = entry.share_per_participant()
+            for pid in entry.participant_ids():
                 owed[pid] = owed.get(pid, Decimal('0')) + share
         balance = {
             m.id: _round2(paid[m.id] - owed[m.id])
@@ -602,9 +599,8 @@ class HomeSummaryBehavior:
             my_portion = Decimal('0')
             for entry in g.entries.all():
                 total_amount += entry.amount
-                participants = [p.member_id for p in entry.participants.all()]
-                if participants and my_member_id in participants:
-                    my_portion += entry.amount / Decimal(len(participants))
+                if my_member_id is not None:
+                    my_portion += entry.share_of(my_member_id)
             members_names = [m.display_name for m in g.members.all()]
             result.append({
                 'id': g.id,
@@ -652,9 +648,7 @@ class MonthlyHistoryBehavior:
             buckets[key]['total'] += entry.amount
             buckets[key]['count'] += 1
             if my_member_id is not None:
-                participants = [p.member_id for p in entry.participants.all()]
-                if participants and my_member_id in participants:
-                    buckets[key]['my_portion'] += entry.amount / Decimal(len(participants))
+                buckets[key]['my_portion'] += entry.share_of(my_member_id)
         result = [
             {
                 'year': year,

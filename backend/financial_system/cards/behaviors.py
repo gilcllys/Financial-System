@@ -113,10 +113,9 @@ def _shared_invoice_breakdown(card, period_start, period_end):
     groups = {}
     for entry in entries:
         amount = abs(float(entry.amount))
-        members = [p.member for p in entry.participants.all()]
-        if not members:
-            members = list(entry.shared_debt.members.all())
-        portion = amount / (len(members) or 1)
+        members_by_id = {m.id: m for m in entry.shared_debt.members.all()}
+        members = [members_by_id[mid] for mid in entry.participant_ids() if mid in members_by_id]
+        portion = abs(float(entry.share_per_participant()))
         gross_total += amount
         my_total += portion
 
