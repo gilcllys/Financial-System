@@ -166,142 +166,125 @@ def _payer_belongs_to_tenant(paid_by_id, tenant_id) -> bool:
     ).exists()
 
 
+class EntryRuleError(ValueError):
+    """Regra de negocio de lancamento compartilhado violada (vira 400 {'detail'})."""
+
+
+def _bad_request(exc: EntryRuleError) -> Response:
+    return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def validate_entry_rules(shared_debt, user, data: dict, *, current=None, partial=False) -> dict:
+    """
+    Regras comuns a criar/editar SharedEntry e a criar SharedRecurringTemplate.
+
+    Recebe `data` ja tipado pelo serializer de entrada e devolve os campos
+    resolvidos: paid_by_id, participant_ids (None = manter os atuais em PATCH),
+    payment_method, credit_card_id, category_id. Levanta EntryRuleError.
+
+    `current` e a entry existente (update); `partial` e o PATCH, onde campos
+    ausentes herdam o valor atual em vez do default.
+    """
+    member_ids = set(shared_debt.members.values_list('id', flat=True))
+
+    def pick(key, default):
+        return data.get(key, getattr(current, key) if (partial and current is not None) else default)
+
+    paid_by_id = data.get('paid_by', current.paid_by_id if (partial and current is not None) else None)
+    if paid_by_id is None:
+        raise EntryRuleError('O campo paid_by é obrigatório.')
+    if paid_by_id not in member_ids:
+        raise EntryRuleError('paid_by não é membro deste grupo.')
+
+    raw_participants = data.get('participant_ids') or None      # [] == ausente
+    if raw_participants is not None:
+        participant_ids = list(dict.fromkeys(raw_participants))
+        if any(pid not in member_ids for pid in participant_ids):
+            raise EntryRuleError('participant_ids contém membros de fora do grupo.')
+    elif partial and current is not None:
+        participant_ids = None                                   # PATCH: mantem os atuais
+    else:
+        participant_ids = list(member_ids)                       # default: todos
+    if participant_ids is not None and not participant_ids:
+        raise EntryRuleError('Grupo sem participantes válidos.')
+
+    payment_method = pick('payment_method', 'dinheiro')
+    credit_card_id = pick('credit_card_id', None)
+    # cartao exigido so quando quem pagou foi o proprio usuario (cartao de
+    # terceiro nao esta cadastrado neste tenant).
+    if payment_method == 'cartao' and credit_card_id is None and _payer_belongs_to_tenant(paid_by_id, user.tenant_id):
+        raise EntryRuleError('credit_card_id é obrigatório quando payment_method é "cartao".')
+    # [SEC-A01] IDOR: checa o cartao ANTES de limpar por 'dinheiro', senao uma
+    # tentativa de usar cartao de outro tenant passaria despercebida.
+    if credit_card_id is not None and not CreditCard.objects.filter(id=credit_card_id, tenant_id=user.tenant_id).exists():
+        raise EntryRuleError('O cartão informado não pertence ao usuário autenticado.')
+    if payment_method == 'dinheiro':
+        credit_card_id = None
+
+    category_id = pick('category_id', None)
+    if category_id is not None and not _category_available_to_tenant(category_id, user.tenant_id):
+        raise EntryRuleError('A categoria informada não pertence ao usuário autenticado.')
+
+    return {
+        'paid_by_id': paid_by_id,
+        'participant_ids': participant_ids,
+        'payment_method': payment_method,
+        'credit_card_id': credit_card_id,
+        'category_id': category_id,
+    }
+
+
 class CreateSharedEntryBehavior:
-    """Cria uma despesa compartilhada e seus participantes (rateio igual)."""
+    """Cria uma despesa compartilhada (e suas parcelas) com participantes em rateio igual."""
 
     def __init__(self, shared_debt: SharedDebt, user, data: dict):
         self.shared_debt = shared_debt
         self.user = user
-        self.description = data.get('description')
-        self.amount = data.get('amount')
-        self.date = data.get('date')
-        self.paid_by_id = data.get('paid_by')
-        self.participant_ids = data.get('participant_ids') or []
-        self.payment_method = data.get('payment_method', 'dinheiro')
-        self.credit_card_id = data.get('credit_card_id')
-        self.category_id = data.get('category_id')
-        self.total_installments = int(data.get('total_installments_input', 1) or 1)
-
-    def _member_ids(self):
-        return set(
-            self.shared_debt.members.values_list('id', flat=True)
-        )
+        self.data = data
 
     def run(self) -> Response:
-        member_ids = self._member_ids()
-        # paid_by precisa ser membro deste grupo.
-        if self.paid_by_id not in member_ids:
-            return Response(
-                {'detail': 'paid_by não é membro deste grupo.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        # participant_ids (se informados) precisam pertencer ao grupo.
-        if self.participant_ids:
-            participant_ids = list(dict.fromkeys(self.participant_ids))
-            invalid = [pid for pid in participant_ids if pid not in member_ids]
-            if invalid:
-                return Response(
-                    {
-                        'detail': 'participant_ids contém membros de fora do grupo.',
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-        else:
-            participant_ids = list(member_ids)
-        if not participant_ids:
-            return Response(
-                {'detail': 'Grupo sem participantes válidos.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        # payment_method='cartao' exige cartão vinculado quando quem pagou foi o
-        # próprio usuário, senão o lançamento fica invisível em qualquer fatura.
-        if (
-            self.payment_method == 'cartao'
-            and self.credit_card_id is None
-            and _payer_belongs_to_tenant(self.paid_by_id, self.user.tenant_id)
-        ):
-            return Response(
-                {
-                    'detail': 'credit_card_id é obrigatório quando payment_method é "cartao".',
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        # [SEC-A01] IDOR: cartão precisa pertencer ao tenant autenticado.
-        if self.credit_card_id is not None:
-            owns_card = CreditCard.objects.filter(
-                id=self.credit_card_id,
-                tenant_id=self.user.tenant_id,
-            ).exists()
-            if not owns_card:
-                return Response(
-                    {
-                        'detail': 'O cartão informado não pertence ao usuário autenticado.',
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-        # payment_method='dinheiro' nunca carrega cartão. Limpamos só aqui, após o
-        # guard de IDOR: limpar antes esconderia uma tentativa de usar cartão
-        # de outro tenant.
-        if self.payment_method == 'dinheiro':
-            self.credit_card_id = None
-        # [SEC-A01] IDOR: categoria precisa ser do tenant ou global.
-        if self.category_id is not None and not _category_available_to_tenant(
-            self.category_id, self.user.tenant_id
-        ):
-            return Response(
-                {
-                    'detail': 'A categoria informada não pertence ao usuário autenticado.',
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        total = self.total_installments
+        data = self.data
+        try:
+            rules = validate_entry_rules(self.shared_debt, self.user, data)
+        except EntryRuleError as exc:
+            return _bad_request(exc)
+
+        total = int(data.get('total_installments_input', 1) or 1)
         group_id = uuid.uuid4() if total > 1 else None
-        # O valor informado é o TOTAL da compra: cada parcela recebe apenas a
-        # sua fração, nunca o valor cheio.
-        installment_amounts = _split_installments(self.amount, total)
-        base_description = _strip_installment_suffix(self.description)
+        # O valor informado e o TOTAL da compra: cada parcela recebe sua fracao.
+        installment_amounts = _split_installments(data['amount'], total)
+        base_description = _strip_installment_suffix(data['description'])
         with transaction.atomic():
             entries = []
             for i in range(total):
-                entry_date = self.date + relativedelta(months=i) if total > 1 else self.date
-                desc = f"{base_description} ({i + 1}/{total})" if total > 1 else base_description
                 entry = SharedEntry.objects.create(
                     shared_debt=self.shared_debt,
-                    paid_by_id=self.paid_by_id,
-                    description=desc,
+                    paid_by_id=rules['paid_by_id'],
+                    description=f"{base_description} ({i + 1}/{total})" if total > 1 else base_description,
                     amount=installment_amounts[i],
-                    date=entry_date,
-                    payment_method=self.payment_method,
-                    credit_card_id=self.credit_card_id,
-                    category_id=self.category_id,
+                    date=data['date'] + relativedelta(months=i) if total > 1 else data['date'],
+                    payment_method=rules['payment_method'],
+                    credit_card_id=rules['credit_card_id'],
+                    category_id=rules['category_id'],
                     created_by_tenant_id=self.user.tenant_id,
                     installment_group_id=group_id,
                     total_installments=total,
                     installment_number=i + 1,
+                    paid=bool(data.get('paid', False)),
                 )
                 SharedEntryParticipant.objects.bulk_create(
-                    [
-                        SharedEntryParticipant(entry=entry, member_id=member_id)
-                        for member_id in participant_ids
-                    ]
+                    [SharedEntryParticipant(entry=entry, member_id=mid) for mid in rules['participant_ids']]
                 )
                 entries.append(entry)
-        return Response(
-            SharedEntrySerializer(entries[0]).data,
-            status=status.HTTP_201_CREATED,
-        )
+        return Response(SharedEntrySerializer(entries[0]).data, status=status.HTTP_201_CREATED)
 
 
 class UpdateSharedEntryBehavior:
     """
-    Atualiza uma despesa compartilhada existente e ressincroniza participantes.
-    Regras idênticas ao create:
-    - paid_by precisa ser membro do grupo da entrada (shared_debt imutável).
-    - participant_ids (se fornecidos) precisam pertencer ao grupo.
-    - Para PUT (partial=False) sem participant_ids → usa todos os membros.
-    - Para PATCH (partial=True) sem participant_ids → mantém participantes atuais.
-    - credit_card_id (se informado e não-nulo) deve pertencer ao tenant autenticado.
-    - payment_method='dinheiro' força credit_card a null.
+    Atualiza uma despesa compartilhada e ressincroniza participantes.
+
+    Mesmas regras do create (validate_entry_rules). PUT sem participant_ids
+    usa todos os membros; PATCH sem participant_ids mantem os atuais.
     """
 
     def __init__(self, entry: SharedEntry, user, data: dict, partial: bool = False):
@@ -310,129 +293,31 @@ class UpdateSharedEntryBehavior:
         self.data = data
         self.partial = partial
 
-    def _member_ids(self):
-        return set(self.entry.shared_debt.members.values_list('id', flat=True))
-
     def run(self) -> Response:
-        entry = self.entry
-        data = self.data
-        member_ids = self._member_ids()
-        # -- paid_by validation --
-        paid_by_id = data.get('paid_by', entry.paid_by_id if self.partial else None)
-        if paid_by_id is None:
-            return Response(
-                {'detail': 'O campo paid_by é obrigatório.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if paid_by_id not in member_ids:
-            return Response(
-                {'detail': 'paid_by não é membro deste grupo.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        # -- participant_ids validation / resolution --
-        # An empty list is treated the same as "not provided":
-        # - PUT  → default to all members of the group.
-        # - PATCH → keep the existing participant set unchanged.
-        raw_participants = data.get('participant_ids') or None  # [] → None
-        if raw_participants is not None:
-            participant_ids = list(dict.fromkeys(raw_participants))
-            invalid = [pid for pid in participant_ids if pid not in member_ids]
-            if invalid:
-                return Response(
-                    {
-                        'detail': 'participant_ids contém membros de fora do grupo.',
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            replace_participants = True
-        elif self.partial:
-            # PATCH without participant_ids → keep existing participants unchanged.
-            participant_ids = None
-            replace_participants = False
-        else:
-            # Full PUT without participant_ids → default to all members.
-            participant_ids = list(member_ids)
-            replace_participants = True
-        if replace_participants and not participant_ids:
-            return Response(
-                {'detail': 'Grupo sem participantes válidos.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        # -- payment_method / credit_card --
-        payment_method = data.get(
-            'payment_method', entry.payment_method if self.partial else 'dinheiro'
-        )
-        credit_card_id = data.get('credit_card_id', entry.credit_card_id if self.partial else None)
-        # payment_method='dinheiro' clears credit_card.
-        if payment_method == 'dinheiro':
-            credit_card_id = None
-        # payment_method='cartao' exige cartão vinculado quando quem pagou foi o
-        # próprio usuário (cartão de terceiro não existe neste tenant).
-        if (
-            payment_method == 'cartao'
-            and credit_card_id is None
-            and _payer_belongs_to_tenant(paid_by_id, self.user.tenant_id)
-        ):
-            return Response(
-                {
-                    'detail': 'credit_card_id é obrigatório quando payment_method é "cartao".',
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        # [SEC-A01] IDOR guard.
-        if credit_card_id is not None:
-            owns_card = CreditCard.objects.filter(
-                id=credit_card_id,
-                tenant_id=self.user.tenant_id,
-            ).exists()
-            if not owns_card:
-                return Response(
-                    {
-                        'detail': 'O cartão informado não pertence ao usuário autenticado.',
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-        # [SEC-A01] IDOR: categoria precisa ser do tenant ou global.
-        next_category_id = data.get(
-            'category_id', entry.category_id if self.partial else None)
-        if next_category_id is not None and not _category_available_to_tenant(
-            next_category_id, self.user.tenant_id
-        ):
-            return Response(
-                {
-                    'detail': 'A categoria informada não pertence ao usuário autenticado.',
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        entry, data = self.entry, self.data
+        try:
+            rules = validate_entry_rules(entry.shared_debt, self.user, data, current=entry, partial=self.partial)
+        except EntryRuleError as exc:
+            return _bad_request(exc)
+
         with transaction.atomic():
-            # Update scalar fields.
-            if 'description' in data or not self.partial:
-                entry.description = data.get('description', entry.description)
-            if 'amount' in data or not self.partial:
-                entry.amount = data.get('amount', entry.amount)
-            if 'date' in data or not self.partial:
-                entry.date = data.get('date', entry.date)
-            entry.paid_by_id = paid_by_id
-            entry.payment_method = payment_method
-            entry.credit_card_id = credit_card_id
+            for field in ('description', 'amount', 'date'):
+                if field in data or not self.partial:
+                    setattr(entry, field, data.get(field, getattr(entry, field)))
+            entry.paid_by_id = rules['paid_by_id']
+            entry.payment_method = rules['payment_method']
+            entry.credit_card_id = rules['credit_card_id']
             if 'category_id' in data or not self.partial:
-                entry.category_id = next_category_id
+                entry.category_id = rules['category_id']
             if 'paid' in data:
                 entry.paid = data['paid']
             entry.save()
-            # Re-sync participants only when requested.
-            if replace_participants:
+            if rules['participant_ids'] is not None:
                 entry.participants.all().delete()
                 SharedEntryParticipant.objects.bulk_create(
-                    [
-                        SharedEntryParticipant(entry=entry, member_id=mid)
-                        for mid in participant_ids
-                    ]
+                    [SharedEntryParticipant(entry=entry, member_id=mid) for mid in rules['participant_ids']]
                 )
-        return Response(
-            SharedEntrySerializer(entry).data,
-            status=status.HTTP_200_OK,
-        )
+        return Response(SharedEntrySerializer(entry).data, status=status.HTTP_200_OK)
 
 
 class BalancesBehavior:
@@ -686,37 +571,25 @@ class RecurringTemplateBehavior:
         )
 
     def create(self, data: dict) -> Response:
+        """`data` ja validado por SharedRecurringTemplateInputSerializer."""
         from debts.models import SharedRecurringTemplate
         from debts.serializer import SharedRecurringTemplateSerializer
-        member_ids = set(self.shared_debt.members.values_list('id', flat=True))
-        paid_by_id = data.get('paid_by')
-        if paid_by_id not in member_ids:
-            return Response({'detail': 'paid_by não é membro do grupo.'},
-                            status=status.HTTP_400_BAD_REQUEST)
-        participant_ids = data.get('participant_ids') or list(member_ids)
-        invalid = [p for p in participant_ids if p not in member_ids]
-        if invalid:
-            return Response({'detail': 'participant_ids inválidos.'},
-                            status=status.HTTP_400_BAD_REQUEST)
-        day = int(data.get('day_of_month', 1))
-        if not (1 <= day <= 28):
-            return Response({'detail': 'day_of_month deve ser entre 1 e 28.'},
-                            status=status.HTTP_400_BAD_REQUEST)
+        try:
+            rules = validate_entry_rules(self.shared_debt, self.user, data)
+        except EntryRuleError as exc:
+            return _bad_request(exc)
         tpl = SharedRecurringTemplate.objects.create(
             shared_debt=self.shared_debt,
             description=data['description'],
             amount=data['amount'],
-            paid_by_id=paid_by_id,
-            participant_ids=participant_ids,
-            payment_method=data.get('payment_method', 'dinheiro'),
-            category_id=data.get('category_id'),
-            day_of_month=day,
+            paid_by_id=rules['paid_by_id'],
+            participant_ids=rules['participant_ids'],
+            payment_method=rules['payment_method'],
+            category_id=rules['category_id'],
+            day_of_month=data.get('day_of_month', 1),
             is_active=data.get('is_active', True),
         )
-        return Response(
-            SharedRecurringTemplateSerializer(tpl).data,
-            status=status.HTTP_201_CREATED,
-        )
+        return Response(SharedRecurringTemplateSerializer(tpl).data, status=status.HTTP_201_CREATED)
 
     def toggle_active(self, template_id: int) -> Response:
         from debts.models import SharedRecurringTemplate

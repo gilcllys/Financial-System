@@ -84,7 +84,9 @@ class SharedDebtViewSet(viewsets.ModelViewSet):
         behavior = RecurringTemplateBehavior(shared_debt, request.user)
         if request.method == 'GET':
             return behavior.list()
-        return behavior.create(request.data)
+        s = custom_serializer.SharedRecurringTemplateInputSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        return behavior.create(dict(s.validated_data))
 
     @action(detail=True, methods=['delete', 'patch'], url_path=r'recurring-templates/(?P<tpl_id>\d+)')
     def recurring_template_detail(self, request, pk=None, tpl_id=None):

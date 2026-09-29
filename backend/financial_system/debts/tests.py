@@ -931,3 +931,53 @@ class ErrorEnvelopeContractTests(TestCase):
 
         self.assertEqual(resp.status_code, 400)
         self.assertIn('shared_debt', resp.data)
+
+
+class EntryRulesRegressionTests(TestCase):
+    """
+    Bugs fechados ao unificar as regras em validate_entry_rules():
+    - paid=true no create era aceito pelo serializer e descartado;
+    - POST recurring-templates nao checava a categoria (IDOR) e recebia
+      request.data cru (KeyError -> 500 com body incompleto).
+    """
+
+    def _client(self, sub):
+        from financial_system.authentication import KeycloakPrincipal
+        from rest_framework.test import APIClient
+        c = APIClient()
+        c.force_authenticate(user=KeycloakPrincipal({
+            'sub': sub, 'email': f'{sub}@e.com', 'given_name': sub, 'family_name': 'X'}))
+        return c
+
+    def setUp(self):
+        from catalog.models import ExpenseCategory
+        self.group = SharedDebt.objects.create(name='G', owner_tenant_id='gil')
+        self.gil = SharedDebtMember.objects.create(shared_debt=self.group, tenant_id='gil', display_name='Gil')
+        self.other_cat = ExpenseCategory.objects.create(tenant_id='zed', name='Secreta')
+        self.client_gil = self._client('gil')
+
+    def test_create_entry_honours_paid_flag(self):
+        resp = self.client_gil.post('/api/debts/shared-entries/', {
+            'shared_debt': self.group.id, 'description': 'Luz', 'amount': '100.00',
+            'date': '2026-09-01', 'paid_by': self.gil.id, 'paid': True,
+        }, format='json')
+
+        self.assertEqual(resp.status_code, 201, resp.data)
+        self.assertTrue(SharedEntry.objects.get(id=resp.data['id']).paid)
+
+    def test_recurring_template_rejects_foreign_category(self):
+        resp = self.client_gil.post(f'/api/debts/shared-debts/{self.group.id}/recurring-templates/', {
+            'description': 'Aluguel', 'amount': '1500.00', 'paid_by': self.gil.id,
+            'category_id': self.other_cat.id,
+        }, format='json')
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('categoria', resp.data['detail'].lower())
+
+    def test_recurring_template_incomplete_body_is_400_not_500(self):
+        resp = self.client_gil.post(f'/api/debts/shared-debts/{self.group.id}/recurring-templates/', {
+            'paid_by': self.gil.id,
+        }, format='json')
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('description', resp.data)
