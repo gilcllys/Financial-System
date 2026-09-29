@@ -1,5 +1,7 @@
 from datetime import date
 
+from django.db import transaction
+
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.decorators import action
@@ -156,7 +158,6 @@ class SharedDebtViewSet(viewsets.ModelViewSet):
         ).run()
 
 
-
 class SharedEntryPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = 'page_size'
@@ -279,6 +280,35 @@ class SharedEntryViewSet(viewsets.ModelViewSet):
                 "Você não tem permissão para excluir este recurso."
             )
         instance.delete()
+
+    @action(detail=False, methods=['post'], url_path='delete-installments')
+    def delete_installments(self, request):
+        """
+        POST shared-entries/delete-installments/ {installment_group_id}
+
+        Remove, de forma atomica, todas as parcelas de um parcelamento
+        compartilhado. Mesma regra de perform_destroy: qualquer membro do
+        grupo pode excluir. Participantes caem em cascata (CASCADE).
+        """
+        s = custom_serializer.DeleteSharedInstallmentsInputSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        group_id = s.validated_data['installment_group_id']
+        qs = SharedEntry.objects.filter(
+            installment_group_id=group_id,
+            shared_debt__members__tenant_id=request.user.tenant_id,
+        ).distinct()
+        if not qs.exists():
+            return Response(
+                {'detail': 'Nenhuma parcela encontrada para este parcelamento.'},
+                status=404,
+            )
+        ids = list(qs.values_list('id', flat=True))
+        with transaction.atomic():
+            # delete() retorna o total incluindo cascatas (participantes);
+            # reportamos apenas as parcelas removidas.
+            _, per_model = SharedEntry.objects.filter(id__in=ids).delete()
+        deleted = per_model.get('debts.SharedEntry', 0)
+        return Response({'deleted': deleted, 'installment_group_id': str(group_id)}, status=200)
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)

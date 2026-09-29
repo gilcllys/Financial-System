@@ -298,6 +298,12 @@ export class SharedDebtService {
     return this.http.delete<void>(`${this.base}/shared-entries/${id}/`);
   }
 
+  deleteInstallments(installmentGroupId: string): Observable<{ deleted: number }> {
+    return this.http.post<{ deleted: number }>(`${this.base}/shared-entries/delete-installments/`, {
+      installment_group_id: installmentGroupId,
+    });
+  }
+
   // ââ€â‚¬ââ€â‚¬ââ€â‚¬ Personal debts summary ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬ââ€â‚¬
   personalSummary(): Observable<PersonalSummary> {
     return this.http.get<PersonalSummary>(`${this.base}/personal-summary/`);

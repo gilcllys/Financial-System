@@ -155,6 +155,7 @@
                   <th>PROGRESSO</th>
                   <th>PROXIMA PARCELA</th>
                   <th class="text-right">SUA PARTE</th>
+                  <th class="col-actions"><span class="sr-only">Acoes</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -178,6 +179,11 @@
                     </td>
                     <td class="col-date">{{ formatNextDate(group.nextDate) }}</td>
                     <td class="col-value text-right value-red">{{ formatAmount(group.myPortion) }}</td>
+                    <td class="col-actions">
+                      <button class="btn btn--danger btn--sm" type="button" (click)="deleteSharedGroup(group)" [disabled]="deletingSharedGroup() === group.installment_group_id" [attr.aria-label]="'Apagar todas as parcelas de ' + group.name">
+                        {{ deletingSharedGroup() === group.installment_group_id ? 'Apagando...' : 'Apagar todas' }}
+                      </button>
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -203,6 +209,7 @@
                     <th>PROGRESSO</th>
                     <th>PROXIMA PARCELA</th>
                     <th class="text-right">SUA PARTE</th>
+                    <th class="col-actions"><span class="sr-only">Acoes</span></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -224,6 +231,11 @@
                       </td>
                       <td class="col-date">-</td>
                       <td class="col-value text-right">{{ formatAmount(group.myPortion) }}</td>
+                      <td class="col-actions">
+                        <button class="btn btn--danger btn--sm" type="button" (click)="deleteSharedGroup(group)" [disabled]="deletingSharedGroup() === group.installment_group_id" [attr.aria-label]="'Apagar todas as parcelas de ' + group.name">
+                          {{ deletingSharedGroup() === group.installment_group_id ? 'Apagando...' : 'Apagar todas' }}
+                        </button>
+                      </td>
                     </tr>
                   }
                 </tbody>
