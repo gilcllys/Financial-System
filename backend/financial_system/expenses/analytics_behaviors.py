@@ -74,10 +74,8 @@ class ExpenseAnalyticsBehavior:
         )
         shared_by_month: dict[int, float] = {}
         for entry in shared_entries:
-            pc = entry.participants.count()
-            if pc > 0:
-                m = entry.date.month
-                shared_by_month[m] = shared_by_month.get(m, 0.0) + float(entry.amount / Decimal(pc))
+            m = entry.date.month
+            shared_by_month[m] = shared_by_month.get(m, 0.0) + float(entry.share_per_participant())
 
         result = []
         for m in range(1, 13):
@@ -339,10 +337,8 @@ class ExpenseAnalyticsBehavior:
         shared_my_portion = Decimal('0')
         shared_count = 0
         for entry in entries_qs:
-            participant_count = entry.participants.count()
-            if participant_count > 0:
-                shared_my_portion += entry.amount / Decimal(participant_count)
-                shared_count += 1
+            shared_my_portion += entry.share_per_participant()
+            shared_count += 1
 
         shared_my_portion = to_float(shared_my_portion)
 

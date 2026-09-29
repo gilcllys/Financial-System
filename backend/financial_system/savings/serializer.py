@@ -75,17 +75,6 @@ class SavingsDepositSerializer(serializers.ModelSerializer):
         return _validate_amount_not_zero(value)
 
 
-class CreateGoalInputSerializer(serializers.Serializer):
-    name = serializers.CharField(required=True, max_length=120)
-    target_amount = serializers.DecimalField(
-        required=False, allow_null=True, default=None, max_digits=12, decimal_places=2)
-    color = serializers.CharField(required=False, default='#6366f1', max_length=7)
-    icon = serializers.CharField(required=False, default='🐷', max_length=10)
-
-    def validate_target_amount(self, value):
-        return _validate_target_amount_not_negative(value)
-
-
 class CreateDepositInputSerializer(serializers.Serializer):
     goal_id = serializers.IntegerField(required=True)
     amount = serializers.DecimalField(

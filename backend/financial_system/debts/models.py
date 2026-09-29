@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 from django.db import models
 from django.db.models import Q
 from financial_system.base_model import BaseModel
@@ -163,6 +164,23 @@ class SharedEntry(BaseModel):
         default=False,
         help_text='Indica se esta despesa compartilhada ja foi paga/quitada.',
     )
+
+    # ── Rateio ─────────────────────────────────────────────────────────────
+    # Regra unica do produto: a despesa e dividida igualmente entre os
+    # participantes; sem participantes cadastrados, entre todos os membros
+    # do grupo. Usa len(...all()) para aproveitar prefetch_related.
+
+    def participant_ids(self) -> list[int]:
+        ids = [p.member_id for p in self.participants.all()]
+        return ids or [m.id for m in self.shared_debt.members.all()]
+
+    def share_per_participant(self) -> Decimal:
+        """Parte de cada participante (amount / n), Decimal sem arredondar."""
+        return Decimal(self.amount) / Decimal(len(self.participant_ids()) or 1)
+
+    def share_of(self, member_id: int) -> Decimal:
+        """Parte de um membro especifico; zero se ele nao participa."""
+        return self.share_per_participant() if member_id in self.participant_ids() else Decimal('0')
 
     class Meta:
         db_table = 'shared_entries'

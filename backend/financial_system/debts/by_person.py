@@ -45,9 +45,8 @@ class ByPersonBehavior:
     # ── helpers ────────────────────────────────────────────────────────────
     def _shares(self, entry, member_ids):
         """{member_id: parte} — rateio igual entre participantes (ou todos)."""
-        participants = [p.member_id for p in entry.participants.all()] or list(member_ids)
-        part = Decimal(entry.amount) / Decimal(len(participants))
-        return {mid: part for mid in participants}
+        part = entry.share_per_participant()
+        return {mid: part for mid in entry.participant_ids()}
 
     def _entry_payload(self, entry, shares):
         return {

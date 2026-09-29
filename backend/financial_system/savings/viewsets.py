@@ -6,7 +6,6 @@ from savings.models import SavingsDeposit
 from savings import serializer as ser
 from savings.behaviors import (
     CreateDepositBehavior,
-    CreateGoalBehavior,
     SavingsSummaryBehavior,
     goals_with_totals,
 )
@@ -18,8 +17,11 @@ class SavingsGoalViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return goals_with_totals(self.request.user.tenant_id)
 
-    def create(self, request, *args, **kwargs):
-        return CreateGoalBehavior(request.user.tenant_id).create(request.data)
+    def perform_create(self, serializer):
+        serializer.save(tenant_id=self.request.user.tenant_id)
+
+    def perform_update(self, serializer):
+        serializer.save(tenant_id=self.request.user.tenant_id)
 
     @action(detail=False, methods=['get'], url_path='summary')
     def summary(self, request):
