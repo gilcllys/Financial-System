@@ -49,8 +49,7 @@ class CreateExpenseBehavior:
             self.credit_card_id = None
 
     def _build_expense(self, description: str, amount: Decimal, expense_date) -> Expense:
-        self._validate_payment()
-        expense = Expense.objects.create(
+        return Expense.objects.create(
             tenant_id=self.tenant_id,
             category_id=self.category_id,
             description=description,
@@ -60,23 +59,8 @@ class CreateExpenseBehavior:
             payment_method=self.payment_method,
             credit_card_id=self.credit_card_id,
         )
-        return expense
 
-    @transaction.atomic
-    def _create_single(self) -> Expense:
-        return self._build_expense(self.description, self.amount, self.date)
-
-    @transaction.atomic
-    def _create_multiple(self) -> List[Expense]:
-        """Cria self.quantity registros independentes com o mesmo valor e data."""
-        return [
-            self._build_expense(self.description, self.amount, self.date)
-            for _ in range(self.quantity)
-        ]
-
-    @transaction.atomic
     def _create_installments(self) -> List[Expense]:
-        expenses = []
         base_description = _strip_installment_suffix(self.description)
         installment_amounts = _split_installments(self.amount, self.installments)
         current_date = (
@@ -84,81 +68,65 @@ class CreateExpenseBehavior:
             if isinstance(self.date, date)
             else date.fromisoformat(str(self.date))
         )
+        expenses = []
         for i in range(1, self.installments + 1):
             desc = f"{base_description} - Parcela {i}/{self.installments}"
-            expenses.append(
-                self._build_expense(desc, installment_amounts[i - 1], current_date)
-            )
+            expenses.append(self._build_expense(desc, installment_amounts[i - 1], current_date))
             current_date = current_date + relativedelta(months=1)
         return expenses
 
+    @transaction.atomic
+    def create(self) -> List[Expense]:
+        """
+        Cria a(s) despesa(s) e devolve a lista. Unico ponto de decisao entre
+        parcelado / quantidade / simples — usado por run() e pelo bulk import.
+        """
+        self._validate_payment()
+        if self.is_installment and self.installments > 1:
+            return self._create_installments()          # parcelado ignora quantity
+        if self.quantity > 1:
+            return [self._build_expense(self.description, self.amount, self.date) for _ in range(self.quantity)]
+        return [self._build_expense(self.description, self.amount, self.date)]
+
+    @staticmethod
+    def _expense_dict(e: Expense) -> dict:
+        return {'id': e.id, 'description': e.description, 'amount': float(e.amount), 'date': e.date.isoformat()}
+
     def run(self) -> Response:
         try:
-            if self.is_installment and self.installments > 1:
-                # Parcelado: ignora quantity, cria N parcelas
-                expenses = self._create_installments()
-                return Response(
-                    {
-                        'message': f'{len(expenses)} parcelas criadas com sucesso',
-                        'is_installment': True,
-                        'installments': self.installments,
-                        'total_amount': float(self.amount),
-                        'installment_amount': float(expenses[0].amount),
-                        'expenses': [
-                            {
-                                'id': e.id,
-                                'description': e.description,
-                                'amount': float(e.amount),
-                                'date': e.date.isoformat(),
-                            }
-                            for e in expenses
-                        ],
-                    },
-                    status=status.HTTP_201_CREATED,
-                )
-            elif self.quantity > 1:
-                # Quantidade > 1: cria N registros independentes
-                expenses = self._create_multiple()
-                return Response(
-                    {
-                        'message': f'{len(expenses)} gastos criados com sucesso',
-                        'is_installment': False,
-                        'quantity': self.quantity,
-                        'total_amount': float(self.amount * self.quantity),
-                        'expenses': [
-                            {
-                                'id': e.id,
-                                'description': e.description,
-                                'amount': float(e.amount),
-                                'date': e.date.isoformat(),
-                            }
-                            for e in expenses
-                        ],
-                    },
-                    status=status.HTTP_201_CREATED,
-                )
-            else:
-                expense = self._create_single()
-                return Response(
-                    {
-                        'message': 'Despesa criada com sucesso',
-                        'is_installment': False,
-                        'installments': 1,
-                        'total_amount': float(self.amount),
-                        'expense': {
-                            'id': expense.id,
-                            'description': expense.description,
-                            'amount': float(expense.amount),
-                            'date': expense.date.isoformat(),
-                        },
-                    },
-                    status=status.HTTP_201_CREATED,
-                )
+            expenses = self.create()
         except Exception as e:
             return Response(
                 {'detail': f'Erro ao criar despesa(s): {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        is_installment = self.is_installment and self.installments > 1
+        if is_installment:
+            payload = {
+                'message': f'{len(expenses)} parcelas criadas com sucesso',
+                'is_installment': True,
+                'installments': self.installments,
+                'total_amount': float(self.amount),
+                'installment_amount': float(expenses[0].amount),
+                'expenses': [self._expense_dict(e) for e in expenses],
+            }
+        elif len(expenses) > 1:
+            payload = {
+                'message': f'{len(expenses)} gastos criados com sucesso',
+                'is_installment': False,
+                'quantity': self.quantity,
+                'total_amount': float(self.amount * self.quantity),
+                'expenses': [self._expense_dict(e) for e in expenses],
+            }
+        else:
+            payload = {
+                'message': 'Despesa criada com sucesso',
+                'is_installment': False,
+                'installments': 1,
+                'total_amount': float(self.amount),
+                'expense': self._expense_dict(expenses[0]),
+            }
+        return Response(payload, status=status.HTTP_201_CREATED)
 
 
 class RecurringExpenseBehavior:

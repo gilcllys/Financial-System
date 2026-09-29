@@ -25,12 +25,7 @@ class BulkImportExpenseBehavior:
         """Cria despesa(s) a partir de um item validado, respeitando quantidade/parcelamento."""
         payload = dict(item)
         payload['tenant_id'] = self.tenant_id
-        behavior = CreateExpenseBehavior(data=payload)
-        if behavior.is_installment and behavior.installments > 1:
-            return behavior._create_installments()
-        if behavior.quantity and behavior.quantity > 1:
-            return behavior._create_multiple()
-        return [behavior._create_single()]
+        return CreateExpenseBehavior(data=payload).create()
 
     def bulk_create(self, items) -> Response:
         """Cria multiplos gastos de forma atomica apos validar suas categorias."""
