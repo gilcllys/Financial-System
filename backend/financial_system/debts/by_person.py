@@ -19,7 +19,8 @@ from rest_framework.response import Response
 from cards.behaviors import _compute_invoice_period, _current_invoice_month
 from cards.models import CreditCard
 from catalog.constants import _MONTH_NAMES
-from debts.behaviors import BalancesBehavior, _round2
+from debts.behaviors import BalancesBehavior
+from financial_system.money import round2 as _round2, to_float as _f
 from debts.models import SharedDebt, SharedEntry
 
 _SHORT_MONTHS = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
@@ -28,9 +29,6 @@ _SHORT_MONTHS = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Se
 def _next_month(month, year):
     return (1, year + 1) if month == 12 else (month + 1, year)
 
-
-def _f(value):
-    return float(_round2(Decimal(value)))
 
 
 class ByPersonBehavior:

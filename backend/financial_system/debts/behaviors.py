@@ -1,5 +1,5 @@
 import re
-from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
+from decimal import Decimal
 import uuid
 from dateutil.relativedelta import relativedelta
 from django.db import transaction
@@ -26,48 +26,15 @@ from expenses.models import Expense
 # Epsilon usado no algoritmo de acerto (settlement) — valores abaixo disso são
 # tratados como "quitados".
 _SETTLEMENT_EPSILON = Decimal('0.01')
-_TWO_PLACES = Decimal('0.01')
-
-
-def _round2(value: Decimal) -> Decimal:
-    return Decimal(value).quantize(_TWO_PLACES, rounding=ROUND_HALF_UP)
+from financial_system.money import round2 as _round2, to_float, split_installments as _split_installments, strip_suffix
 
 # Sufixo de parcela das compartilhadas: " (X/Y)", um ou mais, no fim da string.
 _INSTALLMENT_SUFFIX_RE = re.compile(r'(?:\s*\(\d+\s*/\s*\d+\))+\s*$')
 
 
 def _strip_installment_suffix(description: str) -> str:
-    """
-    Remove o sufixo " (X/Y)" do fim da descrição.
-    Evita acumular sufixos ("Item (1/4) (1/4)") caso uma entrada já parcelada
-    seja reparcelada, o que quebraria o agrupamento na tela de Parcelas.
-    """
-    if not description:
-        return description
-    return _INSTALLMENT_SUFFIX_RE.sub('', description).strip()
-
-
-def _split_installments(total_amount, installments: int) -> list:
-    """
-    Divide um valor total em N parcelas com 2 casas decimais.
-    Os centavos residuais da divisao sao distribuidos nas primeiras parcelas,
-    garantindo que a soma das parcelas seja exatamente igual ao total.
-    Ex.: 100.00 em 3 -> [33.34, 33.33, 33.33]
-    """
-    total = _round2(Decimal(str(total_amount)))
-    if installments < 2:
-        return [total]
-    # Espelha expenses._split_installments: o rateio so e correto sobre o valor
-    # absoluto, pois ROUND_DOWN trunca em direcao ao zero e o residual de um
-    # total negativo sai negativo, anulando o laco de distribuicao.
-    sign = -1 if total < 0 else 1
-    magnitude = abs(total)
-    base = (magnitude / installments).quantize(_TWO_PLACES, rounding=ROUND_DOWN)
-    amounts = [base] * installments
-    residual_cents = int((magnitude - base * installments) / _TWO_PLACES)
-    for i in range(residual_cents):
-        amounts[i] += _TWO_PLACES
-    return [a * sign for a in amounts]
+    """Remove ' (X/Y)' do fim; evita acumular sufixos ao reparcelar uma entrada."""
+    return strip_suffix(description, _INSTALLMENT_SUFFIX_RE)
 
 
 class CreateSharedDebtBehavior:
@@ -502,8 +469,8 @@ class BalancesBehavior:
                 'member_id': m.id,
                 'display_name': m.display_name,
                 'tenant_id': m.tenant_id,
-                'paid': float(_round2(paid[m.id])),
-                'owed': float(_round2(owed[m.id])),
+                'paid': to_float(paid[m.id]),
+                'owed': to_float(owed[m.id]),
                 'balance': float(balance[m.id]),
             }
             for m in members
@@ -536,7 +503,7 @@ class BalancesBehavior:
                     'from_name': members_by_id[debtor[0]].display_name,
                     'to_member_id': creditor[0],
                     'to_name': members_by_id[creditor[0]].display_name,
-                    'amount': float(_round2(transfer)),
+                    'amount': to_float(transfer),
                 }
             )
             creditor[1] -= transfer
@@ -587,11 +554,11 @@ class PersonalSummaryBehavior:
         )
         data = {
             'installments_remaining': {
-                'total': round(float(installments['total'] or 0), 2),
+                'total': to_float(installments['total']),
                 'count': installments['count'] or 0,
             },
             'card_current_month': {
-                'total': round(float(card['total'] or 0), 2),
+                'total': to_float(card['total']),
                 'count': card['count'] or 0,
             },
         }
@@ -643,8 +610,8 @@ class HomeSummaryBehavior:
                 'id': g.id,
                 'name': g.name,
                 'members': members_names,
-                'total_amount': round(float(total_amount), 2),
-                'my_portion': round(float(my_portion), 2),
+                'total_amount': to_float(total_amount),
+                'my_portion': to_float(my_portion),
                 'entry_count': g.entries.count(),
             })
         return Response(result, status=status.HTTP_200_OK)
@@ -693,8 +660,8 @@ class MonthlyHistoryBehavior:
                 'year': year,
                 'month': month,
                 'month_name': _MONTH_NAMES[month],
-                'total': round(float(data['total']), 2),
-                'my_portion': round(float(data['my_portion']), 2),
+                'total': to_float(data['total']),
+                'my_portion': to_float(data['my_portion']),
                 'entry_count': data['count'],
             }
             for (year, month), data in sorted(buckets.items(), reverse=True)

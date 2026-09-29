@@ -7,6 +7,7 @@ from django.db.models.functions import Abs, ExtractDay, ExtractMonth
 
 from expenses import models
 from catalog.constants import _MONTH_NAMES
+from financial_system.money import to_float
 
 
 def _apply_payment_method_filter(qs, params, model):
@@ -257,7 +258,7 @@ class ExpenseAnalyticsBehavior:
             result.append({
                 'day': day,
                 'date': current_date.isoformat(),
-                'total': round(float(row.get('total') or 0), 2),
+                'total': to_float(row.get('total')),
                 'count': row.get('count', 0),
             })
 
@@ -284,14 +285,14 @@ class ExpenseAnalyticsBehavior:
             income=Sum('amount', filter=Q(amount__gt=0)),
             income_count=Count('id', filter=Q(amount__gt=0)),
         )
-        income = round(float(income_agg['income'] or 0), 2)
+        income = to_float(income_agg['income'])
 
         cash_agg = (
             base_qs
             .filter(payment_method='dinheiro', amount__lt=0)
             .aggregate(total=Sum(Abs('amount')), count=Count('id'))
         )
-        cash_expenses = round(float(cash_agg['total'] or 0), 2)
+        cash_expenses = to_float(cash_agg['total'])
         cash_count    = cash_agg['count'] or 0
 
         cards = CreditCard.objects.filter(tenant_id=tenant)
@@ -314,7 +315,7 @@ class ExpenseAnalyticsBehavior:
                 )
                 .aggregate(total=Sum(Abs('amount')), count=Count('id'))
             )
-            total = round(float(agg['total'] or 0), 2)
+            total = to_float(agg['total'])
             cnt   = agg['count'] or 0
             card_invoices_total += total
             card_invoices_count += cnt
@@ -356,7 +357,7 @@ class ExpenseAnalyticsBehavior:
                 shared_my_portion += entry.amount / Decimal(participant_count)
                 shared_count += 1
 
-        shared_my_portion = round(float(shared_my_portion), 2)
+        shared_my_portion = to_float(shared_my_portion)
 
         total_expenses = round(cash_expenses + card_invoices_total + shared_my_portion, 2)
         balance        = round(income - total_expenses, 2)
@@ -402,7 +403,7 @@ class ExpenseAnalyticsBehavior:
             {
                 'category_id': r['category_id'],
                 'category_name': r['category__name'] or 'Sem categoria',
-                'total': round(float(r['total'] or 0), 2),
+                'total': to_float(r['total']),
                 'count': r['count'],
                 'percentage': round(
                     float(r['total'] or 0) / cat_grand * 100 if cat_grand else 0, 2
@@ -427,7 +428,7 @@ class ExpenseAnalyticsBehavior:
         weeks = [0.0, 0.0, 0.0, 0.0]
         for day in range(1, days_in_month + 1):
             row = day_map.get(day, {})
-            total = round(float(row.get('total') or 0), 2)
+            total = to_float(row.get('total'))
             daily.append({'day': day, 'total': total, 'count': row.get('count', 0)})
             w = min((day - 1) // 7, 3)
             weeks[w] += total
@@ -442,8 +443,8 @@ class ExpenseAnalyticsBehavior:
             expenses=Sum(Abs('amount'), filter=Q(amount__lt=0)),
             count=Count('id'),
         )
-        income   = round(float(agg['income']   or 0), 2)
-        expenses = round(float(agg['expenses'] or 0), 2)
+        income   = to_float(agg['income']  )
+        expenses = to_float(agg['expenses'])
 
         return {
             'month': month,
