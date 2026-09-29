@@ -1,12 +1,12 @@
-import calendar
+import calendar
 from datetime import date, timedelta
-
-from django.db.models import Count, Sum
-from django.db.models.functions import Abs
-from rest_framework import status
-from rest_framework.response import Response
+
+from django.db.models import Count, Sum
+from django.db.models.functions import Abs
+from rest_framework import status
+from rest_framework.response import Response
 from catalog.constants import _MONTH_NAMES
-
+
 def _effective_closing_date(year, month, closing_day):
     """Return the effective closing date, moving weekends back to Friday."""
     _, days_in_month = calendar.monthrange(year, month)
@@ -162,152 +162,152 @@ def _shared_invoice_breakdown(card, period_start, period_end):
     }
 
 
-class InvoicesBehavior:
-    """
-    Lista as faturas de um cartão de crédito.
-
-    Retorna 2 faturas futuras + a corrente (is_current=True) + 12 anteriores
-    (15 no total), ordenadas da mais recente para a mais antiga.
-    """
-
-    FUTURE_COUNT = 2
-    PAST_COUNT = 12
-
-    def __init__(self, card):
-        self.card = card
-
-    def _advance_month(self, month, year, steps=1):
-        for _ in range(steps):
-            if month == 12:
-                month, year = 1, year + 1
-            else:
-                month += 1
-        return month, year
-
-    def run(self) -> Response:
-        curr_month, curr_year = _current_invoice_month(self.card)
-
-        # Começa 2 meses à frente da fatura corrente
-        inv_month, inv_year = self._advance_month(curr_month, curr_year, self.FUTURE_COUNT)
-
-        result = []
-        total = self.FUTURE_COUNT + 1 + self.PAST_COUNT  # 15
-
-        for i in range(total):
-            period_start, period_end, due = _compute_invoice_period(
-                self.card, inv_month, inv_year
-            )
-            result.append({
-                'invoice_month': inv_month,
-                'invoice_year': inv_year,
-                'invoice_name': f'{_MONTH_NAMES[inv_month]} {inv_year}',
-                'period_start': period_start.isoformat(),
-                'period_end': period_end.isoformat(),
-                'due_date': due.isoformat(),
-                'is_current': i == self.FUTURE_COUNT,
-                'is_future': i < self.FUTURE_COUNT,
-            })
-
-            if inv_month == 1:
-                inv_month, inv_year = 12, inv_year - 1
-            else:
-                inv_month -= 1
-
-        return Response(result, status=status.HTTP_200_OK)
-
-
-class InvoiceExpensesBehavior:
-    """
-    Retorna as despesas de uma fatura específica de um cartão.
-
-    Inclui:
-      - Resumo geral (total e contagem)
-      - Breakdown por categoria (sempre do período completo da fatura)
-      - Lista de despesas (filtrada por category_id se informado)
-    """
-
-    PAGE_SIZE = 20
-
-    def __init__(self, card, invoice_month: int, invoice_year: int,
-                 category_id: int | None = None, page: int = 1, page_size: int = 20,
-                 search: str | None = None):
-        self.card = card
-        self.invoice_month = invoice_month
-        self.invoice_year = invoice_year
-        self.category_id = category_id
-        self.page = max(1, page)
-        self.page_size = max(1, min(page_size, 200))
-        self.search = search.strip()[:200] if search else None
-
-    def run(self) -> Response:
-        from expenses.models import Expense
-        from expenses.serializer import ExpenseSerializer
-
-        period_start, period_end, due = _compute_invoice_period(
-            self.card, self.invoice_month, self.invoice_year
-        )
-
-        base_filter = dict(
-            tenant_id=self.card.tenant_id,
-            credit_card_id=self.card.id,
-            date__gte=period_start,
-            date__lte=period_end,
-        )
-
-        # QuerySet para a lista de expenses (com filtro de categoria opcional)
-        qs = (
-            Expense.objects
-            .filter(**base_filter)
-            .select_related('category', 'credit_card')
-            .order_by('-date', '-id')
-        )
-        if self.category_id is not None:
-            qs = qs.filter(category_id=self.category_id)
-        if self.search:
-            qs = qs.filter(description__icontains=self.search)
-
-        agg = qs.aggregate(total=Sum('amount'), count=Count('id'))
-        # amount e negativo para despesa e positivo para credito/estorno.
-        # Somar com sinal faz o credito ABATER a fatura, como no extrato
-        # do banco. Com Abs() um estorno era somado como se fosse gasto.
-        grand_total = round(-float(agg['total'] or 0), 2)
-
-        # Breakdown sempre do período completo (sem filtro de categoria)
-        base_qs = Expense.objects.filter(**base_filter)
-        # Creditos nao pertencem a nenhuma categoria de gasto: incluir
-        # um estorno aqui inflaria a categoria e quebraria os percentuais.
-        debit_qs = base_qs.filter(amount__lt=0)
-        period_total = round(
-            float(debit_qs.aggregate(t=Sum(Abs('amount')))['t'] or 0), 2
-        )
-        cat_rows = (
-            debit_qs
-            .values('category_id', 'category__name')
-            .annotate(cat_total=Sum(Abs('amount')), cat_count=Count('id'))
-            .order_by('-cat_total')
-        )
-        by_category = [
-            {
-                'category_id': row['category_id'],
-                'category_name': row['category__name'],
-                'total': round(float(row['cat_total'] or 0), 2),
-                'count': row['cat_count'],
-                'percentage': round(
-                    float(row['cat_total'] or 0) / period_total * 100
-                    if period_total else 0,
-                    2,
-                ),
-            }
-            for row in cat_rows
-        ]
-
-        # Pagination
-        total_count = qs.count()
-        total_pages = max(1, -(-total_count // self.page_size))  # ceil division
-        offset = (self.page - 1) * self.page_size
-        page_qs = qs[offset: offset + self.page_size]
-
-
+class InvoicesBehavior:
+    """
+    Lista as faturas de um cartão de crédito.
+
+    Retorna 2 faturas futuras + a corrente (is_current=True) + 12 anteriores
+    (15 no total), ordenadas da mais recente para a mais antiga.
+    """
+
+    FUTURE_COUNT = 2
+    PAST_COUNT = 12
+
+    def __init__(self, card):
+        self.card = card
+
+    def _advance_month(self, month, year, steps=1):
+        for _ in range(steps):
+            if month == 12:
+                month, year = 1, year + 1
+            else:
+                month += 1
+        return month, year
+
+    def run(self) -> Response:
+        curr_month, curr_year = _current_invoice_month(self.card)
+
+        # Começa 2 meses à frente da fatura corrente
+        inv_month, inv_year = self._advance_month(curr_month, curr_year, self.FUTURE_COUNT)
+
+        result = []
+        total = self.FUTURE_COUNT + 1 + self.PAST_COUNT  # 15
+
+        for i in range(total):
+            period_start, period_end, due = _compute_invoice_period(
+                self.card, inv_month, inv_year
+            )
+            result.append({
+                'invoice_month': inv_month,
+                'invoice_year': inv_year,
+                'invoice_name': f'{_MONTH_NAMES[inv_month]} {inv_year}',
+                'period_start': period_start.isoformat(),
+                'period_end': period_end.isoformat(),
+                'due_date': due.isoformat(),
+                'is_current': i == self.FUTURE_COUNT,
+                'is_future': i < self.FUTURE_COUNT,
+            })
+
+            if inv_month == 1:
+                inv_month, inv_year = 12, inv_year - 1
+            else:
+                inv_month -= 1
+
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class InvoiceExpensesBehavior:
+    """
+    Retorna as despesas de uma fatura específica de um cartão.
+
+    Inclui:
+      - Resumo geral (total e contagem)
+      - Breakdown por categoria (sempre do período completo da fatura)
+      - Lista de despesas (filtrada por category_id se informado)
+    """
+
+    PAGE_SIZE = 20
+
+    def __init__(self, card, invoice_month: int, invoice_year: int,
+                 category_id: int | None = None, page: int = 1, page_size: int = 20,
+                 search: str | None = None):
+        self.card = card
+        self.invoice_month = invoice_month
+        self.invoice_year = invoice_year
+        self.category_id = category_id
+        self.page = max(1, page)
+        self.page_size = max(1, min(page_size, 200))
+        self.search = search.strip()[:200] if search else None
+
+    def run(self) -> Response:
+        from expenses.models import Expense
+        from expenses.serializer import ExpenseSerializer
+
+        period_start, period_end, due = _compute_invoice_period(
+            self.card, self.invoice_month, self.invoice_year
+        )
+
+        base_filter = dict(
+            tenant_id=self.card.tenant_id,
+            credit_card_id=self.card.id,
+            date__gte=period_start,
+            date__lte=period_end,
+        )
+
+        # QuerySet para a lista de expenses (com filtro de categoria opcional)
+        qs = (
+            Expense.objects
+            .filter(**base_filter)
+            .select_related('category', 'credit_card')
+            .order_by('-date', '-id')
+        )
+        if self.category_id is not None:
+            qs = qs.filter(category_id=self.category_id)
+        if self.search:
+            qs = qs.filter(description__icontains=self.search)
+
+        agg = qs.aggregate(total=Sum('amount'), count=Count('id'))
+        # amount e negativo para despesa e positivo para credito/estorno.
+        # Somar com sinal faz o credito ABATER a fatura, como no extrato
+        # do banco. Com Abs() um estorno era somado como se fosse gasto.
+        grand_total = round(-float(agg['total'] or 0), 2)
+
+        # Breakdown sempre do período completo (sem filtro de categoria)
+        base_qs = Expense.objects.filter(**base_filter)
+        # Creditos nao pertencem a nenhuma categoria de gasto: incluir
+        # um estorno aqui inflaria a categoria e quebraria os percentuais.
+        debit_qs = base_qs.filter(amount__lt=0)
+        period_total = round(
+            float(debit_qs.aggregate(t=Sum(Abs('amount')))['t'] or 0), 2
+        )
+        cat_rows = (
+            debit_qs
+            .values('category_id', 'category__name')
+            .annotate(cat_total=Sum(Abs('amount')), cat_count=Count('id'))
+            .order_by('-cat_total')
+        )
+        by_category = [
+            {
+                'category_id': row['category_id'],
+                'category_name': row['category__name'],
+                'total': round(float(row['cat_total'] or 0), 2),
+                'count': row['cat_count'],
+                'percentage': round(
+                    float(row['cat_total'] or 0) / period_total * 100
+                    if period_total else 0,
+                    2,
+                ),
+            }
+            for row in cat_rows
+        ]
+
+        # Pagination
+        total_count = qs.count()
+        total_pages = max(1, -(-total_count // self.page_size))  # ceil division
+        offset = (self.page - 1) * self.page_size
+        page_qs = qs[offset: offset + self.page_size]
+
+
         # Shared debts paid on this card in the invoice period.
         _shared = _shared_invoice_breakdown(self.card, period_start, period_end)
         _shared_my_total = _shared['my_total']
@@ -316,16 +316,16 @@ class InvoiceExpensesBehavior:
             'participants': _shared['participants'],
             'groups': _shared['groups'],
         }
-        _expenses_total = grand_total
-        _composite_total = round(_expenses_total + _shared_my_total, 2)
-        return Response(
-            {
-                'invoice_month': self.invoice_month,
-                'invoice_year': self.invoice_year,
-                'invoice_name': f'{_MONTH_NAMES[self.invoice_month]} {self.invoice_year}',
-                'period_start': period_start.isoformat(),
-                'period_end': period_end.isoformat(),
-                'due_date': due.isoformat(),
+        _expenses_total = grand_total
+        _composite_total = round(_expenses_total + _shared_my_total, 2)
+        return Response(
+            {
+                'invoice_month': self.invoice_month,
+                'invoice_year': self.invoice_year,
+                'invoice_name': f'{_MONTH_NAMES[self.invoice_month]} {self.invoice_year}',
+                'period_start': period_start.isoformat(),
+                'period_end': period_end.isoformat(),
+                'due_date': due.isoformat(),
                 'summary': {
                     'total': _composite_total,
                     'expenses_total': _expenses_total,
@@ -333,23 +333,23 @@ class InvoiceExpensesBehavior:
                     'shared_breakdown': _shared_breakdown,
                     'count': agg['count'] or 0,
                 },
-                'by_category': by_category,
-                'pagination': {
-                    'page': self.page,
-                    'page_size': self.page_size,
-                    'total_count': total_count,
-                    'total_pages': total_pages,
-                },
-                'expenses': ExpenseSerializer(page_qs, many=True).data,
-            },
-            status=status.HTTP_200_OK,
-        )
-
-
-class OpenInvoicesBehavior:
-    """
-    Retorna a fatura corrente (aberta) de cada cartão do tenant,
-    com o total de gastos do período e a data de fechamento/vencimento.
+                'by_category': by_category,
+                'pagination': {
+                    'page': self.page,
+                    'page_size': self.page_size,
+                    'total_count': total_count,
+                    'total_pages': total_pages,
+                },
+                'expenses': ExpenseSerializer(page_qs, many=True).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class OpenInvoicesBehavior:
+    """
+    Retorna a fatura corrente (aberta) de cada cartão do tenant,
+    com o total de gastos do período e a data de fechamento/vencimento.
 
     `total` é o valor BRUTO que o banco cobra: despesas individuais +
     valor cheio das dívidas compartilhadas pagas neste cartão no período.
@@ -357,35 +357,35 @@ class OpenInvoicesBehavior:
 
     Endpoint: GET /api/cards/credit-cards/open-invoices/
     """
-
-    def __init__(self, tenant_id: str):
-        self.tenant_id = tenant_id
-
-    def run(self) -> Response:
-        from cards.models import CreditCard
-        from expenses.models import Expense
-
-        cards = CreditCard.objects.filter(tenant_id=self.tenant_id)
-        result = []
-
-        for card in cards:
-            invoice_month, invoice_year = _current_invoice_month(card)
-            period_start, period_end, due = _compute_invoice_period(
-                card, invoice_month, invoice_year
-            )
-
-            agg = (
-                Expense.objects
-                .filter(
-                    tenant_id=self.tenant_id,
-                    credit_card_id=card.id,
-                    date__gte=period_start,
-                    date__lte=period_end,
-                )
-                .aggregate(total=Sum('amount'), count=Count('id'))
-            )
-
-            days_to_close = (period_end - date.today()).days
+
+    def __init__(self, tenant_id: str):
+        self.tenant_id = tenant_id
+
+    def run(self) -> Response:
+        from cards.models import CreditCard
+        from expenses.models import Expense
+
+        cards = CreditCard.objects.filter(tenant_id=self.tenant_id)
+        result = []
+
+        for card in cards:
+            invoice_month, invoice_year = _current_invoice_month(card)
+            period_start, period_end, due = _compute_invoice_period(
+                card, invoice_month, invoice_year
+            )
+
+            agg = (
+                Expense.objects
+                .filter(
+                    tenant_id=self.tenant_id,
+                    credit_card_id=card.id,
+                    date__gte=period_start,
+                    date__lte=period_end,
+                )
+                .aggregate(total=Sum('amount'), count=Count('id'))
+            )
+
+            days_to_close = (period_end - date.today()).days
             expenses_total = round(-float(agg['total'] or 0), 2)
             shared = _shared_invoice_breakdown(card, period_start, period_end)
 
@@ -415,6 +415,6 @@ class OpenInvoicesBehavior:
                 ],
                 'count': agg['count'] or 0,
             })
-
-        result.sort(key=lambda x: x['days_to_close'])
-        return Response(result, status=status.HTTP_200_OK)
+
+        result.sort(key=lambda x: x['days_to_close'])
+        return Response(result, status=status.HTTP_200_OK)
