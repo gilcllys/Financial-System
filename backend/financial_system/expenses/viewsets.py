@@ -1,6 +1,4 @@
-import re
 from datetime import date
-from django.db import transaction
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
@@ -9,6 +7,7 @@ from expenses import models, serializer
 from expenses.behaviors import CreateExpenseBehavior, RecurringExpenseBehavior
 from expenses.analytics_behaviors import ExpenseAnalyticsBehavior
 from expenses.bulk_import_behaviors import BulkImportExpenseBehavior
+
 
 class ExpensePagination(PageNumberPagination):
     """
@@ -21,6 +20,7 @@ class ExpensePagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 100
     page_query_param = 'page'
+
 
 class ExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = serializer.ExpenseSerializer
@@ -38,6 +38,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     # em conjunto. Quando nenhum dos dois for informado, nenhum filtro de
     # data é aplicado (suporte a buscas históricas).
     # ------------------------------------------------------------------
+
     def get_queryset(self):
         qs = (
             models.Expense.objects
@@ -108,15 +109,18 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             if search:
                 qs = qs.filter(description__icontains=search)
         return qs
+
     def perform_update(self, serializer):
         """[SEC-A01] Defense-in-depth: garante que tenant_id não muda em updates."""
         serializer.save(tenant_id=self.request.user.tenant_id)
     # ------------------------------------------------------------------
     # Custom actions — CRUD helpers
     # ------------------------------------------------------------------
+
     def perform_create(self, serializer):
         """Injeta tenant_id do usuário autenticado ao criar via POST padrão."""
         serializer.save(tenant_id=self.request.user.tenant_id)
+
     @action(detail=False, methods=['post'], url_path='create-expense')
     def create_expense(self, request):
         s = serializer.CreateExpenseInputSerializer(data=request.data)
@@ -124,6 +128,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         payload = dict(s.validated_data)
         payload['tenant_id'] = request.user.tenant_id
         return CreateExpenseBehavior(data=payload).run()
+
     @action(detail=False, methods=['post'], url_path='bulk-create')
     def bulk_create(self, request):
         """POST bulk-create: valida o payload e delega a cria??o at?mica."""
@@ -132,16 +137,19 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         return BulkImportExpenseBehavior(request.user.tenant_id).bulk_create(
             s.validated_data['items']
         )
+
     @action(detail=False, methods=['get'], url_path='import-template')
     def import_template(self, request):
         """GET import-template: retorna o modelo .xlsx de importa??o."""
         return BulkImportExpenseBehavior(request.user.tenant_id).import_template()
+
     @action(detail=False, methods=['post'], url_path='import-excel')
     def import_excel(self, request):
         """POST import-excel: delega a importa??o do arquivo enviado."""
         return BulkImportExpenseBehavior(request.user.tenant_id).import_excel(
             request.FILES.get('file')
         )
+
     @action(detail=False, methods=['post'], url_path='delete-installments')
     def delete_installments(self, request):
         """POST delete-installments: valida e remove as parcelas do grupo."""
@@ -151,6 +159,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             s.validated_data['description_prefix'],
             s.validated_data['total_installments'],
         )
+
     @action(detail=False, methods=['get'], url_path='per-credit-card/(?P<card_id>[0-9]+)')
     def expenses_per_credit_card(self, request, card_id=None):
         """
@@ -172,6 +181,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     # ------------------------------------------------------------------
     # Analytics actions
     # ------------------------------------------------------------------
+
     @action(detail=False, methods=['get'], url_path='analytics/monthly')
     def analytics_monthly(self, request):
         """GET analytics/monthly."""
@@ -179,6 +189,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             request.query_params
         )
         return Response(data, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['get'], url_path='analytics/by-category')
     def analytics_by_category(self, request):
         """GET analytics/by-category."""
@@ -186,6 +197,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             request.query_params
         )
         return Response(data, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['get'], url_path='analytics/by-card')
     def analytics_by_card(self, request):
         """GET analytics/by-card."""
@@ -193,6 +205,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             request.query_params
         )
         return Response(data, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['get'], url_path='analytics/daily')
     def analytics_daily(self, request):
         """GET analytics/daily."""
@@ -200,6 +213,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             request.query_params
         )
         return Response(data, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['get'], url_path='consolidated-summary')
     def consolidated_summary(self, request):
         """GET consolidated-summary."""
@@ -207,6 +221,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             request.query_params
         )
         return Response(data, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['get'], url_path='home-charts')
     def home_charts(self, request):
         """GET home-charts."""
@@ -214,6 +229,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             request.query_params
         )
         return Response(data, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['get', 'post'], url_path='recurring-templates')
     def recurring_templates(self, request):
         """GET: listar templates, POST: criar template"""
@@ -223,8 +239,10 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         s = serializer.CreateRecurringExpenseInputSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         return behavior.create({**dict(s.validated_data), 'tenant_id': request.user.tenant_id})
+
     @action(detail=False, methods=['delete', 'patch', 'put'],
             url_path=r'recurring-templates/(?P<tpl_id>[0-9]+)')
+
     def recurring_template_detail(self, request, tpl_id=None):
         """DELETE: excluir, PATCH: toggle is_active, PUT: editar"""
         behavior = RecurringExpenseBehavior(request.user.tenant_id)
@@ -235,6 +253,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             s.is_valid(raise_exception=True)
             return behavior.update(int(tpl_id), dict(s.validated_data))
         return behavior.toggle_active(int(tpl_id))
+
     @action(detail=False, methods=['post'], url_path='recurring-templates/generate-month')
     def generate_month_recurring(self, request):
         """POST {month, year} → materializa todos os templates ativos"""

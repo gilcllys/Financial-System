@@ -3,6 +3,7 @@ from django.db import models
 from django.db.models import Q
 from financial_system.base_model import BaseModel
 
+
 class SharedDebt(BaseModel):
     """
     Grupo de dívida compartilhada (estilo Tricount).
@@ -22,10 +23,12 @@ class SharedDebt(BaseModel):
         null=False,
         help_text='tenant_id (sub do Keycloak) do criador do grupo.',
     )
+
     class Meta:
         db_table = 'shared_debts'
         verbose_name = 'Shared Debt'
         verbose_name_plural = 'Shared Debts'
+
 
 class SharedDebtMember(BaseModel):
     """
@@ -58,6 +61,7 @@ class SharedDebtMember(BaseModel):
         null=True,
         blank=True,
     )
+
     class Meta:
         db_table = 'shared_debt_members'
         verbose_name = 'Shared Debt Member'
@@ -69,6 +73,7 @@ class SharedDebtMember(BaseModel):
                 name='uniq_member_per_tenant',
             ),
         ]
+
 
 class SharedEntry(BaseModel):
     """Uma despesa compartilhada dentro de um grupo."""
@@ -158,10 +163,12 @@ class SharedEntry(BaseModel):
         default=False,
         help_text='Indica se esta despesa compartilhada ja foi paga/quitada.',
     )
+
     class Meta:
         db_table = 'shared_entries'
         verbose_name = 'Shared Entry'
         verbose_name_plural = 'Shared Entries'
+
 
 class SharedEntryParticipant(BaseModel):
     """
@@ -180,6 +187,7 @@ class SharedEntryParticipant(BaseModel):
         on_delete=models.CASCADE,
         related_name='participations',
     )
+
     class Meta:
         db_table = 'shared_entry_participants'
         verbose_name = 'Shared Entry Participant'
@@ -190,6 +198,7 @@ class SharedEntryParticipant(BaseModel):
                 name='uniq_participant_per_entry',
             ),
         ]
+
 
 class SharedDebtInvite(BaseModel):
     """Convite por link para entrar em um grupo de dívida compartilhada."""
@@ -216,10 +225,12 @@ class SharedDebtInvite(BaseModel):
         db_column='created_by_tenant_id',
         null=False,
     )
+
     class Meta:
         db_table = 'shared_debt_invites'
         verbose_name = 'Shared Debt Invite'
         verbose_name_plural = 'Shared Debt Invites'
+
 
 class SharedRecurringTemplate(BaseModel):
     """
@@ -276,6 +287,7 @@ class SharedRecurringTemplate(BaseModel):
         default=True,
         help_text='Falso = template pausado, não gera novas entradas.',
     )
+
     class Meta:
         db_table = 'shared_recurring_templates'
         verbose_name = 'Shared Recurring Template'

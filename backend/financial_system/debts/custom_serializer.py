@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from decimal import Decimal
 
+
 class CreateSharedDebtInputSerializer(serializers.Serializer):
     name = serializers.CharField(required=True, allow_blank=False, max_length=120)
     member_names = serializers.ListField(
@@ -9,6 +10,7 @@ class CreateSharedDebtInputSerializer(serializers.Serializer):
         default=list,
         help_text='Nomes de membros extras adicionados na criação (tenant_id=None).',
     )
+
 
 class CreateSharedEntryInputSerializer(serializers.Serializer):
     description = serializers.CharField(required=True, allow_blank=False, max_length=255)
@@ -55,6 +57,7 @@ class CreateSharedEntryInputSerializer(serializers.Serializer):
         help_text='Indica se a despesa ja foi paga/quitada.',
     )
 
+
 class JoinSharedDebtInputSerializer(serializers.Serializer):
     token = serializers.UUIDField(required=True)
     display_name = serializers.CharField(
@@ -64,12 +67,14 @@ class JoinSharedDebtInputSerializer(serializers.Serializer):
         help_text='Se ausente, usa o nome/email do usuário autenticado.',
     )
 
+
 class InviteInputSerializer(serializers.Serializer):
     expires_at = serializers.DateTimeField(
         required=False,
         allow_null=True,
         default=None,
     )
+
 
 class DeleteSharedInstallmentsInputSerializer(serializers.Serializer):
     """Entrada de POST shared-entries/delete-installments/."""
