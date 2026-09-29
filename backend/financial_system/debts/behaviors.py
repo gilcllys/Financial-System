@@ -9,7 +9,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 from cards.models import CreditCard
-from catalog.constants import _MONTH_NAMES as SHARED_MONTH_NAMES
+from catalog.constants import _MONTH_NAMES
 from catalog.models import ExpenseCategory
 from debts.models import (
     SharedDebt,
@@ -19,7 +19,6 @@ from debts.models import (
     SharedEntryParticipant,
 )
 from debts.serializer import (
-    SharedDebtMemberSerializer,
     SharedDebtSerializer,
     SharedEntrySerializer,
 )
@@ -29,11 +28,13 @@ from expenses.models import Expense
 _SETTLEMENT_EPSILON = Decimal('0.01')
 _TWO_PLACES = Decimal('0.01')
 
+
 def _round2(value: Decimal) -> Decimal:
     return Decimal(value).quantize(_TWO_PLACES, rounding=ROUND_HALF_UP)
 
 # Sufixo de parcela das compartilhadas: " (X/Y)", um ou mais, no fim da string.
 _INSTALLMENT_SUFFIX_RE = re.compile(r'(?:\s*\(\d+\s*/\s*\d+\))+\s*$')
+
 
 def _strip_installment_suffix(description: str) -> str:
     """
@@ -44,6 +45,7 @@ def _strip_installment_suffix(description: str) -> str:
     if not description:
         return description
     return _INSTALLMENT_SUFFIX_RE.sub('', description).strip()
+
 
 def _split_installments(total_amount, installments: int) -> list:
     """
@@ -67,12 +69,15 @@ def _split_installments(total_amount, installments: int) -> list:
         amounts[i] += _TWO_PLACES
     return [a * sign for a in amounts]
 
+
 class CreateSharedDebtBehavior:
     """Cria um grupo de dívida compartilhada com o dono como primeiro membro."""
+
     def __init__(self, data: dict, user):
         self.name = data.get('name')
         self.member_names = data.get('member_names') or []
         self.user = user
+
     @transaction.atomic
     def run(self) -> Response:
         shared_debt = SharedDebt.objects.create(
@@ -96,12 +101,15 @@ class CreateSharedDebtBehavior:
             status=status.HTTP_201_CREATED,
         )
 
+
 class InviteBehavior:
     """Gera um convite (link) para entrar em um grupo."""
+
     def __init__(self, shared_debt: SharedDebt, user, data: dict):
         self.shared_debt = shared_debt
         self.user = user
         self.expires_at = data.get('expires_at')
+
     def run(self) -> Response:
         invite = SharedDebtInvite.objects.create(
             shared_debt=self.shared_debt,
@@ -116,12 +124,15 @@ class InviteBehavior:
             status=status.HTTP_201_CREATED,
         )
 
+
 class JoinSharedDebtBehavior:
     """Adiciona o usuário autenticado a um grupo via token de convite."""
+
     def __init__(self, data: dict, user):
         self.token = data.get('token')
         self.display_name = data.get('display_name')
         self.user = user
+
     @transaction.atomic
     def run(self) -> Response:
         try:
@@ -161,6 +172,7 @@ class JoinSharedDebtBehavior:
             status=status.HTTP_200_OK,
         )
 
+
 def _category_available_to_tenant(category_id, tenant_id) -> bool:
     """
     True quando a categoria pode ser usada por este tenant.
@@ -174,6 +186,7 @@ def _category_available_to_tenant(category_id, tenant_id) -> bool:
         tenant_id__in=['system', tenant_id],
     ).exists()
 
+
 def _payer_belongs_to_tenant(paid_by_id, tenant_id) -> bool:
     """
     True quando quem pagou é o próprio usuário autenticado.
@@ -185,8 +198,10 @@ def _payer_belongs_to_tenant(paid_by_id, tenant_id) -> bool:
         tenant_id=tenant_id,
     ).exists()
 
+
 class CreateSharedEntryBehavior:
     """Cria uma despesa compartilhada e seus participantes (rateio igual)."""
+
     def __init__(self, shared_debt: SharedDebt, user, data: dict):
         self.shared_debt = shared_debt
         self.user = user
@@ -199,10 +214,12 @@ class CreateSharedEntryBehavior:
         self.credit_card_id = data.get('credit_card_id')
         self.category_id = data.get('category_id')
         self.total_installments = int(data.get('total_installments_input', 1) or 1)
+
     def _member_ids(self):
         return set(
             self.shared_debt.members.values_list('id', flat=True)
         )
+
     def run(self) -> Response:
         member_ids = self._member_ids()
         # paid_by precisa ser membro deste grupo.
@@ -307,6 +324,7 @@ class CreateSharedEntryBehavior:
             status=status.HTTP_201_CREATED,
         )
 
+
 class UpdateSharedEntryBehavior:
     """
     Atualiza uma despesa compartilhada existente e ressincroniza participantes.
@@ -318,13 +336,16 @@ class UpdateSharedEntryBehavior:
     - credit_card_id (se informado e não-nulo) deve pertencer ao tenant autenticado.
     - payment_method='dinheiro' força credit_card a null.
     """
+
     def __init__(self, entry: SharedEntry, user, data: dict, partial: bool = False):
         self.entry = entry
         self.user = user
         self.data = data
         self.partial = partial
+
     def _member_ids(self):
         return set(self.entry.shared_debt.members.values_list('id', flat=True))
+
     def run(self) -> Response:
         entry = self.entry
         data = self.data
@@ -446,10 +467,13 @@ class UpdateSharedEntryBehavior:
             status=status.HTTP_200_OK,
         )
 
+
 class BalancesBehavior:
     """Calcula saldos por membro e o plano de acerto (quem paga quem)."""
+
     def __init__(self, shared_debt: SharedDebt):
         self.shared_debt = shared_debt
+
     def run(self) -> Response:
         members = list(self.shared_debt.members.all())
         members_by_id = {m.id: m for m in members}
@@ -489,6 +513,7 @@ class BalancesBehavior:
             {'members': members_payload, 'settlement': settlement},
             status=status.HTTP_200_OK,
         )
+
     @staticmethod
     def _settlement(balance: dict, members_by_id: dict):
         """Acerto guloso com mínimo de transferências."""
@@ -522,6 +547,7 @@ class BalancesBehavior:
                 debtors.pop(0)
         return settlement
 
+
 class PersonalSummaryBehavior:
     """
     Agrega as "Dívidas Pessoais" do usuário autenticado (sem tabelas novas):
@@ -534,8 +560,10 @@ class PersonalSummaryBehavior:
     """
     # Padrão do formato gerado por CreateExpenseBehavior ("... Parcela X/Y").
     _INSTALLMENT_REGEX = r'parcela\s+\d+/\d+'
+
     def __init__(self, user):
         self.user = user
+
     def run(self) -> Response:
         today = timezone.localdate()
         installments = (
@@ -572,6 +600,8 @@ class PersonalSummaryBehavior:
 # ─────────────────────────────────────────────────────────────────────────────
 # Home Summary: todos os grupos do usuário com total e minha parte (sem N+1)
 # ─────────────────────────────────────────────────────────────────────────────
+
+
 class HomeSummaryBehavior:
     """
     GET /api/debts/shared-debts/home-summary/
@@ -580,10 +610,11 @@ class HomeSummaryBehavior:
       - my_portion     : minha parte proporcional (participações)
       - members        : lista de display_name dos membros (para avatares)
     """
+
     def __init__(self, user):
         self.user = user
+
     def run(self) -> Response:
-        from debts.models import SharedDebt, SharedDebtMember, SharedEntry, SharedEntryParticipant
         # Grupos nos quais sou membro
         groups = list(
             SharedDebt.objects
@@ -621,16 +652,19 @@ class HomeSummaryBehavior:
 # ─────────────────────────────────────────────────────────────────────────────
 # Monthly History: histórico mensal de um grupo
 # ─────────────────────────────────────────────────────────────────────────────
+
+
 class MonthlyHistoryBehavior:
     """
     GET /api/debts/shared-debts/{id}/monthly-history/
     Retorna lista de {year, month, month_name, total, my_portion, entry_count}
     ordenada do mais recente ao mais antigo.
     """
-    _MONTH_NAMES = SHARED_MONTH_NAMES
+
     def __init__(self, shared_debt, user):
         self.shared_debt = shared_debt
         self.user = user
+
     def run(self) -> Response:
         # Descobrir meu member_id neste grupo
         my_member = self.shared_debt.members.filter(
@@ -658,7 +692,7 @@ class MonthlyHistoryBehavior:
             {
                 'year': year,
                 'month': month,
-                'month_name': self._MONTH_NAMES[month],
+                'month_name': _MONTH_NAMES[month],
                 'total': round(float(data['total']), 2),
                 'my_portion': round(float(data['my_portion']), 2),
                 'entry_count': data['count'],
@@ -670,11 +704,15 @@ class MonthlyHistoryBehavior:
 # ─────────────────────────────────────────────────────────────────────────────
 # Recurring Templates CRUD + generate_month
 # ─────────────────────────────────────────────────────────────────────────────
+
+
 class RecurringTemplateBehavior:
     """Cria, lista e materializa templates recorrentes de um grupo."""
+
     def __init__(self, shared_debt, user):
         self.shared_debt = shared_debt
         self.user = user
+
     def list(self) -> Response:
         from debts.models import SharedRecurringTemplate
         from debts.serializer import SharedRecurringTemplateSerializer
@@ -685,8 +723,9 @@ class RecurringTemplateBehavior:
             SharedRecurringTemplateSerializer(qs, many=True).data,
             status=status.HTTP_200_OK,
         )
+
     def create(self, data: dict) -> Response:
-        from debts.models import SharedDebtMember, SharedRecurringTemplate
+        from debts.models import SharedRecurringTemplate
         from debts.serializer import SharedRecurringTemplateSerializer
         member_ids = set(self.shared_debt.members.values_list('id', flat=True))
         paid_by_id = data.get('paid_by')
@@ -717,6 +756,7 @@ class RecurringTemplateBehavior:
             SharedRecurringTemplateSerializer(tpl).data,
             status=status.HTTP_201_CREATED,
         )
+
     def toggle_active(self, template_id: int) -> Response:
         from debts.models import SharedRecurringTemplate
         from debts.serializer import SharedRecurringTemplateSerializer
@@ -729,6 +769,7 @@ class RecurringTemplateBehavior:
         tpl.is_active = not tpl.is_active
         tpl.save(update_fields=['is_active', 'updated_at'])
         return Response(SharedRecurringTemplateSerializer(tpl).data, status=status.HTTP_200_OK)
+
     def delete(self, template_id: int) -> Response:
         from debts.models import SharedRecurringTemplate
         try:
@@ -739,6 +780,7 @@ class RecurringTemplateBehavior:
             return Response({'detail': 'Template não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
         tpl.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
     def generate_month(self, month: int, year: int) -> Response:
         """
         Materializa todos os templates ativos para o mês/ano informado.

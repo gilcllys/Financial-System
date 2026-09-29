@@ -271,16 +271,6 @@ class SharedEntryViewSet(viewsets.ModelViewSet):
         s.is_valid(raise_exception=True)
         return CreateSharedEntryBehavior(group, request.user, dict(s.validated_data)).run()
 
-    def perform_destroy(self, instance):
-        is_member = instance.shared_debt.members.filter(
-            tenant_id=self.request.user.tenant_id,
-        ).exists()
-        if not is_member:
-            raise PermissionDenied(
-                "Você não tem permissão para excluir este recurso."
-            )
-        instance.delete()
-
     @action(detail=False, methods=['post'], url_path='delete-installments')
     def delete_installments(self, request):
         """
@@ -312,15 +302,7 @@ class SharedEntryViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
-        entry = self.get_object()  # enforces membership via get_queryset() + 404
-        # Explicit membership re-check (any member may edit).
-        is_member = entry.shared_debt.members.filter(
-            tenant_id=request.user.tenant_id,
-        ).exists()
-        if not is_member:
-            raise PermissionDenied(
-                "Você não tem permissão para editar esta despesa."
-            )
+        entry = self.get_object()  # membership garantida por get_queryset() (404 se nao for membro)
         s = custom_serializer.CreateSharedEntryInputSerializer(
             data=request.data, partial=partial
         )

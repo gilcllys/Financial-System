@@ -1,6 +1,7 @@
 from django.db import models
 from financial_system.base_model import BaseModel
 
+
 class SupermarketExpense(BaseModel):
     tenant_id = models.CharField(
         max_length=36,
@@ -27,10 +28,12 @@ class SupermarketExpense(BaseModel):
         null=True,
         blank=True,
     )
+
     class Meta:
         db_table = 'supermarket_expenses'
         verbose_name = 'Supermarket Expense'
         verbose_name_plural = 'Supermarket Expenses'
+
 
 class SupermarketExpenseItem(BaseModel):
     tenant_id = models.CharField(
@@ -67,6 +70,7 @@ class SupermarketExpenseItem(BaseModel):
         null=False,
         help_text='Preço unitário do item',
     )
+
     class Meta:
         db_table = 'supermarket_expense_items'
         verbose_name = 'Supermarket Expense Item'

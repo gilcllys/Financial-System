@@ -226,7 +226,6 @@ class InvoiceExpensesBehavior:
       - Lista de despesas (filtrada por category_id se informado)
     """
 
-    PAGE_SIZE = 20
 
     def __init__(self, card, invoice_month: int, invoice_year: int,
                  category_id: int | None = None, page: int = 1, page_size: int = 20,

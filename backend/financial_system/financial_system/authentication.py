@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 JWKS_CACHE_KEY = 'keycloak_jwks'
 JWKS_CACHE_TTL = 3600  # 1 hora
 
+
 class KeycloakPrincipal:
     """
     Representa o usuário autenticado pelo Keycloak.
@@ -20,19 +21,24 @@ class KeycloakPrincipal:
     """
     is_anonymous = False
     is_active = True
+
     def __init__(self, payload: dict):
         self.tenant_id: str = payload.get('sub', '')
         self.email: str = payload.get('email', '')
         self.first_name: str = payload.get('given_name', '')
         self.last_name: str = payload.get('family_name', '')
+
     @property
     def is_authenticated(self):
         return bool(self.tenant_id)
+
     @property
     def pk(self):
         return self.tenant_id
+
     def __str__(self):
         return self.tenant_id
+
 
 def _fetch_jwks():
     jwks_url = (
@@ -50,6 +56,7 @@ def _fetch_jwks():
             "Não foi possível validar as credenciais de autenticação."
         )
 
+
 def get_keycloak_jwks():
     cached = cache.get(JWKS_CACHE_KEY)
     if cached:
@@ -57,6 +64,7 @@ def get_keycloak_jwks():
     jwks = _fetch_jwks()
     cache.set(JWKS_CACHE_KEY, jwks, JWKS_CACHE_TTL)
     return jwks
+
 
 def _introspect_token(token: str) -> dict:
     """
@@ -85,6 +93,7 @@ def _introspect_token(token: str) -> dict:
             "Não foi possível validar as credenciais de autenticação."
         )
 
+
 class KeycloakAuthentication(BaseAuthentication):
     """
     Autentica requisições validando o Bearer token JWT emitido pelo Keycloak.
@@ -94,6 +103,7 @@ class KeycloakAuthentication(BaseAuthentication):
       - KEYCLOAK_CLIENT_SECRET configurado → introspection (cliente confidential)
       - Sem client_secret → validação offline via JWKS (cliente público)
     """
+
     def authenticate(self, request):
         auth_header = request.headers.get('Authorization', '')
         if not auth_header.startswith('Bearer '):
@@ -107,6 +117,7 @@ class KeycloakAuthentication(BaseAuthentication):
         if not principal.tenant_id:
             raise AuthenticationFailed("Token não contém o campo 'sub'.")
         return (principal, token)
+
     def _validate_via_introspection(self, token: str) -> dict:
         result = _introspect_token(token)
         if not result.get('active', False):
@@ -125,6 +136,7 @@ class KeycloakAuthentication(BaseAuthentication):
             )
             raise AuthenticationFailed("Token emitido por emissor não confiável.")
         return result
+
     def _decode_via_jwks(self, token: str) -> dict:
         jwks = get_keycloak_jwks()
         decode_errors = []
