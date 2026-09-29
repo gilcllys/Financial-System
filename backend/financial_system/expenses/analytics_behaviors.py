@@ -8,15 +8,12 @@ from django.db.models.functions import Abs, ExtractDay, ExtractMonth
 from expenses import models
 from catalog.constants import _MONTH_NAMES
 from financial_system.money import to_float
+from financial_system.params import choice_param, int_param
 
 
 def _apply_payment_method_filter(qs, params, model):
-    payment_method = params.get('payment_method')
-    if payment_method is not None:
-        valid_choices = {choice[0] for choice in model.PAYMENT_METHOD_CHOICES}
-        if payment_method in valid_choices:
-            qs = qs.filter(payment_method=payment_method)
-    return qs
+    pm = choice_param(params, 'payment_method', model.PAYMENT_METHOD_CHOICES)
+    return qs.filter(payment_method=pm) if pm is not None else qs
 
 
 class ExpenseAnalyticsBehavior:
@@ -30,23 +27,13 @@ class ExpenseAnalyticsBehavior:
     def __init__(self, tenant_id: str):
         self.tenant_id = tenant_id
 
-    def _parse_month(self, params, default_month: int) -> int:
-        try:
-            month = int(params.get('month', default_month))
-            if not (1 <= month <= 12):
-                raise ValueError
-        except (ValueError, TypeError):
-            month = default_month
-        return month
+    @staticmethod
+    def _parse_month(params, default_month: int) -> int:
+        return int_param(params, 'month', 1, 12, default=default_month)
 
-    def _parse_year(self, params, default_year: int) -> int:
-        try:
-            year = int(params.get('year', default_year))
-            if year <= 0:
-                raise ValueError
-        except (ValueError, TypeError):
-            year = default_year
-        return year
+    @staticmethod
+    def _parse_year(params, default_year: int) -> int:
+        return int_param(params, 'year', 1, default=default_year)
 
     def analytics_monthly(self, params):
         """Retorna totais mensais de receitas, despesas, saldo e quantidade."""
