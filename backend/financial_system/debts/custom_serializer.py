@@ -79,3 +79,16 @@ class InviteInputSerializer(serializers.Serializer):
 class DeleteSharedInstallmentsInputSerializer(serializers.Serializer):
     """Entrada de POST shared-entries/delete-installments/."""
     installment_group_id = serializers.UUIDField()
+
+
+class SharedRecurringTemplateInputSerializer(serializers.Serializer):
+    """Entrada de POST shared-debts/{id}/recurring-templates/."""
+    description = serializers.CharField(required=True, allow_blank=False, max_length=255)
+    amount = serializers.DecimalField(required=True, max_digits=10, decimal_places=2, min_value=Decimal('0.01'))
+    paid_by = serializers.IntegerField(required=True)
+    participant_ids = serializers.ListField(child=serializers.IntegerField(), required=False, default=list)
+    payment_method = serializers.ChoiceField(choices=['dinheiro', 'cartao'], required=False, default='dinheiro')
+    credit_card_id = serializers.IntegerField(required=False, allow_null=True, default=None)
+    category_id = serializers.IntegerField(required=False, allow_null=True, default=None)
+    day_of_month = serializers.IntegerField(required=False, default=1, min_value=1, max_value=28)
+    is_active = serializers.BooleanField(required=False, default=True)
