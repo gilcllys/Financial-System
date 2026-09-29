@@ -17,11 +17,14 @@ from debts.models import (
     SharedDebtMember,
     SharedEntry,
     SharedEntryParticipant,
+    SharedRecurringTemplate,
 )
 from debts.serializer import (
     SharedDebtSerializer,
     SharedEntrySerializer,
+    SharedRecurringTemplateSerializer,
 )
+from financial_system.api import get_or_404
 from expenses.models import Expense
 # Epsilon usado no algoritmo de acerto (settlement) — valores abaixo disso são
 # tratados como "quitados".
@@ -560,8 +563,6 @@ class RecurringTemplateBehavior:
         self.user = user
 
     def list(self) -> Response:
-        from debts.models import SharedRecurringTemplate
-        from debts.serializer import SharedRecurringTemplateSerializer
         qs = SharedRecurringTemplate.objects.filter(
             shared_debt=self.shared_debt
         ).select_related('paid_by', 'category').order_by('id')
@@ -572,8 +573,6 @@ class RecurringTemplateBehavior:
 
     def create(self, data: dict) -> Response:
         """`data` ja validado por SharedRecurringTemplateInputSerializer."""
-        from debts.models import SharedRecurringTemplate
-        from debts.serializer import SharedRecurringTemplateSerializer
         try:
             rules = validate_entry_rules(self.shared_debt, self.user, data)
         except EntryRuleError as exc:
@@ -591,27 +590,21 @@ class RecurringTemplateBehavior:
         )
         return Response(SharedRecurringTemplateSerializer(tpl).data, status=status.HTTP_201_CREATED)
 
+    def _get(self, template_id: int):
+        return get_or_404(SharedRecurringTemplate.objects, 'Template não encontrado.', id=template_id, shared_debt=self.shared_debt)
+
     def toggle_active(self, template_id: int) -> Response:
-        from debts.models import SharedRecurringTemplate
-        from debts.serializer import SharedRecurringTemplateSerializer
-        try:
-            tpl = SharedRecurringTemplate.objects.get(
-                id=template_id, shared_debt=self.shared_debt
-            )
-        except SharedRecurringTemplate.DoesNotExist:
-            return Response({'detail': 'Template não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        tpl, err = self._get(template_id)
+        if err:
+            return err
         tpl.is_active = not tpl.is_active
         tpl.save(update_fields=['is_active', 'updated_at'])
-        return Response(SharedRecurringTemplateSerializer(tpl).data, status=status.HTTP_200_OK)
+        return Response(SharedRecurringTemplateSerializer(tpl).data)
 
     def delete(self, template_id: int) -> Response:
-        from debts.models import SharedRecurringTemplate
-        try:
-            tpl = SharedRecurringTemplate.objects.get(
-                id=template_id, shared_debt=self.shared_debt
-            )
-        except SharedRecurringTemplate.DoesNotExist:
-            return Response({'detail': 'Template não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        tpl, err = self._get(template_id)
+        if err:
+            return err
         tpl.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -623,7 +616,6 @@ class RecurringTemplateBehavior:
         """
         import calendar as cal_mod
         from datetime import date as date_cls
-        from debts.models import SharedRecurringTemplate
         templates = SharedRecurringTemplate.objects.filter(
             shared_debt=self.shared_debt, is_active=True
         )
