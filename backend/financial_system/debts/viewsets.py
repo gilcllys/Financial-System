@@ -5,7 +5,7 @@ from django.db import transaction
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -265,7 +265,7 @@ class SharedEntryViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         shared_debt_id = request.data.get('shared_debt')
         if not shared_debt_id:
-            raise PermissionDenied("O campo 'shared_debt' é obrigatório.")
+            raise ValidationError({'shared_debt': ['Este campo é obrigatório.']})
         group = self._get_group_as_member(shared_debt_id)
         s = custom_serializer.CreateSharedEntryInputSerializer(data=request.data)
         s.is_valid(raise_exception=True)

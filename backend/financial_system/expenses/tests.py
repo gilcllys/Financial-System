@@ -401,12 +401,12 @@ class DeleteInstallmentsActionTest(SimpleTestCase):
         )
         self.assertEqual(response.status_code, 404)
 
-    def test_404_response_contains_error_key(self):
+    def test_404_response_contains_detail_key(self):
         response, _, _ = self._call_action(
             data={'description_prefix': 'Celular novo', 'total_installments': 10},
             delete_return=(0, {}),
         )
-        self.assertIn('error', response.data)
+        self.assertIn('detail', response.data)
 
     # --- validation errors ------------------------------------------------
 
