@@ -78,22 +78,6 @@ class SavingsSummaryBehavior:
         }
 
 
-class CreateGoalBehavior:
-    """Cria um cofrinho ja vinculado ao tenant autenticado."""
-
-    def __init__(self, tenant_id: str):
-        self.tenant_id = tenant_id
-
-    def create(self, data: dict) -> Response:
-        s = ser.CreateGoalInputSerializer(data=data)
-        s.is_valid(raise_exception=True)
-        goal = SavingsGoal.objects.create(tenant_id=self.tenant_id, **s.validated_data)
-        return Response(
-            ser.SavingsGoalSerializer(goal).data,
-            status=status.HTTP_201_CREATED,
-        )
-
-
 class CreateDepositBehavior:
     """Cria um aporte, garantindo que o cofrinho pertence ao tenant."""
 
