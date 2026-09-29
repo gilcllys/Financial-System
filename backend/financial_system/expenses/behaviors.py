@@ -1,7 +1,7 @@
 import re
 from datetime import date
 from dateutil.relativedelta import relativedelta
-from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
+from decimal import Decimal
 from typing import List
 from django.db import transaction
 from rest_framework.response import Response
@@ -9,48 +9,15 @@ from rest_framework import status
 
 from expenses.models import Expense
 
-_TWO_PLACES = Decimal('0.01')
+from financial_system.money import split_installments as _split_installments, strip_suffix  # _split_installments: usado por test_installment_split
 
 # Sufixo de parcela gerado por _create_installments (um ou mais, no fim da string).
 _INSTALLMENT_SUFFIX_RE = re.compile(r'(?:\s*-\s*Parcela\s+\d+\s*/\s*\d+)+\s*$', re.IGNORECASE)
 
 
 def _strip_installment_suffix(description: str) -> str:
-    """
-    Remove o sufixo " - Parcela X/Y" do fim da descrição.
-
-    Necessário porque a UI permite reparcelar uma despesa que JÁ é uma parcela:
-    sem isso a descrição acumula ("Item - Parcela 1/2 - Parcela 1/2") e quebra
-    tanto o agrupamento da tela de Parcelas quanto o delete-installments.
-    """
-    if not description:
-        return description
-    return _INSTALLMENT_SUFFIX_RE.sub('', description).strip()
-
-
-def _split_installments(total_amount, installments: int) -> list:
-    """
-    Divide um valor total em N parcelas com 2 casas decimais.
-
-    Os centavos residuais são distribuídos nas primeiras parcelas, garantindo
-    que a soma das parcelas seja exatamente igual ao total.
-    """
-    total = Decimal(str(total_amount)).quantize(_TWO_PLACES, rounding=ROUND_HALF_UP)
-    if installments < 2:
-        return [total]
-
-    # Despesa em Expense.amount e sempre negativa. ROUND_DOWN trunca em direcao
-    # ao zero e o residual sai negativo, entao o rateio so funciona no valor
-    # absoluto; o sinal e reaplicado no fim.
-    sign = -1 if total < 0 else 1
-    magnitude = abs(total)
-
-    base = (magnitude / installments).quantize(_TWO_PLACES, rounding=ROUND_DOWN)
-    amounts = [base] * installments
-    residual_cents = int((magnitude - base * installments) / _TWO_PLACES)
-    for i in range(residual_cents):
-        amounts[i] += _TWO_PLACES
-    return [a * sign for a in amounts]
+    """Remove ' - Parcela X/Y' do fim; evita acumular sufixos ao reparcelar uma parcela."""
+    return strip_suffix(description, _INSTALLMENT_SUFFIX_RE)
 
 
 class CreateExpenseBehavior:

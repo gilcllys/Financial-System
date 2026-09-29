@@ -6,6 +6,7 @@ from django.db.models.functions import Abs
 from rest_framework import status
 from rest_framework.response import Response
 from catalog.constants import _MONTH_NAMES
+from financial_system.money import to_float
 
 def _effective_closing_date(year, month, closing_day):
     """Return the effective closing date, moving weekends back to Friday."""
@@ -289,7 +290,7 @@ class InvoiceExpensesBehavior:
             {
                 'category_id': row['category_id'],
                 'category_name': row['category__name'],
-                'total': round(float(row['cat_total'] or 0), 2),
+                'total': to_float(row['cat_total']),
                 'count': row['cat_count'],
                 'percentage': round(
                     float(row['cat_total'] or 0) / period_total * 100
