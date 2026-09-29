@@ -20,64 +20,58 @@ def _effective_closing_date(year, month, closing_day):
     return closing
 
 
-def _current_invoice_month(card):
+def shift_month(month, year, delta):
+    """(month, year) deslocado `delta` meses (negativo volta no tempo)."""
+    idx = year * 12 + (month - 1) + delta
+    return idx % 12 + 1, idx // 12
+
+
+def current_invoice_month(card):
     """
-    Determina (invoice_month, invoice_year) da fatura corrente (aberta hoje).
+    (invoice_month, invoice_year) da fatura corrente (aberta hoje).
 
     Usa o fechamento efetivo do mes atual: quando o dia cadastrado cai no
-    fim de semana, a fatura fecha na sexta-feira anterior.
+    fim de semana, a fatura fecha na sexta-feira anterior. A fatura e
+    nomeada pelo mes SEGUINTE ao do fechamento.
     """
     today = date.today()
-    effective_closing = _effective_closing_date(
-        today.year, today.month, card.closing_day
-    )
-
-    if today <= effective_closing:
-        closing_month = today.month
-        closing_year = today.year
-    else:
-        if today.month < 12:
-            closing_month = today.month + 1
-            closing_year = today.year
-        else:
-            closing_month = 1
-            closing_year = today.year + 1
-
-    if closing_month < 12:
-        return closing_month + 1, closing_year
-    return 1, closing_year + 1
+    effective_closing = _effective_closing_date(today.year, today.month, card.closing_day)
+    closing_month, closing_year = (today.month, today.year) if today <= effective_closing else shift_month(today.month, today.year, 1)
+    return shift_month(closing_month, closing_year, 1)
 
 
-def _compute_invoice_period(card, invoice_month, invoice_year):
+def compute_invoice_period(card, invoice_month, invoice_year):
     """
-    Calcula (period_start, period_end, due_date) para a fatura identificada
-    por (invoice_month, invoice_year).
+    (period_start, period_end, due_date) da fatura (invoice_month, invoice_year).
 
-    O fechamento nominal vem de card.closing_day, mas o fechamento efetivo
-    do mes antecipa sabado/domingo para a sexta-feira anterior. O inicio da
-    fatura e o dia seguinte ao fechamento efetivo anterior.
+    Fechamento efetivo antecipa sabado/domingo para a sexta anterior; o
+    inicio da fatura e o dia seguinte ao fechamento efetivo anterior.
     """
-    closing_day = card.closing_day
-
-    if invoice_month == 1:
-        closing_month, closing_year = 12, invoice_year - 1
-    else:
-        closing_month, closing_year = invoice_month - 1, invoice_year
-
-    period_end = _effective_closing_date(closing_year, closing_month, closing_day)
-
-    if closing_month == 1:
-        start_month, start_year = 12, closing_year - 1
-    else:
-        start_month, start_year = closing_month - 1, closing_year
-
-    previous_closing = _effective_closing_date(start_year, start_month, closing_day)
-    period_start = previous_closing + timedelta(days=1)
-
+    closing_month, closing_year = shift_month(invoice_month, invoice_year, -1)
+    period_end = _effective_closing_date(closing_year, closing_month, card.closing_day)
+    start_month, start_year = shift_month(closing_month, closing_year, -1)
+    period_start = _effective_closing_date(start_year, start_month, card.closing_day) + timedelta(days=1)
     _, days_in_due = calendar.monthrange(invoice_year, invoice_month)
     due = date(invoice_year, invoice_month, min(card.due_day, days_in_due))
-
     return period_start, period_end, due
+
+
+def invoice_meta(invoice_month, invoice_year, period_start, period_end, due):
+    """Bloco de identificacao de fatura repetido nas respostas de cards."""
+    return {
+        'invoice_month': invoice_month,
+        'invoice_year': invoice_year,
+        'invoice_name': f'{_MONTH_NAMES[invoice_month]} {invoice_year}',
+        'period_start': period_start.isoformat(),
+        'period_end': period_end.isoformat(),
+        'due_date': due.isoformat(),
+    }
+
+
+# Compatibilidade: nomes antigos importados por cards/tests.py, debts/by_person.py
+# e expenses/analytics_behaviors.py.
+_current_invoice_month = current_invoice_month
+_compute_invoice_period = compute_invoice_period
 
 
 def _sorted_participants(rows):
@@ -176,42 +170,26 @@ class InvoicesBehavior:
     def __init__(self, card):
         self.card = card
 
-    def _advance_month(self, month, year, steps=1):
-        for _ in range(steps):
-            if month == 12:
-                month, year = 1, year + 1
-            else:
-                month += 1
-        return month, year
-
     def run(self) -> Response:
-        curr_month, curr_year = _current_invoice_month(self.card)
+        curr_month, curr_year = current_invoice_month(self.card)
 
         # Começa 2 meses à frente da fatura corrente
-        inv_month, inv_year = self._advance_month(curr_month, curr_year, self.FUTURE_COUNT)
+        inv_month, inv_year = shift_month(curr_month, curr_year, self.FUTURE_COUNT)
 
         result = []
         total = self.FUTURE_COUNT + 1 + self.PAST_COUNT  # 15
 
         for i in range(total):
-            period_start, period_end, due = _compute_invoice_period(
+            period_start, period_end, due = compute_invoice_period(
                 self.card, inv_month, inv_year
             )
             result.append({
-                'invoice_month': inv_month,
-                'invoice_year': inv_year,
-                'invoice_name': f'{_MONTH_NAMES[inv_month]} {inv_year}',
-                'period_start': period_start.isoformat(),
-                'period_end': period_end.isoformat(),
-                'due_date': due.isoformat(),
+                **invoice_meta(inv_month, inv_year, period_start, period_end, due),
                 'is_current': i == self.FUTURE_COUNT,
                 'is_future': i < self.FUTURE_COUNT,
             })
 
-            if inv_month == 1:
-                inv_month, inv_year = 12, inv_year - 1
-            else:
-                inv_month -= 1
+            inv_month, inv_year = shift_month(inv_month, inv_year, -1)
 
         return Response(result, status=status.HTTP_200_OK)
 
@@ -242,7 +220,7 @@ class InvoiceExpensesBehavior:
         from expenses.models import Expense
         from expenses.serializer import ExpenseSerializer
 
-        period_start, period_end, due = _compute_invoice_period(
+        period_start, period_end, due = compute_invoice_period(
             self.card, self.invoice_month, self.invoice_year
         )
 
@@ -319,12 +297,7 @@ class InvoiceExpensesBehavior:
         _composite_total = round(_expenses_total + _shared_my_total, 2)
         return Response(
             {
-                'invoice_month': self.invoice_month,
-                'invoice_year': self.invoice_year,
-                'invoice_name': f'{_MONTH_NAMES[self.invoice_month]} {self.invoice_year}',
-                'period_start': period_start.isoformat(),
-                'period_end': period_end.isoformat(),
-                'due_date': due.isoformat(),
+                **invoice_meta(self.invoice_month, self.invoice_year, period_start, period_end, due),
                 'summary': {
                     'total': _composite_total,
                     'expenses_total': _expenses_total,
@@ -368,8 +341,8 @@ class OpenInvoicesBehavior:
         result = []
 
         for card in cards:
-            invoice_month, invoice_year = _current_invoice_month(card)
-            period_start, period_end, due = _compute_invoice_period(
+            invoice_month, invoice_year = current_invoice_month(card)
+            period_start, period_end, due = compute_invoice_period(
                 card, invoice_month, invoice_year
             )
 
@@ -392,12 +365,7 @@ class OpenInvoicesBehavior:
                 'card_id': card.id,
                 'card_name': card.name,
                 'last_four_digits': card.last_four_digits,
-                'invoice_month': invoice_month,
-                'invoice_year': invoice_year,
-                'invoice_name': f'{_MONTH_NAMES[invoice_month]} {invoice_year}',
-                'period_start': period_start.isoformat(),
-                'period_end': period_end.isoformat(),
-                'due_date': due.isoformat(),
+                **invoice_meta(invoice_month, invoice_year, period_start, period_end, due),
                 'days_to_close': days_to_close,
                 'total': round(expenses_total + shared['total'], 2),
                 'expenses_total': expenses_total,

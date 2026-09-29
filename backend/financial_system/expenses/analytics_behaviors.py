@@ -251,7 +251,7 @@ class ExpenseAnalyticsBehavior:
 
     def consolidated_summary(self, params):
         """Retorna resumo consolidado de receitas, dinheiro, cartoes e dividas."""
-        from cards.behaviors import _compute_invoice_period, _current_invoice_month
+        from cards.behaviors import compute_invoice_period, current_invoice_month
         from cards.models import CreditCard
         from debts.models import SharedDebtMember, SharedEntry
 
@@ -286,8 +286,8 @@ class ExpenseAnalyticsBehavior:
         card_invoices_detail = []
 
         for card in cards:
-            inv_month, inv_year = _current_invoice_month(card)
-            period_start, period_end, due = _compute_invoice_period(
+            inv_month, inv_year = current_invoice_month(card)
+            period_start, period_end, due = compute_invoice_period(
                 card, inv_month, inv_year
             )
             agg = (

@@ -16,18 +16,14 @@ from decimal import Decimal
 from rest_framework import status
 from rest_framework.response import Response
 
-from cards.behaviors import _compute_invoice_period, _current_invoice_month
+from cards.behaviors import compute_invoice_period, current_invoice_month, shift_month
 from cards.models import CreditCard
-from catalog.constants import _MONTH_NAMES
+from catalog.constants import _MONTH_NAMES, SHORT_MONTH_NAMES as _SHORT_MONTHS
 from debts.behaviors import BalancesBehavior
 from financial_system.money import round2 as _round2, to_float as _f
 from debts.models import SharedDebt, SharedEntry
 
-_SHORT_MONTHS = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
-
-def _next_month(month, year):
-    return (1, year + 1) if month == 12 else (month + 1, year)
 
 
 
@@ -83,11 +79,11 @@ class ByPersonBehavior:
     def _invoice_for(self, card):
         """(inv_month, inv_year, start, end, due, is_closed) da fatura relevante ao modo."""
         if self.mode == 'open':
-            inv_month, inv_year = _current_invoice_month(card)
+            inv_month, inv_year = current_invoice_month(card)
         else:
             # A fatura que FECHA no mês M é a fatura nomeada M+1.
-            inv_month, inv_year = _next_month(self.month, self.year)
-        start, end, due = _compute_invoice_period(card, inv_month, inv_year)
+            inv_month, inv_year = shift_month(self.month, self.year, 1)
+        start, end, due = compute_invoice_period(card, inv_month, inv_year)
         return inv_month, inv_year, start, end, due, end < self.today
 
     # ── run ────────────────────────────────────────────────────────────────
@@ -145,8 +141,8 @@ class ByPersonBehavior:
 
             if self.mode == 'closed':
                 # O que já está na fatura ABERTA deste cartão fica fora desta conta.
-                o_month, o_year = _current_invoice_month(card)
-                o_start, o_end, _ = _compute_invoice_period(card, o_month, o_year)
+                o_month, o_year = current_invoice_month(card)
+                o_start, o_end, _ = compute_invoice_period(card, o_month, o_year)
                 if o_start > end:
                     open_qs = base_qs.filter(credit_card=card, date__gte=o_start, date__lte=o_end)
                     outside_count += open_qs.count()

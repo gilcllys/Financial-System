@@ -9,8 +9,8 @@ from django.test import SimpleTestCase, TestCase
 from cards.behaviors import (
     InvoiceExpensesBehavior,
     OpenInvoicesBehavior,
-    _compute_invoice_period,
-    _current_invoice_month,
+    compute_invoice_period,
+    current_invoice_month,
 )
 from cards.models import CreditCard
 from catalog.models import ExpenseCategory
@@ -22,7 +22,7 @@ class InvoicePeriodTests(SimpleTestCase):
     def test_uses_previous_friday_when_closing_day_is_saturday(self):
         card = SimpleNamespace(closing_day=26, due_day=10)
 
-        period_start, period_end, due = _compute_invoice_period(card, 10, 2026)
+        period_start, period_end, due = compute_invoice_period(card, 10, 2026)
 
         self.assertEqual(period_start, real_date(2026, 8, 27))
         self.assertEqual(period_end, real_date(2026, 9, 25))
@@ -31,7 +31,7 @@ class InvoicePeriodTests(SimpleTestCase):
     def test_uses_previous_friday_when_closing_day_is_sunday(self):
         card = SimpleNamespace(closing_day=26, due_day=10)
 
-        period_start, period_end, due = _compute_invoice_period(card, 5, 2026)
+        period_start, period_end, due = compute_invoice_period(card, 5, 2026)
 
         self.assertEqual(period_start, real_date(2026, 3, 27))
         self.assertEqual(period_end, real_date(2026, 4, 24))
@@ -40,7 +40,7 @@ class InvoicePeriodTests(SimpleTestCase):
     def test_clamps_invalid_month_days_before_adjusting_weekends(self):
         card = SimpleNamespace(closing_day=31, due_day=31)
 
-        period_start, period_end, due = _compute_invoice_period(card, 3, 2026)
+        period_start, period_end, due = compute_invoice_period(card, 3, 2026)
 
         self.assertEqual(period_start, real_date(2026, 1, 31))
         self.assertEqual(period_end, real_date(2026, 2, 27))
@@ -55,7 +55,7 @@ class InvoicePeriodTests(SimpleTestCase):
                 return cls(2026, 9, 26)
 
         with patch('cards.behaviors.date', FixedDate):
-            self.assertEqual(_current_invoice_month(card), (11, 2026))
+            self.assertEqual(current_invoice_month(card), (11, 2026))
 
 
 # ---------------------------------------------------------------------------
