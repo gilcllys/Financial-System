@@ -139,6 +139,7 @@
 .col-progress { min-width: 200px; }
 .col-date { min-width: 100px; color: var(--color-muted); font-size: 13px; }
 .col-value { min-width: 110px; }
+.col-actions { width: 1%; white-space: nowrap; text-align: right; }
 
 .item-name {
   font-weight: 600;

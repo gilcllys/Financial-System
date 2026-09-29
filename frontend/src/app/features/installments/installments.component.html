@@ -51,6 +51,7 @@
             <th>PROGRESSO</th>
             <th>PROXIMA PARCELA</th>
             <th class="text-right">VALOR/MES</th>
+            <th class="col-actions"><span class="sr-only">Acoes</span></th>
           </tr>
         </thead>
         <tbody>
@@ -76,6 +77,11 @@
               </td>
               <td class="col-date">{{ formatNextDate(group.nextDate) }}</td>
               <td class="col-value text-right value-red">{{ formatAmount(group.amountPerInstallment) }}</td>
+              <td class="col-actions">
+                <button class="btn btn--danger btn--sm" type="button" (click)="deleteGroup(group)" [disabled]="deletingGroup() === group.name" [attr.aria-label]="'Apagar todas as parcelas de ' + group.name">
+                  {{ deletingGroup() === group.name ? 'Apagando...' : 'Apagar todas' }}
+                </button>
+              </td>
             </tr>
           }
           @if (showFinalizadas()) {
@@ -99,6 +105,11 @@
                 </td>
                 <td class="col-date">-</td>
                 <td class="col-value text-right">{{ formatAmount(group.amountPerInstallment) }}</td>
+                <td class="col-actions">
+                  <button class="btn btn--danger btn--sm" type="button" (click)="deleteGroup(group)" [disabled]="deletingGroup() === group.name" [attr.aria-label]="'Apagar todas as parcelas de ' + group.name">
+                    {{ deletingGroup() === group.name ? 'Apagando...' : 'Apagar todas' }}
+                  </button>
+                </td>
               </tr>
             }
           }
