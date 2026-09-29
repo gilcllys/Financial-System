@@ -74,4 +74,10 @@ class InviteInputSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
         default=None,
-    )
+    )
+
+
+class DeleteSharedInstallmentsInputSerializer(serializers.Serializer):
+    """Entrada de POST shared-entries/delete-installments/."""
+
+    installment_group_id = serializers.UUIDField()

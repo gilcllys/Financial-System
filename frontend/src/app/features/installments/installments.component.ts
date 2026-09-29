@@ -131,6 +131,7 @@ export class InstallmentsComponent implements OnInit {
   showFinalizadas = signal(false);
   showFinalizadasShared = signal(false);
   deletingGroup = signal<string | null>(null);
+  deletingSharedGroup = signal<string | null>(null);
 
   private cardMap = computed(() => new Map(this.cards().map(card => [card.id, card])));
 
@@ -344,6 +345,15 @@ export class InstallmentsComponent implements OnInit {
     this.expenseService.deleteInstallments(group.name, group.totalInstallments).subscribe({
       next: () => { this.deletingGroup.set(null); this.fetchExpenses(); },
       error: () => { alert('Erro ao apagar parcelas.'); this.deletingGroup.set(null); },
+    });
+  }
+
+  deleteSharedGroup(group: SharedInstallmentGroup): void {
+    if (!confirm(`Apagar todas as ${group.totalInstallments} parcelas de "${group.name}" do grupo ${group.shared_debt_name}? Isso afeta todos os membros.`)) return;
+    this.deletingSharedGroup.set(group.installment_group_id);
+    this.sharedDebtService.deleteInstallments(group.installment_group_id).subscribe({
+      next: () => { this.deletingSharedGroup.set(null); this.fetchSharedEntries(); },
+      error: () => { alert('Erro ao apagar parcelas compartilhadas.'); this.deletingSharedGroup.set(null); },
     });
   }
 
