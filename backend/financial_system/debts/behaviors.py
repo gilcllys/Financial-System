@@ -130,12 +130,12 @@ class JoinSharedDebtBehavior:
             )
         except SharedDebtInvite.DoesNotExist:
             return Response(
-                {'success': False, 'message': 'Convite inválido.'},
+                {'detail': 'Convite inválido.'},
                 status=status.HTTP_404_NOT_FOUND,
             )
         if invite.expires_at is not None and invite.expires_at < timezone.now():
             return Response(
-                {'success': False, 'message': 'Convite expirado.'},
+                {'detail': 'Convite expirado.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         shared_debt = invite.shared_debt
@@ -208,7 +208,7 @@ class CreateSharedEntryBehavior:
         # paid_by precisa ser membro deste grupo.
         if self.paid_by_id not in member_ids:
             return Response(
-                {'success': False, 'message': 'paid_by não é membro deste grupo.'},
+                {'detail': 'paid_by não é membro deste grupo.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         # participant_ids (se informados) precisam pertencer ao grupo.
@@ -218,8 +218,7 @@ class CreateSharedEntryBehavior:
             if invalid:
                 return Response(
                     {
-                        'success': False,
-                        'message': 'participant_ids contém membros de fora do grupo.',
+                        'detail': 'participant_ids contém membros de fora do grupo.',
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
@@ -227,7 +226,7 @@ class CreateSharedEntryBehavior:
             participant_ids = list(member_ids)
         if not participant_ids:
             return Response(
-                {'success': False, 'message': 'Grupo sem participantes válidos.'},
+                {'detail': 'Grupo sem participantes válidos.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         # payment_method='cartao' exige cartão vinculado quando quem pagou foi o
@@ -239,8 +238,7 @@ class CreateSharedEntryBehavior:
         ):
             return Response(
                 {
-                    'success': False,
-                    'message': 'credit_card_id é obrigatório quando payment_method é "cartao".',
+                    'detail': 'credit_card_id é obrigatório quando payment_method é "cartao".',
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -253,8 +251,7 @@ class CreateSharedEntryBehavior:
             if not owns_card:
                 return Response(
                     {
-                        'success': False,
-                        'message': 'O cartão informado não pertence ao usuário autenticado.',
+                        'detail': 'O cartão informado não pertence ao usuário autenticado.',
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
@@ -269,8 +266,7 @@ class CreateSharedEntryBehavior:
         ):
             return Response(
                 {
-                    'success': False,
-                    'message': 'A categoria informada não pertence ao usuário autenticado.',
+                    'detail': 'A categoria informada não pertence ao usuário autenticado.',
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -337,12 +333,12 @@ class UpdateSharedEntryBehavior:
         paid_by_id = data.get('paid_by', entry.paid_by_id if self.partial else None)
         if paid_by_id is None:
             return Response(
-                {'success': False, 'message': 'O campo paid_by é obrigatório.'},
+                {'detail': 'O campo paid_by é obrigatório.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if paid_by_id not in member_ids:
             return Response(
-                {'success': False, 'message': 'paid_by não é membro deste grupo.'},
+                {'detail': 'paid_by não é membro deste grupo.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         # -- participant_ids validation / resolution --
@@ -356,8 +352,7 @@ class UpdateSharedEntryBehavior:
             if invalid:
                 return Response(
                     {
-                        'success': False,
-                        'message': 'participant_ids contém membros de fora do grupo.',
+                        'detail': 'participant_ids contém membros de fora do grupo.',
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
@@ -372,7 +367,7 @@ class UpdateSharedEntryBehavior:
             replace_participants = True
         if replace_participants and not participant_ids:
             return Response(
-                {'success': False, 'message': 'Grupo sem participantes válidos.'},
+                {'detail': 'Grupo sem participantes válidos.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         # -- payment_method / credit_card --
@@ -392,8 +387,7 @@ class UpdateSharedEntryBehavior:
         ):
             return Response(
                 {
-                    'success': False,
-                    'message': 'credit_card_id é obrigatório quando payment_method é "cartao".',
+                    'detail': 'credit_card_id é obrigatório quando payment_method é "cartao".',
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -406,8 +400,7 @@ class UpdateSharedEntryBehavior:
             if not owns_card:
                 return Response(
                     {
-                        'success': False,
-                        'message': 'O cartão informado não pertence ao usuário autenticado.',
+                        'detail': 'O cartão informado não pertence ao usuário autenticado.',
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
@@ -419,8 +412,7 @@ class UpdateSharedEntryBehavior:
         ):
             return Response(
                 {
-                    'success': False,
-                    'message': 'A categoria informada não pertence ao usuário autenticado.',
+                    'detail': 'A categoria informada não pertence ao usuário autenticado.',
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )

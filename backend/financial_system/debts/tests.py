@@ -890,3 +890,44 @@ class SharedEntryListQueryCountTests(TestCase):
             resp = self.client.get('/api/debts/shared-entries/')
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data['count'], 5)
+
+
+class ErrorEnvelopeContractTests(TestCase):
+    """
+    Contrato de erro da API: toda rejeicao de negocio responde {'detail': str}.
+    O frontend le err.error.detail em todas as telas; o formato antigo
+    {'success': False, 'message': ...} deixava as mensagens invisiveis.
+    """
+
+    def _client(self, sub):
+        from financial_system.authentication import KeycloakPrincipal
+        from rest_framework.test import APIClient
+        c = APIClient()
+        c.force_authenticate(user=KeycloakPrincipal({
+            'sub': sub, 'email': f'{sub}@e.com', 'given_name': sub, 'family_name': 'X'}))
+        return c
+
+    def test_business_rejection_uses_detail_key(self):
+        group = SharedDebt.objects.create(name='G', owner_tenant_id='gil')
+        SharedDebtMember.objects.create(shared_debt=group, tenant_id='gil', display_name='Gil')
+        outsider = SharedDebtMember.objects.create(
+            shared_debt=SharedDebt.objects.create(name='Outro', owner_tenant_id='zed'),
+            tenant_id='zed', display_name='Zed')
+
+        resp = self._client('gil').post('/api/debts/shared-entries/', {
+            'shared_debt': group.id, 'description': 'X', 'amount': '10.00',
+            'date': '2026-09-01', 'paid_by': outsider.id,
+        }, format='json')
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('detail', resp.data)
+        self.assertNotIn('success', resp.data)
+        self.assertNotIn('message', resp.data)
+
+    def test_missing_shared_debt_is_400_not_403(self):
+        resp = self._client('gil').post('/api/debts/shared-entries/', {
+            'description': 'X', 'amount': '10.00', 'date': '2026-09-01', 'paid_by': 1,
+        }, format='json')
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('shared_debt', resp.data)

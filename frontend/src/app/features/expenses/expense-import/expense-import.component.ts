@@ -61,7 +61,7 @@ export class ExpenseImportComponent {
         if (body?.errors?.length) {
           this.rowErrors.set(body.errors);
         }
-        this.errorMessage.set(body?.message ?? 'Erro ao importar a planilha. Verifique o arquivo e tente novamente.');
+        this.errorMessage.set(body?.detail ?? body?.message ?? 'Erro ao importar a planilha. Verifique o arquivo e tente novamente.');
       },
     });
   }

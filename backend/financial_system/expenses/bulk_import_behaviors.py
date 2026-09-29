@@ -38,15 +38,15 @@ class BulkImportExpenseBehavior:
         allowed_ids = set(ExpenseCategory.objects.filter(tenant_id__in=['system', self.tenant_id], id__in=requested_ids).values_list('id', flat=True))
         invalid_ids = sorted(requested_ids - allowed_ids)
         if invalid_ids:
-            return Response({'success': False, 'message': f'Categoria(s) inv?lida(s): {invalid_ids}', 'invalid_category_ids': invalid_ids}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': f'Categoria(s) inv?lida(s): {invalid_ids}', 'invalid_category_ids': invalid_ids}, status=status.HTTP_400_BAD_REQUEST)
         created = []
         try:
             with transaction.atomic():
                 for item in items:
                     created.extend(self._create_from_item(item))
         except Exception as e:
-            return Response({'success': False, 'message': f'Erro ao criar gastos em lote: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({'success': True, 'created': len(created), 'message': f'{len(created)} gasto(s) criado(s) com sucesso'}, status=status.HTTP_201_CREATED)
+            return Response({'detail': f'Erro ao criar gastos em lote: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'created': len(created), 'message': f'{len(created)} gasto(s) criado(s) com sucesso'}, status=status.HTTP_201_CREATED)
 
     def import_template(self):
         """Gera o arquivo .xlsx modelo para importacao de gastos."""
@@ -128,23 +128,23 @@ class BulkImportExpenseBehavior:
     def import_excel(self, upload) -> Response:
         """Importa gastos de uma planilha .xlsx com semantica tudo-ou-nada."""
         if upload is None:
-            return Response({'success': False, 'message': 'Arquivo n?o enviado'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'Arquivo n?o enviado'}, status=status.HTTP_400_BAD_REQUEST)
         try:
             from openpyxl import load_workbook
             wb = load_workbook(upload, data_only=True)
         except Exception:
-            return Response({'success': False, 'message': 'Arquivo inv?lido ou corrompido'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'Arquivo inv?lido ou corrompido'}, status=status.HTTP_400_BAD_REQUEST)
         ws = wb['Gastos'] if 'Gastos' in wb.sheetnames else wb.active
         rows = list(ws.iter_rows(values_only=True))
         if not rows:
-            return Response({'success': False, 'message': 'Planilha vazia'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'Planilha vazia'}, status=status.HTTP_400_BAD_REQUEST)
         header_map = {str(val).strip().lower(): idx for idx, val in enumerate(rows[0]) if val is not None}
         missing = {'descricao', 'valor', 'data', 'categoria'} - set(header_map.keys())
         if missing:
-            return Response({'success': False, 'message': f'Colunas obrigat?rias ausentes: {sorted(missing)}'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': f'Colunas obrigat?rias ausentes: {sorted(missing)}'}, status=status.HTTP_400_BAD_REQUEST)
         data_rows = rows[1:]
         if len(data_rows) > self.MAX_ROWS:
-            return Response({'success': False, 'message': f'N?mero de linhas excede o m?ximo de {self.MAX_ROWS}'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': f'N?mero de linhas excede o m?ximo de {self.MAX_ROWS}'}, status=status.HTTP_400_BAD_REQUEST)
         category_map = {c.name.strip(): c.id for c in ExpenseCategory.objects.filter(tenant_id__in=['system', self.tenant_id])}
         from cards.models import CreditCard
         card_map = {c.name.strip().lower(): c.id for c in CreditCard.objects.filter(tenant_id=self.tenant_id)}
@@ -224,17 +224,17 @@ class BulkImportExpenseBehavior:
                 continue
             parsed_items.append({'category_id': category_id, 'description': descricao, 'amount': amount, 'date': data_val, 'quantity': quantity, 'payment_method': payment_method, 'credit_card_id': credit_card_id, 'is_installment': parcelado == 'sim', 'installments': parcelas})
         if errors:
-            return Response({'success': False, 'errors': errors, 'message': f'{len(errors)} linha(s) com erro; nada foi importado'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'errors': errors, 'detail': f'{len(errors)} linha(s) com erro; nada foi importado'}, status=status.HTTP_400_BAD_REQUEST)
         if not parsed_items:
-            return Response({'success': False, 'message': 'Nenhuma linha de dados encontrada'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'Nenhuma linha de dados encontrada'}, status=status.HTTP_400_BAD_REQUEST)
         created = []
         try:
             with transaction.atomic():
                 for item in parsed_items:
                     created.extend(self._create_from_item(item))
         except Exception as e:
-            return Response({'success': False, 'message': f'Erro ao importar gastos: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({'success': True, 'created': len(created), 'message': f'{len(created)} gasto(s) importado(s) com sucesso'}, status=status.HTTP_201_CREATED)
+            return Response({'detail': f'Erro ao importar gastos: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'created': len(created), 'message': f'{len(created)} gasto(s) importado(s) com sucesso'}, status=status.HTTP_201_CREATED)
 
     def delete_installments(self, description_prefix, total_installments) -> Response:
         """Remove todas as parcelas de uma despesa parcelada de uma so vez."""
@@ -243,5 +243,5 @@ class BulkImportExpenseBehavior:
         with transaction.atomic():
             deleted_count, _ = qs.delete()
         if deleted_count == 0:
-            return Response({'error': 'Nenhuma parcela encontrada para os crit?rios informados.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'detail': 'Nenhuma parcela encontrada para os crit?rios informados.'}, status=status.HTTP_404_NOT_FOUND)
         return Response({'deleted': deleted_count, 'description_prefix': description_prefix, 'total_installments': total_installments}, status=status.HTTP_200_OK)

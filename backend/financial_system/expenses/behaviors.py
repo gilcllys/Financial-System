@@ -132,7 +132,6 @@ class CreateExpenseBehavior:
                 expenses = self._create_installments()
                 return Response(
                     {
-                        'success': True,
                         'message': f'{len(expenses)} parcelas criadas com sucesso',
                         'is_installment': True,
                         'installments': self.installments,
@@ -155,7 +154,6 @@ class CreateExpenseBehavior:
                 expenses = self._create_multiple()
                 return Response(
                     {
-                        'success': True,
                         'message': f'{len(expenses)} gastos criados com sucesso',
                         'is_installment': False,
                         'quantity': self.quantity,
@@ -176,7 +174,6 @@ class CreateExpenseBehavior:
                 expense = self._create_single()
                 return Response(
                     {
-                        'success': True,
                         'message': 'Despesa criada com sucesso',
                         'is_installment': False,
                         'installments': 1,
@@ -192,7 +189,7 @@ class CreateExpenseBehavior:
                 )
         except Exception as e:
             return Response(
-                {'success': False, 'message': f'Erro ao criar despesa(s): {str(e)}', 'error': str(e)},
+                {'detail': f'Erro ao criar despesa(s): {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

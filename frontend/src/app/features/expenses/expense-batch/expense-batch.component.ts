@@ -164,7 +164,7 @@ export class ExpenseBatchComponent implements OnInit {
       next: () => this.router.navigate(['/expenses']),
       error: err => {
         this.saving.set(false);
-        this.errorMessage.set(err?.error?.message ?? err?.error?.detail ?? 'Erro ao salvar gastos. Tente novamente.');
+        this.errorMessage.set(err?.error?.detail ?? err?.error?.message ?? 'Erro ao salvar gastos. Tente novamente.');
       },
     });
   }
