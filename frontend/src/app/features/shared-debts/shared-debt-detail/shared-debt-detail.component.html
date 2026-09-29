@@ -291,14 +291,14 @@
 
         @if (d.blocks.length === 0 && d.mode === 'closed') {
           <div class="empty-state">
-            <div class="empty-state__icon">&#128203;</div>
+            <div class="empty-state__icon" aria-hidden="true"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></div>
             <p class="empty-state__title">Nenhuma fatura fechou em {{ d.month_name }} com gastos deste grupo.</p>
           </div>
         } @else {
 
           <!-- Cabecalho de colunas -->
           <div class="bp-head">
-            <span class="bp-head__label">{{ d.mode === 'closed' ? 'Fatura fechada ? cartao de quem pagou' : 'Fatura em aberto ? cartao de quem vai pagar' }}</span>
+            <span class="bp-head__label">@if (d.mode === 'closed') { Fatura fechada &middot; cartao de quem pagou } @else { Fatura em aberto &middot; cartao de quem vai pagar }</span>
             <div class="bp-head__members">
               @for (m of d.members; track m.id) {
                 <div class="bp-head__member" [class.bp-head__member--me]="bpIsMe(m)">
@@ -355,7 +355,7 @@
                 <div class="bp-card__details bp-card__details--empty">Nenhum lancamento compartilhado neste periodo ainda</div>
               } @else {
                 <button type="button" class="bp-card__toggle" (click)="bpToggle(bpKey(b))" [attr.aria-expanded]="bpIsOpen(bpKey(b))">
-                  <span class="bp-card__chevron" aria-hidden="true">{{ bpIsOpen(bpKey(b)) ? '&#9662;' : '&#9656;' }}</span>
+                  <span class="bp-card__chevron" aria-hidden="true">{{ bpIsOpen(bpKey(b)) ? '▾' : '▸' }}</span>
                   Detalhes &middot; {{ b.entries.length }} lancamento(s) dentro do periodo
                 </button>
                 @if (bpIsOpen(bpKey(b))) {
@@ -435,7 +435,7 @@
           } @else {
             <div class="bp-settle bp-settle--forecast">
               <div class="bp-settle__row">
-                <span class="bp-settle__clock" aria-hidden="true">&#128339;</span>
+                <span class="bp-settle__clock" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
                 <div>
                   @if (d.settlement.length > 0) {
                     @for (s of d.settlement; track s.from_member_id + '-' + s.to_member_id) {
