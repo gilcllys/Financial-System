@@ -1,4 +1,3 @@
-from datetime import date
 
 from django.db import transaction
 
@@ -24,6 +23,8 @@ from debts.behaviors import (
 )
 from debts.by_person import ByPersonBehavior
 from debts.models import SharedDebt, SharedEntry
+from expenses.serializer import GenerateMonthInputSerializer
+from financial_system.params import apply_common_filters, int_param
 
 
 class SharedDebtViewSet(viewsets.ModelViewSet):
@@ -98,16 +99,9 @@ class SharedDebtViewSet(viewsets.ModelViewSet):
     def generate_month(self, request, pk=None):
         """POST /api/debts/shared-debts/{id}/generate-month/ body: {month, year}"""
         shared_debt = self.get_object()
-        try:
-            month = int(request.data.get('month', 0))
-            year  = int(request.data.get('year', 0))
-            if not (1 <= month <= 12) or year < 2000:
-                raise ValueError
-        except (ValueError, TypeError):
-            from rest_framework.response import Response
-            from rest_framework import status as drf_status
-            return Response({'detail': 'month e year são obrigatórios.'}, status=drf_status.HTTP_400_BAD_REQUEST)
-        return RecurringTemplateBehavior(shared_debt, request.user).generate_month(month, year)
+        s = GenerateMonthInputSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        return RecurringTemplateBehavior(shared_debt, request.user).generate_month(**s.validated_data)
 
     def perform_destroy(self, instance):
         # Only the group owner may delete the group.
@@ -140,21 +134,11 @@ class SharedDebtViewSet(viewsets.ModelViewSet):
         """
         shared_debt = self.get_object()  # já filtra por membership
 
-        def _int(name, lo, hi):
-            raw = request.query_params.get(name)
-            if raw in (None, ''):
-                return None
-            try:
-                value = int(raw)
-            except (TypeError, ValueError):
-                return None
-            return value if lo <= value <= hi else None
-
         return ByPersonBehavior(
             shared_debt,
             mode=request.query_params.get('mode', 'closed'),
-            month=_int('month', 1, 12),
-            year=_int('year', 2000, 2100),
+            month=int_param(request.query_params, 'month', 1, 12),
+            year=int_param(request.query_params, 'year', 2000, 2100),
         ).run()
 
 
@@ -182,67 +166,15 @@ class SharedEntryViewSet(viewsets.ModelViewSet):
         )
 
         params = self.request.query_params
-
-        raw_shared_debt = params.get('shared_debt')
-        if raw_shared_debt is not None:
-            try:
-                qs = qs.filter(shared_debt_id=int(raw_shared_debt))
-            except (ValueError, TypeError):
-                pass
-
-        raw_credit_card = params.get('credit_card')
-        if raw_credit_card is not None:
-            try:
-                card_id = int(raw_credit_card)
-                # Subseção "shared" da fatura do cartão: apenas entries que o
-                # usuário atual pagou naquele cartão.
-                qs = qs.filter(
-                    credit_card_id=card_id,
-                    paid_by__tenant_id=self.request.user.tenant_id,
-                )
-            except (ValueError, TypeError):
-                pass
-
-        payment_method = params.get('payment_method')
-        if payment_method is not None:
-            valid_choices = {choice[0] for choice in SharedEntry.PAYMENT_METHOD_CHOICES}
-            if payment_method in valid_choices:
-                qs = qs.filter(payment_method=payment_method)
-
-        raw_month = params.get('month')
-        raw_year  = params.get('year')
-        if raw_month and raw_year:
-            try:
-                qs = qs.filter(date__month=int(raw_month), date__year=int(raw_year))
-            except (ValueError, TypeError):
-                pass
-        elif raw_month:
-            try:
-                qs = qs.filter(date__month=int(raw_month))
-            except (ValueError, TypeError):
-                pass
-
-        raw_category = params.get('category')
-        if raw_category is not None:
-            try:
-                qs = qs.filter(category_id=int(raw_category))
-            except (ValueError, TypeError):
-                pass
-
-        raw_start_date = params.get('start_date')
-        if raw_start_date:
-            try:
-                qs = qs.filter(date__gte=date.fromisoformat(raw_start_date))
-            except (ValueError, TypeError):
-                pass
-
-        raw_end_date = params.get('end_date')
-        if raw_end_date:
-            try:
-                qs = qs.filter(date__lte=date.fromisoformat(raw_end_date))
-            except (ValueError, TypeError):
-                pass
-
+        shared_debt_id = int_param(params, 'shared_debt')
+        if shared_debt_id is not None:
+            qs = qs.filter(shared_debt_id=shared_debt_id)
+        # Subsecao "shared" da fatura do cartao: apenas entries que o usuario
+        # atual pagou naquele cartao (por isso o cartao nao entra no filtro comum).
+        card_id = int_param(params, 'credit_card')
+        if card_id is not None:
+            qs = qs.filter(credit_card_id=card_id, paid_by__tenant_id=self.request.user.tenant_id)
+        qs = apply_common_filters(qs, params, SharedEntry, category_key='category', card_key='__unused__')
         return qs
 
     def _get_group_as_member(self, shared_debt_id):

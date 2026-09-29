@@ -1,4 +1,3 @@
-from datetime import date
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
@@ -7,6 +6,7 @@ from expenses import models, serializer
 from expenses.behaviors import CreateExpenseBehavior, RecurringExpenseBehavior
 from expenses.analytics_behaviors import ExpenseAnalyticsBehavior
 from expenses.bulk_import_behaviors import BulkImportExpenseBehavior
+from financial_system.params import apply_common_filters
 
 
 class ExpensePagination(PageNumberPagination):
@@ -48,58 +48,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             .order_by('-date', '-id')
         )
         params = self.request.query_params
-        # --- month ---------------------------------------------------
-        raw_month = params.get('month')
-        if raw_month is not None:
-            try:
-                month = int(raw_month)
-                if 1 <= month <= 12:
-                    qs = qs.filter(date__month=month)
-            except (ValueError, TypeError):
-                pass  # parâmetro inválido ignorado silenciosamente
-        # --- year ----------------------------------------------------
-        raw_year = params.get('year')
-        if raw_year is not None:
-            try:
-                year = int(raw_year)
-                if year > 0:
-                    qs = qs.filter(date__year=year)
-            except (ValueError, TypeError):
-                pass
-        # --- category_id ---------------------------------------------
-        raw_category = params.get('category_id')
-        if raw_category is not None:
-            try:
-                category_id = int(raw_category)
-                qs = qs.filter(category_id=category_id)
-            except (ValueError, TypeError):
-                pass
-        # --- payment_method ------------------------------------------
-        payment_method = params.get('payment_method')
-        if payment_method is not None:
-            valid_choices = {choice[0] for choice in models.Expense.PAYMENT_METHOD_CHOICES}
-            if payment_method in valid_choices:
-                qs = qs.filter(payment_method=payment_method)
-        # --- credit_card_id ------------------------------------------
-        raw_credit_card = params.get('credit_card_id')
-        if raw_credit_card is not None:
-            try:
-                qs = qs.filter(credit_card_id=int(raw_credit_card))
-            except (ValueError, TypeError):
-                pass
-        # --- start_date / end_date -----------------------------------
-        raw_start_date = params.get('start_date')
-        if raw_start_date:
-            try:
-                qs = qs.filter(date__gte=date.fromisoformat(raw_start_date))
-            except (ValueError, TypeError):
-                pass
-        raw_end_date = params.get('end_date')
-        if raw_end_date:
-            try:
-                qs = qs.filter(date__lte=date.fromisoformat(raw_end_date))
-            except (ValueError, TypeError):
-                pass
+        qs = apply_common_filters(qs, params, models.Expense)
         # --- search (description icontains) --------------------------
         # [SEC-A03] Limita o tamanho da query para prevenir DoS via queries longas
         # (icontains é parameterizado pelo ORM — seguro contra SQL injection)
