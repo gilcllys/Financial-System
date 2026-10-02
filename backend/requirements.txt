@@ -3,7 +3,7 @@ asgiref==3.10.0
 # SEC-FIX: bumped para >=48.0.1 (CVE-2026-26007, PYSEC-2026-35, GHSA-537c-gmf6-5ccf)
 cryptography>=48.0.1,<49.0.0
 # SEC-FIX: 5.2.16 corrige PYSEC-2025-104/107/108/109, PYSEC-2026-42~55/197~201, CVE-2026-25673/25674 + GDALRaster heap over-read, DomainNameValidator header injection, cache middleware info disclosure
-Django==5.2.16
+Django==5.2.17
 django-cors-headers==4.9.0
 djangorestframework==3.16.1
 # [SEC-A08] 'dotenv==0.9.9' removido — pacote diferente de python-dotenv, obsoleto e
