@@ -5,7 +5,7 @@ cryptography>=48.0.1,<49.0.0
 # SEC-FIX: 5.2.16 corrige PYSEC-2025-104/107/108/109, PYSEC-2026-42~55/197~201, CVE-2026-25673/25674 + GDALRaster heap over-read, DomainNameValidator header injection, cache middleware info disclosure
 Django==5.2.16
 django-cors-headers==4.9.0
-djangorestframework==3.16.1
+djangorestframework==3.18.2
 # [SEC-A08] 'dotenv==0.9.9' removido — pacote diferente de python-dotenv, obsoleto e
 #            conflitante. Usar apenas python-dotenv abaixo.
 drf-yasg==1.21.11
