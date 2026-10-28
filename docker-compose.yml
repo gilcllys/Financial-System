@@ -3,12 +3,13 @@ services:
   # ─── Banco de Dados ────────────────────────────────────────────────────────
   db:
     image: postgres:16-alpine
-    env_file:
-      - ./backend/.env
     environment:
       POSTGRES_DB: ${DB_NAME:-financial_db}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_HOST_AUTH_METHOD: trust
+    env_file:
+      - ./backend/.env
     # [SEC-A05] Porta 5432 NÃO exposta ao host — acesso apenas via rede interna Docker.
     # Em dev local, descomente SOMENTE se precisar de acesso direto ao banco:
     # ports:
@@ -16,7 +17,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-financial_db}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-financial_db}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -48,7 +49,7 @@ services:
         condition: service_healthy
     healthcheck:
       # [SEC-A05] Healthcheck do backend — verifica se o Gunicorn está respondendo
-      test: ["CMD-SHELL", "python -c 'import socket; s=socket.socket(); s.settimeout(5); s.connect((\"localhost\",8000)); s.close()' || exit 1"]
+      test: [ "CMD-SHELL", "python -c 'import socket; s=socket.socket(); s.settimeout(5); s.connect((\"localhost\",8000)); s.close()' || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -71,7 +72,7 @@ services:
       - backend
     healthcheck:
       # [SEC-A05] Healthcheck do frontend — verifica se o Nginx está servindo
-      test: ["CMD-SHELL", "curl -f http://localhost/ -o /dev/null -s || exit 1"]
+      test: [ "CMD-SHELL", "curl -f http://localhost/ -o /dev/null -s || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3
