@@ -151,40 +151,43 @@ class ExpenseAnalyticsBehavior:
         return result
 
     def analytics_by_card(self, params):
-        """Retorna despesas agrupadas por cartao de credito."""
-        qs = models.Expense.objects.filter(
-            tenant_id=self.tenant_id,
-            payment_method='cartao',
-            credit_card_id__isnull=False,
-        )
+        """Agrupa despesas por cartão no ciclo da fatura (ou mês da compra)."""
+        from cards.behaviors import compute_invoice_period
+        from cards.models import CreditCard
 
-        raw_month = params.get('month')
-        if raw_month is not None:
-            try:
-                month = int(raw_month)
-                if 1 <= month <= 12:
-                    qs = qs.filter(date__month=month)
-            except (ValueError, TypeError):
-                pass
+        today = date.today()
+        month = self._parse_month(params, today.month)
+        year = self._parse_year(params, today.year)
+        # Compatibilidade do endpoint antigo: consumidores legados que não
+        # enviam `period` continuam vendo mês da compra. A UI nova envia cycle.
+        period = params.get('period', 'purchase_month')
+        cards = CreditCard.objects.filter(tenant_id=self.tenant_id).order_by('id')
+        rows = []
 
-        raw_year = params.get('year')
-        if raw_year is not None:
-            try:
-                year = int(raw_year)
-                if year > 0:
-                    qs = qs.filter(date__year=year)
-            except (ValueError, TypeError):
-                pass
-
-        rows = (
-            qs
-            .values('credit_card_id', 'credit_card__name', 'credit_card__last_four_digits')
-            .annotate(
-                total=Sum(Abs('amount')),
-                count=Count('id'),
+        for card in cards:
+            qs = models.Expense.objects.filter(
+                tenant_id=self.tenant_id,
+                payment_method='cartao',
+                credit_card_id=card.id,
+                amount__lt=0,
             )
-            .order_by('-total')
-        )
+            if period == 'purchase_month':
+                qs = qs.filter(date__month=month, date__year=year)
+            else:
+                start, end, _ = compute_invoice_period(card, month, year)
+                qs = qs.filter(date__gte=start, date__lte=end)
+            aggregate = qs.aggregate(total=Sum(Abs('amount')), count=Count('id'))
+            total = float(aggregate['total'] or 0)
+            if total:
+                rows.append({
+                    'card_id': card.id,
+                    'card_name': card.name,
+                    'last_four_digits': card.last_four_digits,
+                    'total': total,
+                    'count': aggregate['count'] or 0,
+                })
+
+        rows.sort(key=lambda row: row['total'], reverse=True)
 
         grand_total = sum(float(row['total'] or 0) for row in rows)
 
@@ -192,12 +195,13 @@ class ExpenseAnalyticsBehavior:
         for row in rows:
             total = float(row['total'] or 0)
             result.append({
-                'card_id': row['credit_card_id'],
-                'card_name': row['credit_card__name'],
-                'last_four_digits': row['credit_card__last_four_digits'],
+                'card_id': row['card_id'],
+                'card_name': row['card_name'],
+                'last_four_digits': row['last_four_digits'],
                 'total': round(total, 2),
                 'count': row['count'],
                 'percentage': round((total / grand_total * 100) if grand_total else 0, 2),
+                'period': 'purchase_month' if period == 'purchase_month' else 'cycle',
             })
 
         return result
@@ -251,7 +255,7 @@ class ExpenseAnalyticsBehavior:
 
     def consolidated_summary(self, params):
         """Retorna resumo consolidado de receitas, dinheiro, cartoes e dividas."""
-        from cards.behaviors import compute_invoice_period, current_invoice_month
+        from cards.behaviors import compute_invoice_period, current_invoice_month, shift_month
         from cards.models import CreditCard
         from debts.models import SharedDebtMember, SharedEntry
 
@@ -259,6 +263,8 @@ class ExpenseAnalyticsBehavior:
         tenant = self.tenant_id
         month = self._parse_month(params, today.month)
         year = self._parse_year(params, today.year)
+        closing_month = int_param(params, 'closing_month', 1, 12)
+        closing_year = int_param(params, 'closing_year', 1)
 
         base_qs = models.Expense.objects.filter(
             tenant_id=tenant,
@@ -286,7 +292,10 @@ class ExpenseAnalyticsBehavior:
         card_invoices_detail = []
 
         for card in cards:
-            inv_month, inv_year = current_invoice_month(card)
+            if closing_month is not None and closing_year is not None:
+                inv_month, inv_year = shift_month(closing_month, closing_year, 1)
+            else:
+                inv_month, inv_year = current_invoice_month(card)
             period_start, period_end, due = compute_invoice_period(
                 card, inv_month, inv_year
             )
@@ -345,7 +354,7 @@ class ExpenseAnalyticsBehavior:
         total_expenses = round(cash_expenses + card_invoices_total + shared_my_portion, 2)
         balance        = round(income - total_expenses, 2)
 
-        return {
+        result = {
             'month': month,
             'year':  year,
             'income':       income,
@@ -359,6 +368,27 @@ class ExpenseAnalyticsBehavior:
             'total_expenses': total_expenses,
             'balance':        balance,
         }
+        if params.get('include_obligations') == '1':
+            from expenses.models import RecurringExpenseTemplate
+            templates = RecurringExpenseTemplate.objects.filter(
+                tenant_id=tenant, is_active=True,
+            )
+            ungenerated_fixed = Decimal('0')
+            for template in templates:
+                exists = models.Expense.objects.filter(
+                    tenant_id=tenant,
+                    recurring_template_id=template.id,
+                    date__year=year,
+                    date__month=month,
+                ).exists()
+                if not exists:
+                    ungenerated_fixed += abs(Decimal(template.amount))
+            result.update({
+                'personal_cost': total_expenses,
+                'upcoming_fixed': to_float(ungenerated_fixed),
+                'free_to_spend': round(balance - to_float(ungenerated_fixed), 2),
+            })
+        return result
 
     def home_charts(self, params):
         """Retorna os dados consolidados dos graficos da Home/Gastos."""

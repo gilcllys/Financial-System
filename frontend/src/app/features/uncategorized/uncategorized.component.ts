@@ -1,4 +1,4 @@
-﻿import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -22,7 +22,6 @@ import { Expense, ExpenseCategory } from '../../core/models';
       <div class="loading-state"><div class="spinner"></div><p>Carregando...</p></div>
     } @else if (items().length === 0) {
       <div class="empty-state">
-        <div class="empty-state__icon">✅</div>
         <p class="empty-state__title">Tudo categorizado!</p>
         <p class="empty-state__text">Todos os seus lançamentos têm categoria.</p>
       </div>
@@ -50,7 +49,7 @@ import { Expense, ExpenseCategory } from '../../core/models';
                     (change)="categorize(e, $any($event.target).value)"
                     aria-label="Selecionar categoria para {{ e.description }}">
                     <option value="">Selecionar…</option>
-                    @for (c of categories(); track c.id) {
+                    @for (c of categoriesFor(e); track c.id) {
                       <option [value]="c.id">{{ c.name }}</option>
                     }
                   </select>
@@ -79,17 +78,24 @@ export class UncategorizedComponent implements OnInit {
   private load(): void {
     this.loading.set(true);
     // ponytail: reuse list() — filter client-side for uncategorized
-    this.expenseService.list({ page_size: 200 }).subscribe({
-      next: res => {
-        this.items.set(res.results.filter(e => !e.category_id));
+    this.expenseService.listAll({ category_key: 'uncategorized' }).subscribe({
+      next: items => {
+        this.items.set(items);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
     });
   }
 
+  categoriesFor(expense: Expense): ExpenseCategory[] {
+    const kind = expense.amount >= 0 ? 'receita' : 'despesa';
+    return this.categories().filter(category => (category.kind ?? 'despesa') === kind);
+  }
+
   categorize(expense: Expense, categoryId: string): void {
     if (!categoryId) return;
+    const matching = this.categories().find(category => category.id === +categoryId);
+    if (!matching || matching.kind !== (expense.amount >= 0 ? 'receita' : 'despesa')) return;
     this.expenseService.update(expense.id, { ...expense, category_id: +categoryId } as any).subscribe({
       next: () => this.items.update(list => list.filter(e => e.id !== expense.id)),
     });
@@ -98,5 +104,4 @@ export class UncategorizedComponent implements OnInit {
   fmt(v: number): string {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(v));
   }
-}
-
+}

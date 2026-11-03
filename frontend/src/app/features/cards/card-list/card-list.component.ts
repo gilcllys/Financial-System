@@ -1,4 +1,5 @@
-﻿import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { CardService } from '../../../core/services/card.service';
@@ -24,6 +25,7 @@ const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
   styleUrls: ['./card-list.component.scss'],
 })
 export class CardListComponent implements OnInit {
+  private confirmDialog = inject(ConfirmDialogService);
   private cardSvc = inject(CardService);
 
   cards        = signal<CreditCard[]>([]);
@@ -186,9 +188,9 @@ export class CardListComponent implements OnInit {
 
   closeMenu(): void { this.menuCard.set(null); }
 
-  deleteFromMenu(): void {
+  async deleteFromMenu(): Promise<void> {
     const card = this.menuCard();
-    if (!card || !confirm(`Deseja excluir o cartão "${card.name}"?`)) return;
+    if (!card || !(await this.confirmDialog.confirm(`Deseja excluir o cartão "${card.name}"?`))) return;
     this.closeMenu();
     this.deletingId.set(card.id);
     this.cardSvc.delete(card.id).subscribe({

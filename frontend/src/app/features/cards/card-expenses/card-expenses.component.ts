@@ -9,6 +9,8 @@ import {
   ViewChild,
   ElementRef,
 } from '@angular/core';
+import { ToastService } from '../../../core/services/toast.service';
+import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ReactiveFormsModule, FormsModule, FormControl } from '@angular/forms';
 import { Subject } from 'rxjs';
@@ -85,6 +87,8 @@ function daysInMonth(year: number, month: number): number {
   styleUrls: ['./card-expenses.component.scss'],
 })
 export class CardExpensesComponent implements OnInit, OnDestroy {
+  private toast = inject(ToastService);
+  private confirmDialog = inject(ConfirmDialogService);
   private route      = inject(ActivatedRoute);
   private cardSvc    = inject(CardService);
   private expenseSvc = inject(ExpenseService);
@@ -433,11 +437,11 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   clearSearch(): void { this.searchControl.setValue(''); }
   changePage(page: number): void { this.currentPage.set(page); this.loadPage(); }
 
-  deleteExpense(expense: Expense): void {
-    if (!confirm(`Excluir "${expense.description}"?`)) return;
+  async deleteExpense(expense: Expense): Promise<void> {
+    if (!(await this.confirmDialog.confirm(`Excluir "${expense.description}"?`))) return;
     this.expenseSvc.delete(expense.id).subscribe({
       next:  () => { const inv = this.selectedInvoice(); if (inv) { this.loadPage(inv); this.loadChart(inv); } },
-      error: () => alert('Erro ao excluir o gasto. Tente novamente.'),
+      error: () => this.toast.error('Erro ao excluir o gasto. Tente novamente.'),
     });
   }
 
@@ -513,18 +517,18 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.savingEdit.set(false);
-        alert('Erro ao salvar a alteracao. Tente novamente.');
+        this.toast.error('Erro ao salvar a alteracao. Tente novamente.');
       },
     });
   }
 
-  deleteSharedEntry(row: CombinedExpenseRow): void {
+  async deleteSharedEntry(row: CombinedExpenseRow): Promise<void> {
     const s = row.sharedEntry;
     if (!s) return;
-    if (!confirm(`Cancelar/excluir "${s.description}" (compartilhado)?`)) return;
+    if (!(await this.confirmDialog.confirm(`Cancelar/excluir "${s.description}" (compartilhado)?`))) return;
     this.sharedSvc.deleteEntry(s.id).subscribe({
       next: () => this.reloadSharedEntries(),
-      error: () => alert('Erro ao excluir o gasto compartilhado. Tente novamente.'),
+      error: () => this.toast.error('Erro ao excluir o gasto compartilhado. Tente novamente.'),
     });
   }
 

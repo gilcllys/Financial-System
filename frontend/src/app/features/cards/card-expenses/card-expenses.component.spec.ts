@@ -9,6 +9,7 @@ import { SharedDebtService } from '../../../core/services/shared-debt.service';
 import { CategoryService } from '../../../core/services/category.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { D3ChartService } from '../../../core/services/d3-chart.service';
+import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
 
 /**
  * Testes de CARACTERIZACAO.
@@ -62,12 +63,14 @@ function invoiceData(over: Partial<any> = {}): any {
 describe('CardExpensesComponent [caracterizacao]', () => {
   let cardSvc: any;
   let sharedSvc: any;
+  let confirmDialog: any;
 
   function setup(opts: {
     invoiceData?: any; chartExpenses?: any[]; sharedEntries?: any[];
     sharedEntriesFake?: (params: any) => any;
     userProfile?: { name?: string; email?: string; sub?: string };
   } = {}) {
+    confirmDialog = { confirm: jasmine.createSpy('confirm').and.resolveTo(true) };
     cardSvc = {
       get: jasmine.createSpy('get').and.returnValue(of({ id: 1, name: 'Bradesco' })),
       getAllCardExpenses: jasmine.createSpy('getAllCardExpenses').and.returnValue(of([])),
@@ -101,6 +104,7 @@ describe('CardExpensesComponent [caracterizacao]', () => {
     TestBed.configureTestingModule({
       imports: [CardExpensesComponent],
       providers: [
+        { provide: ConfirmDialogService, useValue: confirmDialog },
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => '1' } } } },
         { provide: CardService, useValue: cardSvc },
         { provide: SharedDebtService, useValue: sharedSvc },
@@ -290,12 +294,11 @@ describe('CardExpensesComponent [caracterizacao]', () => {
       expect(descriptions).toEqual(['Milhas Livelo', 'Pet Love do Pitoco']);
     });
 
-    it('recarrega pelo periodo da fatura (nao lista tudo) apos excluir um compartilhado', () => {
+    it('recarrega pelo periodo da fatura (nao lista tudo) apos excluir um compartilhado', async () => {
       const f = setup({ sharedEntries: [] });
       sharedSvc.listEntries.calls.reset();
-      spyOn(window, 'confirm').and.returnValue(true);
 
-      f.componentInstance.deleteSharedEntry({
+      await f.componentInstance.deleteSharedEntry({
         sharedEntry: sharedEntry({ id: 99, description: 'Teste' }),
       } as any);
 

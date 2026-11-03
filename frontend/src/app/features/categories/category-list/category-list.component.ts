@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
 import { RouterLink } from '@angular/router';
 import { CategoryService } from '../../../core/services/category.service';
 import { ExpenseCategory } from '../../../core/models';
@@ -11,6 +12,7 @@ import { ExpenseCategory } from '../../../core/models';
   styleUrls: ['./category-list.component.scss'],
 })
 export class CategoryListComponent implements OnInit {
+  private confirmDialog = inject(ConfirmDialogService);
   private categoryService = inject(CategoryService);
 
   categories = signal<ExpenseCategory[]>([]);
@@ -31,9 +33,9 @@ export class CategoryListComponent implements OnInit {
     });
   }
 
-  delete(cat: ExpenseCategory): void {
+  async delete(cat: ExpenseCategory): Promise<void> {
     if (cat.tenant_id === 'system') return;
-    if (!confirm(`Excluir categoria "${cat.name}"?`)) return;
+    if (!(await this.confirmDialog.confirm(`Excluir categoria "${cat.name}"?`))) return;
     this.deletingId.set(cat.id);
     this.categoryService.delete(cat.id).subscribe({
       next: () => { this.categories.update(list => list.filter(c => c.id !== cat.id)); this.deletingId.set(null); },

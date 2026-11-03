@@ -3,7 +3,8 @@ import { HttpClient } from '@angular/common/http';
 import { forkJoin, Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
-import { OpenInvoice, Expense } from '../models';
+import { OpenInvoice, Expense, CreditCard } from '../models';
+import { invoiceForDate, isInvoiceClosed } from '../utils/invoice-cycle';
 import { AnalyticsService, MonthlyAnalytics, CategoryAnalytics, ConsolidatedSummary } from './analytics.service';
 import { SharedDebtService, SharedDebtHomeSummary } from './shared-debt.service';
 import { ExpenseService } from './expense.service';
@@ -39,89 +40,61 @@ export class HomeService {
 
   load(month: number, year: number): Observable<HomeSummary> {
     return forkJoin({
-      consolidated:        this.analytics.consolidatedSummary(month, year),
+      consolidated:        this.analytics.consolidatedSummary(month, year, month, year),
       homeCharts:          this.analytics.homeCharts(month, year),
       evolution:           this.analytics.monthly(year),
-      openInvoices:        this.http.get<OpenInvoice[]>(`${this.cardsBase}/open-invoices/`),
+      openInvoices:        this.http.get<OpenInvoice[]>(`${this.cardsBase}/open-invoices/?closing_month=${month}&closing_year=${year}`),
       sharedDebts:         this.sharedDebt.homeSummary(),
       recentExpenses:      this.expenseService.list({ month, year, page: 1, page_size: 5 }),
-      allInstallmentExp:   this.expenseService.list({ page_size: 500 }),
+      allInstallmentExp:   this.expenseService.listAll(),
+      cards:               this.http.get<CreditCard[]>(`${this.cardsBase}/`),
     }).pipe(
       map(({ consolidated, homeCharts, evolution, openInvoices,
-             sharedDebts, recentExpenses, allInstallmentExp }) => ({
+             sharedDebts, recentExpenses, allInstallmentExp, cards }) => ({
         consolidated,
         evolution,
         openInvoices,
         sharedDebts,
         byCategory:        homeCharts.by_category,
         recentExpenses:    recentExpenses.results,
-        installmentGroups: this._groupInstallments(allInstallmentExp.results),
+        installmentGroups: this._groupInstallments(allInstallmentExp, cards),
       }))
     );
   }
 
-  private _groupInstallments(expenses: Expense[]): InstallmentGroup[] {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const installmentExpenses = expenses.filter(e =>
-      /parcela\s+\d+\/\d+/i.test(e.description)
-    );
-
-    const groupMap = new Map<string, {
-      name: string; totalInstallments: number; paidInstallments: number;
-      amountPerInstallment: number; nextDate: string | null; expenses: Expense[];
-    }>();
+  private _groupInstallments(expenses: Expense[], cards: CreditCard[]): InstallmentGroup[] {
+    const cardById = new Map(cards.map(card => [card.id, card]));
+    const installmentExpenses = expenses.filter(e => /parcela\s+\d+\/\d+/i.test(e.description));
+    const groups = new Map<string, { name: string; totalInstallments: number; paidInstallments: number; amountPerInstallment: number; totalAmount: number; remainingAmount: number; nextDate: string | null }>();
 
     for (const expense of installmentExpenses) {
       const match = expense.description.match(/^(.*?)[\s-]*parcela\s+(\d+)\/(\d+)/i);
       if (!match) continue;
-
-      const baseName   = match[1].trim() || expense.description;
-      const currentPart = +match[2];
-      const totalParts  = +match[3];
-      const key         = `${baseName}-${totalParts}`;
-      const expDate     = new Date(expense.date + 'T00:00:00');
-      const isPaid      = expDate <= today;
-
-      const existing = groupMap.get(key);
-      if (existing) {
-        existing.expenses.push(expense);
-        if (isPaid && currentPart > existing.paidInstallments) {
-          existing.paidInstallments = currentPart;
-        }
-        // track next unpaid installment date
-        if (!isPaid) {
-          if (!existing.nextDate || expense.date < existing.nextDate) {
-            existing.nextDate = expense.date;
-          }
-        }
-      } else {
-        groupMap.set(key, {
-          name: baseName,
-          totalInstallments: totalParts,
-          paidInstallments: isPaid ? currentPart : 0,
-          amountPerInstallment: Math.abs(expense.amount),
-          nextDate: !isPaid ? expense.date : null,
-          expenses: [expense],
-        });
+      const name = match[1].trim() || expense.description;
+      const part = Number(match[2]);
+      const totalParts = Number(match[3]);
+      const cardId = expense.credit_card_id ?? (expense as any).credit_card ?? null;
+      const card = cardId ? cardById.get(cardId) : undefined;
+      const key = `${name}-${totalParts}-${cardId ?? 'none'}`;
+      const invoice = card ? invoiceForDate(expense.date, card.closing_day) : null;
+      const closed = card ? isInvoiceClosed(expense.date, card.closing_day) : expense.date < new Date().toISOString().slice(0, 10);
+      const displayDate = invoice?.displayDate ?? expense.date;
+      const group = groups.get(key) ?? {
+        name, totalInstallments: totalParts, paidInstallments: 0,
+        amountPerInstallment: Math.abs(Number(expense.amount)), totalAmount: 0,
+        remainingAmount: 0, nextDate: null,
+      };
+      group.totalAmount = Math.round((group.totalAmount + Math.abs(Number(expense.amount))) * 100) / 100;
+      if (closed) group.paidInstallments = Math.max(group.paidInstallments, part);
+      else {
+        group.remainingAmount = Math.round((group.remainingAmount + Math.abs(Number(expense.amount))) * 100) / 100;
+        if (!group.nextDate || displayDate < group.nextDate) group.nextDate = displayDate;
       }
+      groups.set(key, group);
     }
 
-    const remaining = (g: { amountPerInstallment: number; paidInstallments: number; totalInstallments: number }) =>
-      Math.round((g.totalInstallments - g.paidInstallments) * g.amountPerInstallment * 100) / 100;
-
-    return Array.from(groupMap.values())
-      .filter(g => g.paidInstallments < g.totalInstallments)   // apenas ativas
-      .sort((a, b) => (a.nextDate ?? '').localeCompare(b.nextDate ?? ''))
-      .map(g => ({
-        name:                 g.name,
-        totalInstallments:    g.totalInstallments,
-        paidInstallments:     g.paidInstallments,
-        amountPerInstallment: g.amountPerInstallment,
-        totalAmount:          Math.round(g.totalInstallments * g.amountPerInstallment * 100) / 100,
-        remainingAmount:      remaining(g),
-        nextDate:             g.nextDate,
-      }));
+    return Array.from(groups.values())
+      .filter(group => group.paidInstallments < group.totalInstallments)
+      .sort((a, b) => (a.nextDate ?? '').localeCompare(b.nextDate ?? ''));
   }
 }

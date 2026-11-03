@@ -354,6 +354,8 @@ class DeleteInstallmentsActionTest(SimpleTestCase):
 
         mock_qs = MagicMock()
         mock_qs.delete.return_value = delete_return
+        mock_qs.count.return_value = len(data.get('expense_ids', []))
+        mock_qs.filter.return_value = mock_qs
 
         with patch('expenses.models.Expense.objects') as mock_objects, \
              patch('django.db.transaction.atomic'):
@@ -498,6 +500,15 @@ class DeleteInstallmentsActionTest(SimpleTestCase):
             delete_return=(3, {'expenses.Expense': 3}),
         )
         mock_objects.filter.assert_called_once()
+
+    def test_specific_ids_limit_delete_to_one_installment_group(self):
+        ids = [101, 102]
+        response, mock_objects, mock_qs = self._call_action(
+            data={'description_prefix': 'Celular', 'total_installments': 3, 'expense_ids': ids},
+            delete_return=(2, {'expenses.Expense': 2}),
+        )
+        self.assertEqual(response.status_code, 200)
+        mock_qs.filter.assert_called_once_with(id__in=ids)
 
 
 # ---------------------------------------------------------------------------

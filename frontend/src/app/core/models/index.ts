@@ -5,6 +5,8 @@ export interface ExpenseCategory {
   tenant_id: string;
   name: string;
   description: string;
+  kind?: 'despesa' | 'receita';
+  key?: string | null;
 }
 
 export type PaymentMethod = 'dinheiro' | 'cartao';

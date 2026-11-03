@@ -1,5 +1,6 @@
 import * as d3 from 'd3';
 import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild } from '@angular/core';
+import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
 import { RouterLink } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { CurrencyPipe } from '@angular/common';
@@ -16,6 +17,7 @@ import {
   styleUrls: ['./savings.component.scss'],
 })
 export class SavingsComponent implements OnInit {
+  private confirmDialog = inject(ConfirmDialogService);
   private svc = inject(SavingsService);
   private fb = inject(FormBuilder);
 
@@ -101,8 +103,8 @@ export class SavingsComponent implements OnInit {
     });
   }
 
-  deleteGoal(id: number): void {
-    if (!confirm('Excluir este cofrinho e todos os aportes?')) return;
+  async deleteGoal(id: number): Promise<void> {
+    if (!(await this.confirmDialog.confirm('Excluir este cofrinho e todos os aportes?'))) return;
     this.svc.deleteGoal(id).subscribe({ next: () => this.loadSummary() });
   }
 

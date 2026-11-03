@@ -85,8 +85,25 @@ class CreditCardViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='open-invoices')
     def open_invoices(self, request):
-        """GET /api/cards/credit-cards/open-invoices/"""
-        return OpenInvoicesBehavior(request.user.tenant_id).run()
+        """GET /api/cards/credit-cards/open-invoices/?closing_month=11&closing_year=2026"""
+        closing_month, err = self._parse_int_param(
+            request.query_params.get('closing_month'),
+            'closing_month', required=False, min_val=1, max_val=12,
+        )
+        if err:
+            return err
+        closing_year, err = self._parse_int_param(
+            request.query_params.get('closing_year'),
+            'closing_year', required=False, min_val=1,
+        )
+        if err:
+            return err
+        if (closing_month is None) != (closing_year is None):
+            return Response(
+                {'detail': 'closing_month e closing_year devem ser enviados juntos.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return OpenInvoicesBehavior(request.user.tenant_id).run(closing_month, closing_year)
 
     # ------------------------------------------------------------------
     # Helpers
