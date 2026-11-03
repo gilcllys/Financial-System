@@ -63,6 +63,28 @@ export class LayoutComponent implements OnInit {
       .toUpperCase();
   }
 
+  currentPageLabel(): string {
+    const routeLabels: Record<string, string> = {
+      '/home': 'Início',
+      '/history': 'Histórico',
+      '/cards': 'Cartões',
+      '/installments': 'Parcelamentos',
+      '/recurring-expenses': 'Gastos fixos',
+      '/analytics': 'Análises',
+      '/shared-debts': 'Grupos compartilhados',
+      '/categories': 'Categorias',
+      '/uncategorized': 'Sem categoria',
+      '/supermarket': 'Supermercado',
+      '/savings': 'Investimentos',
+      '/expenses/new': 'Novo lançamento',
+    };
+    const path = this.router.url.split('?')[0].replace(/\/$/, '') || '/home';
+    const matchedRoute = Object.keys(routeLabels)
+      .sort((first, second) => second.length - first.length)
+      .find(route => path === route || path.startsWith(`${route}/`));
+    return matchedRoute ? routeLabels[matchedRoute] : 'Financeiro';
+  }
+
   toggleDrawer(): void {
     this.drawerOpen.update(v => !v);
   }

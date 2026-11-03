@@ -438,3 +438,128 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+// The application shell follows the light, restrained prototype treatment.
+.sidebar {
+  background: var(--color-canvas);
+  border-right-color: var(--color-hairline);
+
+  &__header {
+    border-bottom-color: var(--color-hairline);
+    color: var(--color-ink);
+  }
+
+  &__logo-box {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  &__logo-name,
+  &__user-name {
+    color: var(--color-ink);
+  }
+
+  &__close:hover {
+    color: var(--color-ink);
+  }
+
+  &__divider {
+    background: var(--color-hairline);
+  }
+
+  &__link {
+    min-height: 40px;
+    border-left-color: transparent;
+    color: var(--color-body);
+
+    &:hover {
+      background: var(--color-surface-soft);
+      color: var(--color-ink);
+    }
+
+    &--active {
+      background: var(--color-primary-soft) !important;
+      color: var(--color-primary) !important;
+      border-left-color: transparent !important;
+    }
+  }
+
+  &__link-icon {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    font-size: 16px;
+
+    svg {
+      display: block;
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  &__badge {
+    background: #fff3e5;
+    color: #a85b00;
+  }
+
+  &__footer {
+    border-top-color: var(--color-hairline);
+    background: var(--color-canvas);
+  }
+}
+
+.mobile-header__logo {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.mobile-header__name {
+  color: var(--color-ink);
+}
+
+.app-topbar {
+  display: none;
+
+  @media (min-width: 768px) {
+    position: sticky;
+    top: 0;
+    z-index: 250;
+    display: flex;
+    align-items: center;
+    height: 68px;
+    margin-left: var(--sidebar-w);
+    padding-inline: 36px;
+    border-bottom: 1px solid var(--color-hairline);
+    background: rgb(255 255 255 / 94%);
+    backdrop-filter: blur(12px);
+  }
+
+  &__breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--color-muted);
+    font-size: 12px;
+
+    strong {
+      color: var(--color-ink);
+      font-weight: 600;
+    }
+  }
+}
+
+.sidebar__avatar {
+  background: #e9edf5;
+  color: #526076;
+}

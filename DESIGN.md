@@ -5,6 +5,7 @@ description: Controle financeiro pessoal com foco em leitura rápida de faturas,
 colors:
   primary: "#0052ff"
   primary-active: "#003ecc"
+  primary-soft: "#edf3ff"
   danger: "#cf202f"
   success: "#05b169"
   background: "#f6f7f9"
@@ -54,7 +55,7 @@ A clear monthly ledger: familiar, compact financial software where the amount an
 
 ## Colors
 
-Blue `#0052ff` is the primary action and focus accent; red `#cf202f` and green `#05b169` communicate negative and positive values only when accompanied by text or a sign. White and soft gray form the canvas and cards, with `#dee1e6` borders. Maintain visible focus rings and do not rely on color alone for chart or status meaning. The current runtime supports the light theme.
+Blue `#0052ff` is the primary action and focus accent; pale blue `#edf3ff` marks the active navigation item; red `#cf202f` and green `#05b169` communicate negative and positive values only when accompanied by text or a sign. White and soft gray form the canvas and cards, with `#dee1e6` borders. Maintain visible focus rings and do not rely on color alone for chart or status meaning. The current runtime supports the light theme.
 
 ## Typography
 
