@@ -1,11 +1,11 @@
 <div class="page-header">
   <div class="page-header__left">
+    <p class="page-eyebrow">Lançamentos</p>
     <h1 class="page-header__title">Importar Excel</h1>
     <p class="page-header__subtitle">Importe vários gastos de uma planilha</p>
   </div>
   <a routerLink="/expenses" class="btn btn--secondary btn--sm">← Voltar</a>
 </div>
-
 <div class="card">
   <ol class="import-instructions">
     <li>Baixe o template abaixo e preencha as linhas com seus gastos.</li>
@@ -14,11 +14,9 @@
     <li>Use a lista suspensa de categorias da planilha para evitar erros de digitação.</li>
     <li>É tudo ou nada: se qualquer linha tiver erro, nada é importado.</li>
   </ol>
-
   <div class="import-actions">
-    <button type="button" class="btn btn--secondary" (click)="downloadTemplate()">⬇️ Baixar template (.xlsx)</button>
+    <button type="button" class="btn btn--secondary" (click)="downloadTemplate()">Baixar template (.xlsx)</button>
   </div>
-
   <div class="form-row">
     <div class="form-group">
       <label class="form-label" for="file">Planilha preenchida (.xlsx)</label>
@@ -26,25 +24,21 @@
         aria-label="Selecionar planilha para importar" />
     </div>
   </div>
-
   <div class="form-actions">
     <button type="button" class="btn btn--primary" [disabled]="!file() || importing()" (click)="importFile()">
       @if (importing()) { <span class="spinner"></span> } 📤 Importar
     </button>
   </div>
 </div>
-
 @if (successCount() !== null) {
   <div class="card success-box" role="status" aria-live="polite">
     <p>✅ {{ successCount() }} gasto(s) importado(s) com sucesso.</p>
     <a routerLink="/expenses" class="btn btn--primary btn--sm">Ver gastos</a>
   </div>
 }
-
 @if (errorMessage()) {
   <div class="form-error-box" role="alert">{{ errorMessage() }}</div>
 }
-
 @if (rowErrors().length > 0) {
   <div class="data-table-wrapper" aria-label="Erros por linha">
     <table class="data-table" role="table">

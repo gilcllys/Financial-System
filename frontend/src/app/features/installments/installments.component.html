@@ -1,4 +1,4 @@
-﻿<div class="page-header">
+<div class="page-header">
   <div class="page-header__left">
     <h1 class="page-header__title">Parcelamentos</h1>
     <p class="page-header__subtitle">Compras parceladas ativas</p>
@@ -255,7 +255,7 @@
 
   @if (activeGroups().length === 0 && activeSharedGroups().length === 0 && finalizadasGroups().length === 0 && finalizadasSharedGroups().length === 0) {
     <div class="empty-state">
-      <div class="empty-state__icon">📅</div>
+      <div class="empty-state__icon"></div>
       <p class="empty-state__title">Nenhum parcelamento encontrado</p>
       <p class="empty-state__text">Gastos parcelados aparecem aqui quando criados com a opcao de parcelamento.</p>
       <a routerLink="/expenses/new" class="btn btn--primary" style="margin-top: 16px">+ Novo Gasto Parcelado</a>

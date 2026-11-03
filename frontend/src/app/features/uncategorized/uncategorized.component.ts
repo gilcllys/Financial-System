@@ -12,7 +12,7 @@ import { Expense, ExpenseCategory } from '../../core/models';
   template: `
     <div class="page-header">
       <div>
-        <h1 class="page-header__title">⚠️ Sem Categoria</h1>
+        <h1 class="page-header__title">Sem categoria</h1>
         <p class="page-header__subtitle">{{ items().length }} lançamentos sem categoria</p>
       </div>
     </div>

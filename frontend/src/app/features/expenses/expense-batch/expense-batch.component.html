@@ -3,11 +3,11 @@
   <button type="button" class="mode-toggle__btn mode-toggle__btn--active">Individual</button>
   <button type="button" class="mode-toggle__btn" (click)="goToShared()">Compartilhado</button>
 </div>
-
 <div class="page-header">
   <div class="page-header__left">
+    <p class="page-eyebrow">Lançamentos</p>
     <h1 class="page-header__title">Vários Gastos</h1>
-    <p class="page-header__subtitle">Monte uma lista e salve todos de uma vez</p>
+    <p class="page-header__subtitle">Adicione diversos lançamentos e salve de uma só vez.</p>
   </div>
   <div class="page-header__actions">
     <a routerLink="/expenses/new" class="btn btn--secondary btn--sm">＋ Adicionar 1 (form normal)</a>
@@ -15,10 +15,8 @@
     <a routerLink="/expenses" class="btn btn--secondary btn--sm">← Voltar</a>
   </div>
 </div>
-
 <div class="card">
   <form [formGroup]="form" (ngSubmit)="addToList()" novalidate aria-label="Adicionar gasto à lista">
-
     <div class="form-row">
       <div class="form-group">
         <label class="form-label" for="description">Descrição *</label>
@@ -29,7 +27,6 @@
         }
       </div>
     </div>
-
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Tipo *</label>
@@ -41,7 +38,6 @@
         </div>
       </div>
     </div>
-
     <div class="form-row form-row--2col">
       <div class="form-group">
         <label class="form-label" for="amount">
@@ -62,7 +58,6 @@
         <input id="date" class="form-input" type="date" formControlName="date" [class.error]="hasError('date')" />
       </div>
     </div>
-
     <div class="form-row">
       <div class="form-group">
         <label class="form-label" for="category_id">Categoria *</label>
@@ -77,23 +72,21 @@
         }
       </div>
     </div>
-
     <div class="form-row">
       <fieldset class="form-group">
         <legend class="form-label">Método de Pagamento *</legend>
         <div class="radio-group" role="radiogroup">
           <label class="radio-option">
             <input type="radio" formControlName="payment_method" value="dinheiro" />
-            <span class="radio-btn">💵 Dinheiro</span>
+            <span class="radio-btn">Dinheiro</span>
           </label>
           <label class="radio-option">
             <input type="radio" formControlName="payment_method" value="cartao" />
-            <span class="radio-btn">💳 Cartão</span>
+            <span class="radio-btn">Cartão</span>
           </label>
         </div>
       </fieldset>
     </div>
-
     @if (isCartao) {
       <div class="form-row">
         <div class="form-group">
@@ -110,7 +103,6 @@
         </div>
       </div>
     }
-
     <div class="form-row">
       <label class="toggle-label" for="is_installment">
         <span class="toggle-text">É parcelado?</span>
@@ -120,7 +112,6 @@
         </span>
       </label>
     </div>
-
     @if (isInstallment) {
       <div class="form-row">
         <div class="form-group">
@@ -131,13 +122,11 @@
         </div>
       </div>
     }
-
     <div class="form-actions">
       <button type="submit" class="btn btn--primary">➕ Adicionar à lista</button>
     </div>
   </form>
 </div>
-
 <!-- Lista de rascunhos -->
 @if (drafts().length > 0) {
   <div class="data-table-wrapper" aria-label="Lista de gastos a salvar">
@@ -163,7 +152,7 @@
             </td>
             <td><span class="badge">{{ d.category_name }}</span></td>
             <td class="mono text-muted">{{ d.date | slice:8:10 }}/{{ d.date | slice:5:7 }}/{{ d.date | slice:0:4 }}</td>
-            <td>{{ d.payment_method === 'cartao' ? '💳 Cartão' : '💵 Dinheiro' }}</td>
+            <td>{{ d.payment_method === 'cartao' ? 'Cartão' : 'Dinheiro' }}</td>
             <td class="text-right">
               <span [class]="amountClass(draftAmount(d))" class="mono">
                 {{ amountPrefix(draftAmount(d)) }} {{ formatAmount(draftAmount(d)) }}
@@ -171,9 +160,9 @@
             </td>
             <td>
               <div class="action-buttons">
-                <button class="btn btn--ghost btn--sm" (click)="edit(d)" [attr.aria-label]="'Editar ' + d.description">✏️</button>
+                <button class="btn btn--ghost btn--sm" (click)="edit(d)" [attr.aria-label]="'Editar ' + d.description">Editar</button>
                 <button class="btn btn--ghost btn--sm" (click)="duplicate(d)" [attr.aria-label]="'Duplicar ' + d.description">📄</button>
-                <button class="btn btn--ghost btn--sm" (click)="remove(d.localId)" [attr.aria-label]="'Remover ' + d.description">🗑️</button>
+                <button class="btn btn--ghost btn--sm" (click)="remove(d.localId)" [attr.aria-label]="'Remover ' + d.description">Remover</button>
               </div>
             </td>
           </tr>
@@ -182,11 +171,9 @@
     </table>
   </div>
 }
-
 @if (errorMessage()) {
   <div class="form-error-box" role="alert">{{ errorMessage() }}</div>
 }
-
 <!-- Rodapé / resumo -->
 <div class="card batch-summary">
   <div class="batch-summary__info">

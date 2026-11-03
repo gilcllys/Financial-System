@@ -1,4 +1,5 @@
 import * as d3 from 'd3';
+import { DecimalPipe } from '@angular/common';
 import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild } from '@angular/core';
 import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
@@ -10,7 +11,7 @@ import {
 @Component({
   selector: 'app-savings',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, DecimalPipe],
   templateUrl: './savings.component.html',
   styleUrls: ['./savings.component.scss'],
 })
@@ -59,6 +60,19 @@ export class SavingsComponent implements OnInit {
   goalProgress(goal: SavingsGoal): number {
     if (!goal.target_amount || goal.target_amount === 0) return 0;
     return Math.min(100, (Number(goal.total_deposited) / Number(goal.target_amount)) * 100);
+  }
+
+  currentMonthDeposits(): number {
+    const current = new Date();
+    return this.summary()?.monthly_breakdown.find(
+      row => row.year === current.getFullYear() && row.month === current.getMonth() + 1
+    )?.total ?? 0;
+  }
+
+  nearestGoal(): SavingsGoal | null {
+    return this.summary()?.goals
+      .filter(goal => Number(goal.target_amount) > 0)
+      .sort((a, b) => this.goalProgress(a) - this.goalProgress(b))[0] ?? null;
   }
 
   ngOnInit(): void {

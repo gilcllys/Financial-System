@@ -1,16 +1,12 @@
-.savings-total-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  color: white;
-  border-radius: 16px;
-  padding: var(--space-lg) var(--space-xl);
+.savings-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
   margin-bottom: var(--space-lg);
-  text-align: center;
-
-  &__label { font-size: 0.85rem; opacity: 0.85; margin-bottom: 4px; }
-  &__value { font-size: 2rem; font-weight: 700; font-family: monospace; }
+  article { display: flex; min-width: 0; flex-direction: column; padding: 17px 19px; border: 1px solid var(--color-hairline); border-radius: var(--rounded-md); background: var(--color-canvas); box-shadow: var(--shadow-sm); }
+  span { color: var(--color-muted); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  strong { margin: 10px 0 4px; color: var(--color-ink); font: 600 22px/1.2 var(--font-mono); font-variant-numeric: tabular-nums; }
+  small { color: var(--color-body); font-size: 11px; }
 }
 
 .goals-grid {
@@ -21,10 +17,10 @@
 }
 
 .goal-card {
-  background: var(--color-surface);
+  background: var(--color-canvas);
   border: 1px solid var(--color-hairline);
   border-top: 4px solid #6366f1;
-  border-radius: 12px;
+  border-radius: var(--rounded-md);
   padding: var(--space-md);
 
   &__header {
@@ -54,3 +50,5 @@
   }
   &__progress-label { font-size: 0.72rem; }
 }
+
+@media (max-width: 767px) { .savings-kpis { grid-template-columns: 1fr; } }
