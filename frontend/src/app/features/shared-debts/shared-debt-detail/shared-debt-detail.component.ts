@@ -1,5 +1,7 @@
-﻿import * as d3 from 'd3';
+import * as d3 from 'd3';
 import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild, effect } from '@angular/core';
+import { ToastService } from '../../../core/services/toast.service';
+import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
 import { SlicePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
@@ -46,6 +48,8 @@ interface DraftSharedEntry {
   styleUrls: ['./shared-debt-detail.component.scss'],
 })
 export class SharedDebtDetailComponent implements OnInit {
+  private toast = inject(ToastService);
+  private confirmDialog = inject(ConfirmDialogService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private svc = inject(SharedDebtService);
@@ -427,11 +431,11 @@ export class SharedDebtDetailComponent implements OnInit {
     });
   }
 
-  deleteEntry(entry: SharedDebtEntry): void {
-    if (!confirm(`Excluir "${entry.description}"?`)) return;
+  async deleteEntry(entry: SharedDebtEntry): Promise<void> {
+    if (!(await this.confirmDialog.confirm(`Excluir "${entry.description}"?`))) return;
     this.svc.deleteEntry(entry.id).subscribe({
       next: () => this.refreshEntriesAndBalances(),
-      error: () => alert('Erro ao excluir despesa.'),
+      error: () => this.toast.error('Erro ao excluir despesa.'),
     });
   }
 
@@ -439,20 +443,20 @@ export class SharedDebtDetailComponent implements OnInit {
     const nextPaid = !entry.paid;
     this.svc.updateEntry(entry.id, { paid: nextPaid }).subscribe({
       next: () => this.refreshEntriesAndBalances(),
-      error: () => alert('Erro ao atualizar status de pagamento.'),
+      error: () => this.toast.error('Erro ao atualizar status de pagamento.'),
     });
   }
 
   // ── Group deletion (owner only) ─────────────────────────────────────────
-  deleteGroup(): void {
+  async deleteGroup(): Promise<void> {
     const name = this.group()?.name ?? 'este grupo';
-    if (!confirm(`Excluir o grupo "${name}" e todas as despesas? Esta ação não pode ser desfeita.`)) return;
+    if (!(await this.confirmDialog.confirm(`Excluir o grupo "${name}" e todas as despesas? Esta ação não pode ser desfeita.`))) return;
     this.deletingGroup.set(true);
     this.svc.deleteGroup(this.groupId).subscribe({
       next: () => this.router.navigate(['/shared-debts']),
       error: () => {
         this.deletingGroup.set(false);
-        alert('Erro ao excluir grupo. Apenas o dono pode excluir.');
+        this.toast.error('Erro ao excluir grupo. Apenas o dono pode excluir.');
       },
     });
   }
@@ -505,8 +509,8 @@ export class SharedDebtDetailComponent implements OnInit {
     });
   }
 
-  deleteRecurring(tplId: number): void {
-    if (!confirm('Excluir este gasto recorrente?')) return;
+  async deleteRecurring(tplId: number): Promise<void> {
+    if (!(await this.confirmDialog.confirm('Excluir este gasto recorrente?'))) return;
     this.svc.deleteRecurringTemplate(this.groupId, tplId).subscribe({
       next: () => this.loadRecurringTemplates(),
     });

@@ -79,7 +79,7 @@ class ByPersonBehavior:
     def _invoice_for(self, card):
         """(inv_month, inv_year, start, end, due, is_closed) da fatura relevante ao modo."""
         if self.mode == 'open':
-            inv_month, inv_year = current_invoice_month(card)
+            inv_month, inv_year = current_invoice_month(card, self.today)
         else:
             # A fatura que FECHA no mês M é a fatura nomeada M+1.
             inv_month, inv_year = shift_month(self.month, self.year, 1)
@@ -141,7 +141,7 @@ class ByPersonBehavior:
 
             if self.mode == 'closed':
                 # O que já está na fatura ABERTA deste cartão fica fora desta conta.
-                o_month, o_year = current_invoice_month(card)
+                o_month, o_year = current_invoice_month(card, self.today)
                 o_start, o_end, _ = compute_invoice_period(card, o_month, o_year)
                 if o_start > end:
                     open_qs = base_qs.filter(credit_card=card, date__gte=o_start, date__lte=o_end)

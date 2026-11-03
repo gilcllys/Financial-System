@@ -5,6 +5,7 @@ import { RecurringExpensesComponent } from './recurring-expenses.component';
 import { ExpenseService } from '../../core/services/expense.service';
 import { CardService } from '../../core/services/card.service';
 import { CategoryService } from '../../core/services/category.service';
+import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
 
 /**
  * Testes de CARACTERIZACAO da tela de Gastos Fixos.
@@ -36,8 +37,10 @@ function template(over: Partial<any> = {}): any {
 
 describe('RecurringExpensesComponent [caracterizacao]', () => {
   let expSvc: any;
+  let confirmDialog: any;
 
   function setup(templates: any[] = []) {
+    confirmDialog = { confirm: jasmine.createSpy('confirm').and.resolveTo(true) };
     expSvc = {
       listRecurringTemplates: jasmine.createSpy('list').and.returnValue(of(templates)),
       createRecurringTemplate: jasmine.createSpy('create').and.returnValue(of(template())),
@@ -54,6 +57,7 @@ describe('RecurringExpensesComponent [caracterizacao]', () => {
         { provide: ExpenseService, useValue: expSvc },
         { provide: CardService, useValue: { list: () => of([{ id: 1, name: 'Itau Azul' }]) } },
         { provide: CategoryService, useValue: { list: () => of([{ id: 8, name: 'Assinaturas' }]) } },
+        { provide: ConfirmDialogService, useValue: confirmDialog },
       ],
     });
 
@@ -190,7 +194,7 @@ describe('RecurringExpensesComponent [caracterizacao]', () => {
     expect(c.generating()).toBeFalse();
   });
 
-  it('recarrega a lista apos pausar e apos excluir', () => {
+  it('recarrega a lista apos pausar e apos excluir', async () => {
     const c = setup([template()]);
     expSvc.listRecurringTemplates.calls.reset();
 
@@ -198,15 +202,14 @@ describe('RecurringExpensesComponent [caracterizacao]', () => {
     expect(expSvc.toggleRecurringTemplate).toHaveBeenCalled();
     expect(expSvc.listRecurringTemplates).toHaveBeenCalled();
 
-    spyOn(window, 'confirm').and.returnValue(true);
-    c.remove(c.templates()[0]);
+    await c.remove(c.templates()[0]);
     expect(expSvc.deleteRecurringTemplate).toHaveBeenCalled();
   });
 
-  it('nao exclui quando o usuario cancela a confirmacao', () => {
+  it('nao exclui quando o usuario cancela a confirmacao', async () => {
     const c = setup([template()]);
-    spyOn(window, 'confirm').and.returnValue(false);
-    c.remove(c.templates()[0]);
+    confirmDialog.confirm.and.resolveTo(false);
+    await c.remove(c.templates()[0]);
     expect(expSvc.deleteRecurringTemplate).not.toHaveBeenCalled();
   });
 

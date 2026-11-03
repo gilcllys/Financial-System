@@ -26,7 +26,7 @@ def shift_month(month, year, delta):
     return idx % 12 + 1, idx // 12
 
 
-def current_invoice_month(card):
+def current_invoice_month(card, today=None):
     """
     (invoice_month, invoice_year) da fatura corrente (aberta hoje).
 
@@ -34,7 +34,7 @@ def current_invoice_month(card):
     fim de semana, a fatura fecha na sexta-feira anterior. A fatura e
     nomeada pelo mes SEGUINTE ao do fechamento.
     """
-    today = date.today()
+    today = today or date.today()
     effective_closing = _effective_closing_date(today.year, today.month, card.closing_day)
     closing_month, closing_year = (today.month, today.year) if today <= effective_closing else shift_month(today.month, today.year, 1)
     return shift_month(closing_month, closing_year, 1)
@@ -320,7 +320,7 @@ class InvoiceExpensesBehavior:
 
 class OpenInvoicesBehavior:
     """
-    Retorna a fatura corrente (aberta) de cada cartão do tenant,
+    Retorna o ciclo de fechamento selecionado para cada cartão do tenant,
     com o total de gastos do período e a data de fechamento/vencimento.
 
     `total` é o valor BRUTO que o banco cobra: despesas individuais +
@@ -333,7 +333,7 @@ class OpenInvoicesBehavior:
     def __init__(self, tenant_id: str):
         self.tenant_id = tenant_id
 
-    def run(self) -> Response:
+    def run(self, closing_month=None, closing_year=None) -> Response:
         from cards.models import CreditCard
         from expenses.models import Expense
 
@@ -341,7 +341,10 @@ class OpenInvoicesBehavior:
         result = []
 
         for card in cards:
-            invoice_month, invoice_year = current_invoice_month(card)
+            if closing_month is not None and closing_year is not None:
+                invoice_month, invoice_year = shift_month(closing_month, closing_year, 1)
+            else:
+                invoice_month, invoice_year = current_invoice_month(card)
             period_start, period_end, due = compute_invoice_period(
                 card, invoice_month, invoice_year
             )

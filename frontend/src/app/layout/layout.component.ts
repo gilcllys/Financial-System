@@ -2,6 +2,10 @@ import { Component, OnInit, inject, HostListener, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { ExpenseService } from '../core/services/expense.service';
+import { SupermarketService } from '../core/services/supermarket.service';
+import { SavingsService } from '../core/services/savings.service';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 @Component({
   selector: 'app-layout',
@@ -14,20 +18,31 @@ export class LayoutComponent implements OnInit {
   private auth = inject(AuthService);
   private router = inject(Router);
   private expenseService = inject(ExpenseService);
+  private supermarketService = inject(SupermarketService);
+  private savingsService = inject(SavingsService);
 
   /** Controls the mobile drawer (sidebar slide-in) */
   drawerOpen = signal(false);
 
-  /** Count of uncategorized expenses (category_id = 11) for the badge */
+  /** Count of expenses assigned to the stable uncategorized category. */
   uncategorizedCount = signal(0);
+  hasMarketData = signal(false);
+  hasInvestmentData = signal(false);
 
   ngOnInit(): void {
     this.loadUncategorizedCount();
+    forkJoin({
+      market: this.supermarketService.list().pipe(catchError(() => of([]))),
+      goals: this.savingsService.listGoals().pipe(catchError(() => of([]))),
+    }).subscribe(({ market, goals }) => {
+      this.hasMarketData.set(market.length > 0);
+      this.hasInvestmentData.set(goals.length > 0);
+    });
   }
 
   private loadUncategorizedCount(): void {
     this.expenseService
-      .list({ category_id: 11, page: 1, page_size: 1 })
+      .list({ category_key: 'uncategorized', page: 1, page_size: 1 })
       .subscribe({ next: res => this.uncategorizedCount.set(res.count), error: () => {} });
   }
 

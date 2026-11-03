@@ -130,14 +130,16 @@
   gap: 4px;
   overflow-x: auto;
   padding: 6px;
+  scrollbar-color: var(--color-hairline) transparent;
   background: var(--color-canvas);
   border: 1px solid var(--inv-line);
   border-radius: var(--rounded-pill);
   scrollbar-width: thin;
 
-  &::-webkit-scrollbar { height: 4px; }
-  &::-webkit-scrollbar-thumb { background: var(--color-hairline); border-radius: 4px; }
 }
+
+.month-strip::-webkit-scrollbar { height: 4px; }
+.month-strip::-webkit-scrollbar-thumb { background: var(--color-hairline); border-radius: 4px; }
 
 .month-pill {
   flex: 0 0 auto;

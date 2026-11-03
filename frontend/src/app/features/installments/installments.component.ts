@@ -1,78 +1,12 @@
-﻿import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { ToastService } from '../../core/services/toast.service';
+import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
 import { RouterLink } from '@angular/router';
 import { ExpenseService } from '../../core/services/expense.service';
 import { CardService } from '../../core/services/card.service';
 import { SharedDebtService, SharedDebtEntry } from '../../core/services/shared-debt.service';
 import { CreditCard, Expense } from '../../core/models';
-
-interface InvoiceRef {
-  year: number;
-  month: number;
-  displayDate: string;
-  sort: number;
-}
-
-function parseIsoDate(dateStr: string): Date {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
-function monthDate(year: number, month: number): string {
-  return `${year}-${String(month).padStart(2, '0')}-01`;
-}
-
-function daysInMonth(year: number, month: number): number {
-  return new Date(year, month, 0).getDate();
-}
-
-function nextMonth(year: number, month: number): { year: number; month: number } {
-  return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
-}
-
-function invoiceFromClosing(year: number, month: number): InvoiceRef {
-  const invoice = nextMonth(year, month);
-  return {
-    year: invoice.year,
-    month: invoice.month,
-    displayDate: monthDate(invoice.year, invoice.month),
-    sort: invoice.year * 12 + invoice.month,
-  };
-}
-
-function effectiveClosingDate(year: number, month: number, closingDay: number): Date {
-  const closing = new Date(year, month - 1, Math.min(closingDay, daysInMonth(year, month)));
-  if (closing.getDay() === 6) return new Date(year, month - 1, closing.getDate() - 1);
-  if (closing.getDay() === 0) return new Date(year, month - 1, closing.getDate() - 2);
-  return closing;
-}
-
-function invoiceForDate(dateStr: string, closingDay: number): InvoiceRef {
-  const date = parseIsoDate(dateStr);
-  let closingYear = date.getFullYear();
-  let closingMonth = date.getMonth() + 1;
-  const effectiveClosing = effectiveClosingDate(closingYear, closingMonth, closingDay);
-
-  if (date > effectiveClosing) {
-    const next = nextMonth(closingYear, closingMonth);
-    closingYear = next.year;
-    closingMonth = next.month;
-  }
-
-  return invoiceFromClosing(closingYear, closingMonth);
-}
-
-function currentInvoice(closingDay: number): InvoiceRef {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const year = today.getFullYear();
-  const month = today.getMonth() + 1;
-  const effectiveClosing = effectiveClosingDate(year, month, closingDay);
-
-  if (today <= effectiveClosing) return invoiceFromClosing(year, month);
-  const next = nextMonth(year, month);
-  return invoiceFromClosing(next.year, next.month);
-}
-
+import { invoiceForDate, isInvoiceClosed, InvoiceMonthRef } from '../../core/utils/invoice-cycle';
 
 interface InstallmentGroup {
   name: string;
@@ -118,6 +52,8 @@ interface SharedDebtInstallmentSection {
   styleUrls: ['./installments.component.scss'],
 })
 export class InstallmentsComponent implements OnInit {
+  private toast = inject(ToastService);
+  private confirmDialog = inject(ConfirmDialogService);
   private expenseService = inject(ExpenseService);
   private sharedDebtService = inject(SharedDebtService);
   private cardService = inject(CardService);
@@ -139,7 +75,7 @@ export class InstallmentsComponent implements OnInit {
     return expense.credit_card_id ?? (expense as any).credit_card ?? null;
   }
 
-  private installmentInvoice(date: string, cardId: number | null): InvoiceRef | null {
+  private installmentInvoice(date: string, cardId: number | null): InvoiceMonthRef | null {
     const card = cardId ? this.cardMap().get(cardId) : null;
     return card ? invoiceForDate(date, card.closing_day) : null;
   }
@@ -150,9 +86,10 @@ export class InstallmentsComponent implements OnInit {
     if (!invoice || !card) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      return parseIsoDate(date) <= today;
+      const [year, month, day] = date.split('-').map(Number);
+      return new Date(year, month - 1, day) <= today;
     }
-    return invoice.sort < currentInvoice(card.closing_day).sort;
+    return isInvoiceClosed(date, card.closing_day);
   }
 
   private installmentDisplayDate(date: string, cardId: number | null): string {
@@ -178,6 +115,7 @@ export class InstallmentsComponent implements OnInit {
       const existing = groupMap.get(key);
       if (existing) {
         existing.expenses.push(expense);
+        existing.totalAmount = Math.round((existing.totalAmount + Math.abs(expense.amount)) * 100) / 100;
         if (isPaid && currentPart > existing.paidInstallments) {
           existing.paidInstallments = currentPart;
         }
@@ -325,8 +263,8 @@ export class InstallmentsComponent implements OnInit {
 
   private fetchExpenses(): void {
     this.loading.set(true);
-    this.expenseService.list({ page_size: 500 }).subscribe({
-      next: res => { this.expenses.set(res.results); this.loading.set(false); },
+    this.expenseService.listAll().subscribe({
+      next: expenses => { this.expenses.set(expenses); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
   }
@@ -339,21 +277,41 @@ export class InstallmentsComponent implements OnInit {
     });
   }
 
-  deleteGroup(group: InstallmentGroup): void {
-    if (!confirm(`Apagar todas as ${group.totalInstallments} parcelas de "${group.name}"?`)) return;
-    this.deletingGroup.set(group.name);
-    this.expenseService.deleteInstallments(group.name, group.totalInstallments).subscribe({
+  installmentKey(group: InstallmentGroup): string { return `${group.name}:${group.cardId ?? 'none'}`; }
+
+  futureExpenses(group: InstallmentGroup): Expense[] {
+    return group.expenses.filter(expense => !this.isInstallmentClosed(expense.date, group.cardId));
+  }
+
+  async deleteGroup(group: InstallmentGroup): Promise<void> {
+    const key = this.installmentKey(group);
+    const ids = group.expenses.map(expense => expense.id);
+    if (!(await this.confirmDialog.confirm(`Apagar as ${ids.length} parcelas de "${group.name}" deste grupo?`))) return;
+    this.deletingGroup.set(key);
+    this.expenseService.deleteInstallments(group.name, group.totalInstallments, ids).subscribe({
       next: () => { this.deletingGroup.set(null); this.fetchExpenses(); },
-      error: () => { alert('Erro ao apagar parcelas.'); this.deletingGroup.set(null); },
+      error: () => { this.toast.error('Erro ao apagar parcelas.'); this.deletingGroup.set(null); },
     });
   }
 
-  deleteSharedGroup(group: SharedInstallmentGroup): void {
-    if (!confirm(`Apagar todas as ${group.totalInstallments} parcelas de "${group.name}" do grupo ${group.shared_debt_name}? Isso afeta todos os membros.`)) return;
+  async cancelFutureInstallments(group: InstallmentGroup): Promise<void> {
+    const futureIds = this.futureExpenses(group).map(expense => expense.id);
+    if (!futureIds.length) return;
+    if (!(await this.confirmDialog.confirm(`Cancelar ${futureIds.length} parcelas futuras de "${group.name}"? Parcelas já fechadas serão preservadas.`, 'Cancelar parcelas futuras'))) return;
+    const key = this.installmentKey(group);
+    this.deletingGroup.set(key);
+    this.expenseService.deleteInstallments(group.name, group.totalInstallments, futureIds).subscribe({
+      next: () => { this.deletingGroup.set(null); this.fetchExpenses(); },
+      error: () => { this.toast.error('Erro ao cancelar parcelas futuras.'); this.deletingGroup.set(null); },
+    });
+  }
+
+  async deleteSharedGroup(group: SharedInstallmentGroup): Promise<void> {
+    if (!(await this.confirmDialog.confirm(`Apagar todas as ${group.totalInstallments} parcelas de "${group.name}" do grupo ${group.shared_debt_name}? Isso afeta todos os membros.`))) return;
     this.deletingSharedGroup.set(group.installment_group_id);
     this.sharedDebtService.deleteInstallments(group.installment_group_id).subscribe({
       next: () => { this.deletingSharedGroup.set(null); this.fetchSharedEntries(); },
-      error: () => { alert('Erro ao apagar parcelas compartilhadas.'); this.deletingSharedGroup.set(null); },
+      error: () => { this.toast.error('Erro ao apagar parcelas compartilhadas.'); this.deletingSharedGroup.set(null); },
     });
   }
 

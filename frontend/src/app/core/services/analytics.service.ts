@@ -56,6 +56,8 @@ export interface ConsolidatedSummary {
   shared_count: number;
   total_expenses: number;
   balance: number;
+  personal_cost?: number;
+  free_to_spend?: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -78,10 +80,11 @@ export class AnalyticsService {
     return this.http.get<CategoryAnalytics[]>(`${this.base}/by-category/`, { params });
   }
 
-  byCard(month?: number, year?: number): Observable<CardAnalytics[]> {
+  byCard(month?: number, year?: number, period: 'cycle' | 'purchase_month' = 'cycle'): Observable<CardAnalytics[]> {
     let params = new HttpParams();
     if (month) params = params.set('month', month);
     if (year) params = params.set('year', year);
+    params = params.set('period', period);
     return this.http.get<CardAnalytics[]>(`${this.base}/by-card/`, { params });
   }
 
@@ -94,10 +97,13 @@ export class AnalyticsService {
   }
 
 
-  consolidatedSummary(month?: number, year?: number): Observable<ConsolidatedSummary> {
+  consolidatedSummary(month?: number, year?: number, closingMonth?: number, closingYear?: number): Observable<ConsolidatedSummary> {
     let params = new HttpParams();
     if (month) params = params.set('month', month);
     if (year)  params = params.set('year', year);
+    if (closingMonth) params = params.set('closing_month', closingMonth);
+    if (closingYear) params = params.set('closing_year', closingYear);
+    params = params.set('include_obligations', '1');
     return this.http.get<ConsolidatedSummary>(
       `${environment.apiBaseUrl}/api/expenses/expenses/consolidated-summary/`, { params }
     );

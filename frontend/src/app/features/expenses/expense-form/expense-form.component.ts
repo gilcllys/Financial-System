@@ -1,4 +1,5 @@
-﻿import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
 
 import { DecimalPipe } from '@angular/common';
 
@@ -44,6 +45,7 @@ import { ToastService } from '../../../core/services/toast.service';
   styleUrls: ['./expense-form.component.scss'],
 })
 export class ExpenseFormComponent implements OnInit {
+  private confirmDialog = inject(ConfirmDialogService);
   private fb = inject(FormBuilder);
 
   private expenseService = inject(ExpenseService);
@@ -184,8 +186,8 @@ export class ExpenseFormComponent implements OnInit {
       });
   }
 
-  deleteRecurring(id: number): void {
-    if (!confirm('Excluir este gasto fixo?')) return;
+  async deleteRecurring(id: number): Promise<void> {
+    if (!(await this.confirmDialog.confirm('Excluir este gasto fixo?'))) return;
 
     this.expenseService
       .deleteRecurringTemplate(id)
@@ -213,11 +215,17 @@ export class ExpenseFormComponent implements OnInit {
 
   categories = signal<ExpenseCategory[]>([]);
 
+  availableCategories = computed(() => this.categories().filter(category =>
+    (category.kind ?? 'despesa') === (this.isIncome() ? 'receita' : 'despesa')
+  ));
+
   cards = signal<CreditCard[]>([]);
 
   loading = signal(false);
 
   saving = signal(false);
+
+  saveAndAddAnother = signal(false);
 
   errorMessage = signal('');
 
@@ -299,6 +307,9 @@ export class ExpenseFormComponent implements OnInit {
 
   toggleType(income: boolean): void {
     this.isIncome.set(income);
+    const matching = this.categories().filter(category => (category.kind ?? 'despesa') === (income ? 'receita' : 'despesa'));
+    const preferred = income ? matching[0] : matching.find(category => category.key === 'uncategorized');
+    this.form.patchValue({ category_id: preferred?.id ?? null });
   }
 
   /** cartao => credit_card_id obrigatorio, espelhando a regra do backend. */
@@ -363,7 +374,11 @@ export class ExpenseFormComponent implements OnInit {
   private loadSelects(): void {
     this.categoryService
       .list()
-      .subscribe({ next: (cats) => this.categories.set(cats) });
+      .subscribe({ next: (cats) => {
+        this.categories.set(cats);
+        const uncategorized = cats.find(category => category.key === 'uncategorized');
+        if (!this.isEdit() && uncategorized) this.form.patchValue({ category_id: uncategorized.id });
+      } });
 
     this.cardService
       .list()
@@ -538,7 +553,7 @@ export class ExpenseFormComponent implements OnInit {
       });
   }
 
-  submit(): void {
+  submit(addAnother = false): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
 
@@ -552,6 +567,7 @@ export class ExpenseFormComponent implements OnInit {
     }
 
     this.saving.set(true);
+    this.saveAndAddAnother.set(addAnother);
 
     this.errorMessage.set('');
 
@@ -633,10 +649,23 @@ export class ExpenseFormComponent implements OnInit {
         );
 
         this.saving.set(false);
+        if (addAnother && !this.isEdit()) {
+          const paymentMethod = this.form.value.payment_method;
+          const cardId = this.form.value.credit_card_id;
+          this.form.reset({
+            description: '', amount: null, date: this.todayStr(), category_id: null,
+            payment_method: paymentMethod, credit_card_id: cardId,
+            is_installment: false, installments: 1, quantity: 1,
+          });
+          this.form.markAsPristine();
+          this.form.markAsUntouched();
+        }
+        this.saveAndAddAnother.set(false);
       },
 
       error: (err) => {
         this.saving.set(false);
+        this.saveAndAddAnother.set(false);
 
         this.errorMessage.set(
           this.toast.apiError(err, 'Erro ao salvar gasto. Tente novamente.'),

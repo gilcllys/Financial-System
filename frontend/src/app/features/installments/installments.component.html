@@ -78,9 +78,14 @@
               <td class="col-date">{{ formatNextDate(group.nextDate) }}</td>
               <td class="col-value text-right value-red">{{ formatAmount(group.amountPerInstallment) }}</td>
               <td class="col-actions">
-                <button class="btn btn--danger btn--sm" type="button" (click)="deleteGroup(group)" [disabled]="deletingGroup() === group.name" [attr.aria-label]="'Apagar todas as parcelas de ' + group.name">
-                  {{ deletingGroup() === group.name ? 'Apagando...' : 'Apagar todas' }}
+                <button class="btn btn--danger btn--sm" type="button" (click)="deleteGroup(group)" [disabled]="deletingGroup() === installmentKey(group)" [attr.aria-label]="'Apagar todas as parcelas de ' + group.name">
+                  {{ deletingGroup() === installmentKey(group) ? 'Apagando...' : 'Apagar todas' }}
                 </button>
+                @if (futureExpenses(group).length > 0) {
+                  <button class="btn btn--secondary btn--sm" type="button" (click)="cancelFutureInstallments(group)" [disabled]="deletingGroup() === installmentKey(group)">
+                    Cancelar futuras ({{ futureExpenses(group).length }})
+                  </button>
+                }
               </td>
             </tr>
           }
@@ -106,8 +111,8 @@
                 <td class="col-date">-</td>
                 <td class="col-value text-right">{{ formatAmount(group.amountPerInstallment) }}</td>
                 <td class="col-actions">
-                  <button class="btn btn--danger btn--sm" type="button" (click)="deleteGroup(group)" [disabled]="deletingGroup() === group.name" [attr.aria-label]="'Apagar todas as parcelas de ' + group.name">
-                    {{ deletingGroup() === group.name ? 'Apagando...' : 'Apagar todas' }}
+                  <button class="btn btn--danger btn--sm" type="button" (click)="deleteGroup(group)" [disabled]="deletingGroup() === installmentKey(group)" [attr.aria-label]="'Apagar todas as parcelas de ' + group.name">
+                    {{ deletingGroup() === installmentKey(group) ? 'Apagando...' : 'Apagar todas' }}
                   </button>
                 </td>
               </tr>
@@ -123,7 +128,7 @@
     <div class="section-card">
       <div class="section-card__header">
         <div>
-          <h2 class="section-card__title">Parcelamentos de Dividas Compartilhadas</h2>
+          <h2 class="section-card__title">Parcelamentos de Dívidas Compartilhadas</h2>
           <p class="section-card__subtitle">Parcelas organizadas por grupo compartilhado.</p>
         </div>
         @if (finalizadasSharedGroups().length > 0) {

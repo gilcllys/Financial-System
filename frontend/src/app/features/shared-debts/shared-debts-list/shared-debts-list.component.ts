@@ -1,4 +1,6 @@
-﻿import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
+import { ToastService } from '../../../core/services/toast.service';
+import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
 import { RouterLink } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { forkJoin, of } from 'rxjs';
@@ -20,6 +22,8 @@ interface Settlement { iOwe: boolean; name: string; amount: number; }
   styleUrls: ['./shared-debts-list.component.scss'],
 })
 export class SharedDebtsListComponent implements OnInit {
+  private toast = inject(ToastService);
+  private confirmDialog = inject(ConfirmDialogService);
   private svc  = inject(SharedDebtService);
   private auth = inject(AuthService);
   private fb   = inject(FormBuilder);
@@ -121,7 +125,7 @@ export class SharedDebtsListComponent implements OnInit {
     this.svc.createInvite(groupId).subscribe({
       next: inv => {
         const url = window.location.origin + inv.join_path;
-        navigator.clipboard.writeText(url).then(() => alert('Link copiado!'));
+        navigator.clipboard.writeText(url).then(() => this.toast.success('Link copiado!'));
       },
     });
   }

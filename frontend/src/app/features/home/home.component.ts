@@ -2,6 +2,7 @@ import {
   Component, OnInit, OnDestroy, AfterViewInit,
   ElementRef, ViewChild, inject, signal, computed, effect
 } from '@angular/core';
+import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DatePipe, SlicePipe } from '@angular/common';
@@ -36,6 +37,7 @@ const EMPTY_CONSOLIDATED: ConsolidatedSummary = {
   styleUrls: ['./home.component.scss'],
 })
 export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
+  private confirmDialog = inject(ConfirmDialogService);
   private homeService      = inject(HomeService);
   private expenseService   = inject(ExpenseService);
   private categoryService  = inject(CategoryService);
@@ -90,11 +92,8 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
   maxCategory   = computed(() => Math.max(...this.byCategory().map(c => c.total), 1));
 
   // ── Home v2: KPIs centrados no cartão ─────────────────────────────────────
-  /** Saldo = Receitas − Faturas abertas (bruto) − gastos em dinheiro fora do cartão. */
-  balance = computed(() =>
-    this.consolidated().income - this.totalInvoices() - this.consolidated().cash_expenses
-  );
-
+  /** Usa o saldo pessoal calculado no backend, incluindo obrigações ainda não lançadas. */
+  balance = computed(() => this.consolidated().free_to_spend ?? this.consolidated().balance);
   nextDueDate = computed<string | null>(() => {
     const dates = this.openInvoices().map(i => i.due_date).filter(Boolean).sort();
     return dates[0] ?? null;
@@ -202,8 +201,10 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
       });
 
     // KPIs consolidados: recarrega ao trocar mês/ano
-    this.analyticsService.consolidatedSummary(this.filterMonth(), this.filterYear())
-      .pipe(takeUntil(this.destroy$))
+    this.analyticsService.consolidatedSummary(
+      this.filterMonth(), this.filterYear(), this.filterMonth(), this.filterYear()
+    )
+    .pipe(takeUntil(this.destroy$))
       .subscribe({ next: data => this.consolidated.set(data) });
 
     // Categorias: recarrega ao trocar mês/ano
@@ -251,8 +252,8 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loadTable();
   }
 
-  delete(id: number): void {
-    if (!confirm('Deseja excluir este gasto?')) return;
+  async delete(id: number): Promise<void> {
+    if (!(await this.confirmDialog.confirm('Deseja excluir este gasto?'))) return;
     this.deletingId.set(id);
     this.expenseService.delete(id).subscribe({
       next: () => {

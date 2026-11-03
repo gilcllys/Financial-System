@@ -1,208 +1,115 @@
-﻿<div class="page-header">
+<div class="page-header">
   <div class="page-header__left">
-    <h1 class="page-header__title">Historico</h1>
-    <p class="page-header__subtitle">Consulte, edite e exclua todos os gastos registrados.</p>
+    <h1 class="page-header__title">Histórico</h1>
+    <p class="page-header__subtitle">Consulte lançamentos individuais e compartilhados em uma lista.</p>
   </div>
-  <a routerLink="/expenses/new" class="btn btn--primary">+ Novo gasto</a>
+  <div class="page-header__actions">
+    <button class="btn btn--secondary" type="button" (click)="exportCsv()">Exportar CSV</button>
+    <a routerLink="/expenses/new" class="btn btn--primary">+ Novo lançamento</a>
+  </div>
 </div>
 
-<section class="history-filters" aria-label="Filtros do historico">
-  <label class="filter-field">
-    <span>Mes</span>
+<section class="history-filters" aria-label="Filtros do histórico">
+  <label class="filter-field"><span>Mês</span>
     <select class="form-select" [ngModel]="filterMonth()" (ngModelChange)="filterMonth.set($event ? +$event : null)">
       <option [ngValue]="null">Todos</option>
-      @for (m of MONTHS; track m.value) {
-        <option [ngValue]="m.value">{{ m.label }}</option>
-      }
+      @for (m of MONTHS; track m.value) { <option [ngValue]="m.value">{{ m.label }}</option> }
     </select>
   </label>
-
-  <label class="filter-field filter-field--short">
-    <span>Ano</span>
+  <label class="filter-field filter-field--short"><span>Ano</span>
     <input class="form-input" type="number" min="2000" [ngModel]="filterYear()" (ngModelChange)="filterYear.set($event ? +$event : null)">
   </label>
-
-  <label class="filter-field">
-    <span>Categoria</span>
+  <label class="filter-field"><span>Tipo</span>
+    <select class="form-select" [ngModel]="entryType()" (ngModelChange)="entryType.set($event)">
+      <option value="all">Todos</option><option value="individual">Individual</option><option value="shared">Compartilhado</option>
+    </select>
+  </label>
+  <label class="filter-field"><span>Categoria</span>
     <select class="form-select" [ngModel]="filterCategory()" (ngModelChange)="filterCategory.set($event ? +$event : null)">
       <option [ngValue]="null">Todas</option>
-      @for (category of categories(); track category.id) {
-        <option [ngValue]="category.id">{{ category.name }}</option>
-      }
+      @for (category of categories(); track category.id) { <option [ngValue]="category.id">{{ category.name }}</option> }
     </select>
   </label>
-
-  <label class="filter-field">
-    <span>Pagamento</span>
+  <label class="filter-field"><span>Pagamento</span>
     <select class="form-select" [ngModel]="filterPayment()" (ngModelChange)="filterPayment.set($event || null)">
-      <option [ngValue]="null">Todos</option>
-      <option value="dinheiro">Dinheiro</option>
-      <option value="cartao">Cartao</option>
+      <option [ngValue]="null">Todos</option><option value="dinheiro">Dinheiro</option><option value="cartao">Cartão</option>
     </select>
   </label>
-
-  <label class="filter-field">
-    <span>Cartao</span>
+  <label class="filter-field"><span>Cartão</span>
     <select class="form-select" [ngModel]="filterCard()" (ngModelChange)="filterCard.set($event ? +$event : null)">
       <option [ngValue]="null">Todos</option>
-      @for (card of cards(); track card.id) {
-        <option [ngValue]="card.id">{{ card.name }} **** {{ card.last_four_digits }}</option>
-      }
+      @for (card of cards(); track card.id) { <option [ngValue]="card.id">{{ card.name }} •••• {{ card.last_four_digits }}</option> }
     </select>
   </label>
-
-  <label class="filter-field">
-    <span>Data inicial</span>
-    <input class="form-input" type="date" [ngModel]="filterStartDate()" (ngModelChange)="filterStartDate.set($event)">
+  <label class="filter-field"><span>Data inicial</span><input class="form-input" type="date" [ngModel]="filterStartDate()" (ngModelChange)="filterStartDate.set($event)"></label>
+  <label class="filter-field"><span>Data final</span><input class="form-input" type="date" [ngModel]="filterEndDate()" (ngModelChange)="filterEndDate.set($event)"></label>
+  <label class="filter-field filter-field--search"><span>Descrição</span>
+    <input class="form-input" type="search" placeholder="Buscar descrição" [ngModel]="filterSearch()" (ngModelChange)="filterSearch.set($event)">
   </label>
-
-  <label class="filter-field">
-    <span>Data final</span>
-    <input class="form-input" type="date" [ngModel]="filterEndDate()" (ngModelChange)="filterEndDate.set($event)">
-  </label>
-
-  <label class="filter-field filter-field--search">
-    <span>Descricao</span>
-    <input class="form-input" type="search" placeholder="Buscar gasto individual" [ngModel]="filterSearch()" (ngModelChange)="filterSearch.set($event)">
-  </label>
-
+  <label class="filter-field filter-field--short"><span>Valor mínimo</span><input class="form-input" type="number" min="0" step="0.01" [ngModel]="minAmount()" (ngModelChange)="minAmount.set($event)"></label>
+  <label class="filter-field filter-field--short"><span>Valor máximo</span><input class="form-input" type="number" min="0" step="0.01" [ngModel]="maxAmount()" (ngModelChange)="maxAmount.set($event)"></label>
+  <label class="filter-field filter-field--checkbox"><input type="checkbox" [ngModel]="includeFuture()" (ngModelChange)="includeFuture.set($event)"> Incluir parcelas futuras</label>
   <div class="filter-actions">
     <button class="btn btn--primary btn--sm" type="button" (click)="applyFilters()">Aplicar</button>
     <button class="btn btn--secondary btn--sm" type="button" (click)="clearFilters()">Limpar</button>
   </div>
 </section>
 
-<section class="history-section" aria-labelledby="individual-title">
+<section class="history-section" aria-labelledby="history-list-title">
   <div class="history-section__header">
     <div>
-      <h2 id="individual-title">Gastos individuais</h2>
-      <p>{{ individualTotal() }} registros encontrados</p>
+      <h2 id="history-list-title">Lançamentos</h2>
+      <p>{{ totals().count }} registros · Sua parte nas despesas {{ formatCurrency(-totals().expenses) }} · Receitas {{ formatCurrency(totals().income) }} · Saldo líquido {{ formatCurrency(totals().net) }}</p>
     </div>
-  </div>
-
-  @if (individualLoading()) {
-    <div class="loading-wrapper"><span class="spinner"></span> Carregando gastos individuais...</div>
-  } @else if (individualExpenses().length === 0) {
-    <div class="empty-state">
-      <div class="empty-state__icon">🧾</div>
-      <p class="empty-state__title">Nenhum gasto individual encontrado</p>
-      <p class="empty-state__text">Ajuste os filtros para consultar outros registros.</p>
-    </div>
-  } @else {
-    <div class="table-wrap">
-      <table class="history-table" aria-label="Historico de gastos individuais">
-        <thead>
-          <tr>
-            <th>Descricao</th>
-            <th>Data</th>
-            <th>Categoria</th>
-            <th>Pagamento</th>
-            <th>Cartao</th>
-            <th class="text-right">Valor</th>
-            <th>Acoes</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (expense of individualExpenses(); track expense.id) {
-            <tr>
-              <td>
-                <strong>{{ expense.description }}</strong>
-                @if (expense.is_recurring) {
-                  <span class="recurring-badge" title="Gerado automaticamente a partir de um gasto fixo">Fixo</span>
-                }
-              </td>
-              <td class="mono text-muted">{{ formatDate(expense.date) }}</td>
-              <td>{{ categoryName(expense) }}</td>
-              <td><span class="chip" [class.chip--card]="expense.payment_method === 'cartao'" [class.chip--cash]="expense.payment_method === 'dinheiro'">{{ paymentLabel(expense.payment_method) }}</span></td>
-              <td>{{ cardName(expense.credit_card_id) }}</td>
-              <td class="text-right mono" [class.value-up]="expense.amount >= 0" [class.value-down]="expense.amount < 0">{{ formatSignedCurrency(expense.amount) }}</td>
-              <td class="actions-cell">
-                <button class="icon-btn" type="button" (click)="editIndividual(expense)" aria-label="Editar gasto individual">Editar</button>
-                <button class="icon-btn icon-btn--danger" type="button" (click)="deleteIndividual(expense)" aria-label="Excluir gasto individual">Excluir</button>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-    @if (individualTotalPages() > 1) {
-      <div class="pagination" aria-label="Paginacao de gastos individuais">
-        <button class="page-btn" type="button" [disabled]="individualPage() === 1" (click)="goToIndividualPage(individualPage() - 1)">Anterior</button>
-        @for (page of individualPageNumbers(); track page) {
-          <button class="page-btn" type="button" [class.page-btn--active]="page === individualPage()" (click)="goToIndividualPage(page)">{{ page }}</button>
-        }
-        <button class="page-btn" type="button" [disabled]="individualPage() === individualTotalPages()" (click)="goToIndividualPage(individualPage() + 1)">Proxima</button>
+    @if (selectedIndividualEntries().length > 0) {
+      <div class="filter-actions" aria-label="Ação em massa">
+        <span>{{ selectedIndividualEntries().length }} selecionados</span>
+        <select class="form-select" [ngModel]="bulkCategory()" (ngModelChange)="bulkCategory.set($event ? +$event : null)" aria-label="Nova categoria para os selecionados">
+          <option [ngValue]="null">Alterar categoria...</option>
+          @for (category of bulkCategories(); track category.id) { <option [ngValue]="category.id">{{ category.name }}</option> }
+        </select>
+        <button class="btn btn--secondary btn--sm" type="button" [disabled]="!bulkCategory() || savingCategory()" (click)="updateCategory()">Aplicar</button>
       </div>
     }
-  }
-</section>
-
-<section class="history-section" aria-labelledby="shared-title">
-  <div class="history-section__header">
-    <div>
-      <h2 id="shared-title">Gastos compartilhados</h2>
-      <p>{{ sharedTotal() }} registros encontrados</p>
-    </div>
   </div>
 
-  @if (sharedLoading()) {
-    <div class="loading-wrapper"><span class="spinner"></span> Carregando gastos compartilhados...</div>
-  } @else if (sharedExpenses().length === 0) {
-    <div class="empty-state">
-      <div class="empty-state__icon">👥</div>
-      <p class="empty-state__title">Nenhum gasto compartilhado encontrado</p>
-      <p class="empty-state__text">Ajuste os filtros para consultar outros registros.</p>
-    </div>
+  @if (loading()) {
+    <div class="loading-wrapper"><span class="spinner"></span> Carregando histórico...</div>
+  } @else if (error()) {
+    <div class="empty-state" role="alert"><p class="empty-state__title">Não foi possível carregar o histórico.</p><button class="btn btn--secondary" type="button" (click)="load()">Tentar novamente</button></div>
+  } @else if (entries().length === 0) {
+    <div class="empty-state"><p class="empty-state__title">Nenhum lançamento encontrado</p><p class="empty-state__text">Ajuste os filtros para consultar outros períodos.</p></div>
   } @else {
     <div class="table-wrap">
-      <table class="history-table" aria-label="Historico de gastos compartilhados">
-        <thead>
-          <tr>
-            <th>Grupo</th>
-            <th>Descricao</th>
-            <th>Data</th>
-            <th>Categoria</th>
-            <th>Pagamento</th>
-            <th>Cartao</th>
-            <th>Pago por</th>
-            <th class="text-right">Total</th>
-            <th class="text-right">Minha parte</th>
-            <th>Acoes</th>
-          </tr>
-        </thead>
+      <table class="history-table" aria-label="Histórico de lançamentos">
+        <thead><tr>
+          <th><input type="checkbox" aria-label="Selecionar todos os lançamentos individuais desta página" (change)="selectVisible()"></th>
+          <th>Tipo</th><th>Descrição</th><th>Data</th><th>Categoria</th><th>Pagamento</th><th>Cartão</th><th>Grupo / pagador</th><th class="text-right">Valor total</th><th class="text-right">Minha parte</th><th>Ações</th>
+        </tr></thead>
         <tbody>
-          @for (entry of sharedExpenses(); track entry.id) {
+          @for (entry of entries(); track entry.type + ':' + entry.id) {
             <tr>
-              <td><span class="group-chip">{{ entry.shared_debt_name }}</span></td>
-              <td>
-                <strong>{{ entry.description }}</strong>
-                @if (entry.total_installments > 1) {
-                  <span class="installment-badge">{{ entry.installment_number }}/{{ entry.total_installments }}</span>
-                }
-              </td>
+              <td>@if (entry.type === 'individual') { <input type="checkbox" [checked]="isSelected(entry)" (change)="toggleSelected(entry)" [attr.aria-label]="'Selecionar ' + entry.description"> }</td>
+              <td>{{ entry.type === 'shared' ? 'Compartilhado' : 'Individual' }}</td>
+              <td><strong>{{ entry.description }}</strong>@if (entry.total_installments && entry.total_installments > 1) { <span class="installment-badge">{{ entry.installment_number }}/{{ entry.total_installments }}</span> }@if (entry.is_recurring) { <span class="recurring-badge">Fixo</span> }</td>
               <td class="mono text-muted">{{ formatDate(entry.date) }}</td>
-              <td>{{ entry.category_name ?? 'Sem categoria' }}</td>
-              <td><span class="chip" [class.chip--card]="entry.payment_method === 'cartao'" [class.chip--cash]="entry.payment_method === 'dinheiro'">{{ paymentLabel(entry.payment_method) }}</span></td>
-              <td>{{ entry.credit_card_name ?? cardName(entry.credit_card) }}</td>
-              <td>{{ entry.paid_by_name }}</td>
-              <td class="text-right mono value-down">{{ formatCurrency(entry.amount) }}</td>
-              <td class="text-right mono value-down">{{ formatCurrency(mySharedPortion(entry)) }}</td>
-              <td class="actions-cell">
-                <button class="icon-btn" type="button" (click)="editShared(entry)" aria-label="Editar gasto compartilhado">Editar</button>
-                <button class="icon-btn icon-btn--danger" type="button" (click)="deleteShared(entry)" aria-label="Excluir gasto compartilhado">Excluir</button>
-              </td>
+              <td>{{ entry.category_name }}</td>
+              <td><span class="chip" [class.chip--card]="entry.payment_method === 'cartao'" [class.chip--cash]="entry.payment_method === 'dinheiro'">{{ entry.payment_method === 'cartao' ? 'Cartão' : 'Dinheiro' }}</span></td>
+              <td>{{ cardName(entry) }}</td>
+              <td>{{ entry.group_name ? entry.group_name + ' · ' + entry.paid_by_name : '—' }}</td>
+              <td class="text-right mono" [class.value-up]="entry.amount > 0" [class.value-down]="entry.amount < 0">{{ formatCurrency(entry.amount) }}</td>
+              <td class="text-right mono">{{ formatCurrency(-ownPortion(entry)) }}</td>
+              <td class="actions-cell"><button class="icon-btn" type="button" (click)="edit(entry)" aria-label="Editar lançamento">Editar</button><button class="icon-btn icon-btn--danger" type="button" (click)="delete(entry)" aria-label="Excluir lançamento">Excluir</button></td>
             </tr>
           }
         </tbody>
       </table>
     </div>
-    @if (sharedTotalPages() > 1) {
-      <div class="pagination" aria-label="Paginacao de gastos compartilhados">
-        <button class="page-btn" type="button" [disabled]="sharedPage() === 1" (click)="goToSharedPage(sharedPage() - 1)">Anterior</button>
-        @for (page of sharedPageNumbers(); track page) {
-          <button class="page-btn" type="button" [class.page-btn--active]="page === sharedPage()" (click)="goToSharedPage(page)">{{ page }}</button>
-        }
-        <button class="page-btn" type="button" [disabled]="sharedPage() === sharedTotalPages()" (click)="goToSharedPage(sharedPage() + 1)">Proxima</button>
+    @if (totalPages() > 1) {
+      <div class="pagination" aria-label="Paginação do histórico">
+        <button class="page-btn" type="button" [disabled]="page() === 1" (click)="goToPage(page() - 1)">Anterior</button>
+        <span>Página {{ page() }} de {{ totalPages() }}</span>
+        <button class="page-btn" type="button" [disabled]="page() === totalPages()" (click)="goToPage(page() + 1)">Próxima</button>
       </div>
     }
   }

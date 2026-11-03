@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
+import axe from 'axe-core';
 
 import { HistoryComponent } from './history.component';
 import { CardService } from '../../core/services/card.service';
@@ -32,7 +33,13 @@ describe('HistoryComponent - selo de gasto fixo', () => {
         provideRouter([]),
         {
           provide: ExpenseService,
-          useValue: { list: () => of({ results: expenses, count: expenses.length }) },
+          useValue: { history: () => of({
+            results: expenses.map(item => ({ ...item, type: 'individual', group_id: null,
+              group_name: null, paid_by_name: null, installment_number: null,
+              total_installments: null, card_name: null })),
+            count: expenses.length, next: null, previous: null,
+            totals: { count: expenses.length, income: 0, expenses: 0, net: 0 },
+          }) },
         },
         { provide: SharedDebtService, useValue: { listEntries: () => of({ results: [], count: 0 }) } },
         { provide: CategoryService, useValue: { list: () => of([]) } },
@@ -91,5 +98,20 @@ describe('HistoryComponent - selo de gasto fixo', () => {
     ]);
 
     expect(badges(fixture).length).toBe(1);
+  });
+
+  it('nao tem violações WCAG A/AA detectáveis pelo axe na lista', async () => {
+    const fixture = setup([expense({ is_recurring: true, recurring_template_id: 6 })]);
+    await fixture.whenStable();
+
+    const result = await axe.run(fixture.nativeElement, {
+      runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
+    });
+
+    const violations = result.violations.map(violation => ({
+      id: violation.id,
+      nodes: violation.nodes.map(node => ({ target: node.target, summary: node.failureSummary })),
+    }));
+    expect(violations).withContext(JSON.stringify(violations)).toEqual([]);
   });
 });
