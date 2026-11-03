@@ -177,7 +177,9 @@ class OpenInvoicesSharedTests(TestCase):
 
     def _run(self, closing_month=None, closing_year=None):
         with patch('cards.behaviors.date', _FixedToday):
-            rows = OpenInvoicesBehavior(self.TENANT).run(closing_month, closing_year).data
+            rows = OpenInvoicesBehavior(
+                self.TENANT, closing_month, closing_year,
+            ).run().data
         self.assertEqual(len(rows), 1)
         return rows[0]
 

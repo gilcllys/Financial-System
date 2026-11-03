@@ -68,8 +68,7 @@ def invoice_meta(invoice_month, invoice_year, period_start, period_end, due):
     }
 
 
-# Compatibilidade: nomes antigos importados por cards/tests.py, debts/by_person.py
-# e expenses/analytics_behaviors.py.
+# Compatibilidade: nomes antigos importados por cards/tests.py e debts/by_person.py.
 _current_invoice_month = current_invoice_month
 _compute_invoice_period = compute_invoice_period
 
@@ -220,102 +219,94 @@ class InvoiceExpensesBehavior:
         from expenses.models import Expense
         from expenses.serializer import ExpenseSerializer
 
-        period_start, period_end, due = compute_invoice_period(
-            self.card, self.invoice_month, self.invoice_year
-        )
+        period = compute_invoice_period(self.card, self.invoice_month, self.invoice_year)
+        base_filter = self._period_filter(period)
+        expense_page = self._get_expense_page(Expense, base_filter)
+        breakdown = self._get_category_breakdown(Expense, base_filter)
+        shared = _shared_invoice_breakdown(self.card, period[0], period[1])
+        return self._build_response(period, expense_page, breakdown, shared, ExpenseSerializer)
 
-        base_filter = dict(
-            tenant_id=self.card.tenant_id,
-            credit_card_id=self.card.id,
-            date__gte=period_start,
-            date__lte=period_end,
-        )
+    def _period_filter(self, period):
+        return {
+            'tenant_id': self.card.tenant_id,
+            'credit_card_id': self.card.id,
+            'date__gte': period[0],
+            'date__lte': period[1],
+        }
 
-        # QuerySet para a lista de expenses (com filtro de categoria opcional)
-        qs = (
-            Expense.objects
-            .filter(**base_filter)
-            .select_related('category', 'credit_card')
-            .order_by('-date', '-id')
-        )
+    def _expense_queryset(self, expense_model, base_filter):
+        queryset = expense_model.objects.filter(**base_filter).select_related(
+            'category', 'credit_card',
+        ).order_by('-date', '-id')
         if self.category_id is not None:
-            qs = qs.filter(category_id=self.category_id)
+            queryset = queryset.filter(category_id=self.category_id)
         if self.search:
-            qs = qs.filter(description__icontains=self.search)
+            queryset = queryset.filter(description__icontains=self.search)
+        return queryset
 
-        agg = qs.aggregate(total=Sum('amount'), count=Count('id'))
-        # amount e negativo para despesa e positivo para credito/estorno.
-        # Somar com sinal faz o credito ABATER a fatura, como no extrato
-        # do banco. Com Abs() um estorno era somado como se fosse gasto.
-        grand_total = round(-float(agg['total'] or 0), 2)
+    def _get_expense_page(self, expense_model, base_filter):
+        queryset = self._expense_queryset(expense_model, base_filter)
+        aggregate = queryset.aggregate(total=Sum('amount'), count=Count('id'))
+        total_count = queryset.count()
+        total_pages = max(1, -(-total_count // self.page_size))
+        offset = (self.page - 1) * self.page_size
+        return {
+            'aggregate': aggregate,
+            'total_count': total_count,
+            'total_pages': total_pages,
+            'rows': queryset[offset:offset + self.page_size],
+        }
 
-        # Breakdown sempre do período completo (sem filtro de categoria)
-        base_qs = Expense.objects.filter(**base_filter)
-        # Creditos nao pertencem a nenhuma categoria de gasto: incluir
-        # um estorno aqui inflaria a categoria e quebraria os percentuais.
-        debit_qs = base_qs.filter(amount__lt=0)
+    @staticmethod
+    def _get_category_breakdown(expense_model, base_filter):
+        debit_queryset = expense_model.objects.filter(**base_filter, amount__lt=0)
         period_total = round(
-            float(debit_qs.aggregate(t=Sum(Abs('amount')))['t'] or 0), 2
+            float(debit_queryset.aggregate(total=Sum(Abs('amount')))['total'] or 0), 2,
         )
-        cat_rows = (
-            debit_qs
-            .values('category_id', 'category__name')
-            .annotate(cat_total=Sum(Abs('amount')), cat_count=Count('id'))
-            .order_by('-cat_total')
-        )
-        by_category = [
+        category_rows = debit_queryset.values(
+            'category_id', 'category__name',
+        ).annotate(
+            cat_total=Sum(Abs('amount')), cat_count=Count('id'),
+        ).order_by('-cat_total')
+        return [
             {
                 'category_id': row['category_id'],
                 'category_name': row['category__name'],
                 'total': to_float(row['cat_total']),
                 'count': row['cat_count'],
-                'percentage': round(
-                    float(row['cat_total'] or 0) / period_total * 100
-                    if period_total else 0,
-                    2,
-                ),
+                'percentage': round(float(row['cat_total'] or 0) / period_total * 100, 2)
+                if period_total else 0,
             }
-            for row in cat_rows
+            for row in category_rows
         ]
 
-        # Pagination
-        total_count = qs.count()
-        total_pages = max(1, -(-total_count // self.page_size))  # ceil division
-        offset = (self.page - 1) * self.page_size
-        page_qs = qs[offset: offset + self.page_size]
-
-
-        # Shared debts paid on this card in the invoice period.
-        _shared = _shared_invoice_breakdown(self.card, period_start, period_end)
-        _shared_my_total = _shared['my_total']
-        _shared_breakdown = {
-            'total': _shared['total'],
-            'participants': _shared['participants'],
-            'groups': _shared['groups'],
+    def _build_response(self, period, expense_page, by_category, shared, expense_serializer):
+        period_start, period_end, due = period
+        aggregate = expense_page['aggregate']
+        expenses_total = round(-float(aggregate['total'] or 0), 2)
+        shared_breakdown = {
+            'total': shared['total'],
+            'participants': shared['participants'],
+            'groups': shared['groups'],
         }
-        _expenses_total = grand_total
-        _composite_total = round(_expenses_total + _shared_my_total, 2)
-        return Response(
-            {
-                **invoice_meta(self.invoice_month, self.invoice_year, period_start, period_end, due),
-                'summary': {
-                    'total': _composite_total,
-                    'expenses_total': _expenses_total,
-                    'shared_total': _shared_my_total,
-                    'shared_breakdown': _shared_breakdown,
-                    'count': agg['count'] or 0,
-                },
-                'by_category': by_category,
-                'pagination': {
-                    'page': self.page,
-                    'page_size': self.page_size,
-                    'total_count': total_count,
-                    'total_pages': total_pages,
-                },
-                'expenses': ExpenseSerializer(page_qs, many=True).data,
+        return Response({
+            **invoice_meta(self.invoice_month, self.invoice_year, period_start, period_end, due),
+            'summary': {
+                'total': round(expenses_total + shared['my_total'], 2),
+                'expenses_total': expenses_total,
+                'shared_total': shared['my_total'],
+                'shared_breakdown': shared_breakdown,
+                'count': aggregate['count'] or 0,
             },
-            status=status.HTTP_200_OK,
-        )
+            'by_category': by_category,
+            'pagination': {
+                'page': self.page,
+                'page_size': self.page_size,
+                'total_count': expense_page['total_count'],
+                'total_pages': expense_page['total_pages'],
+            },
+            'expenses': expense_serializer(expense_page['rows'], many=True).data,
+        }, status=status.HTTP_200_OK)
 
 
 class OpenInvoicesBehavior:
@@ -330,61 +321,147 @@ class OpenInvoicesBehavior:
     Endpoint: GET /api/cards/credit-cards/open-invoices/
     """
 
-    def __init__(self, tenant_id: str):
+    def __init__(self, tenant_id: str, closing_month=None, closing_year=None):
         self.tenant_id = tenant_id
+        self.closing_month = closing_month
+        self.closing_year = closing_year
 
-    def run(self, closing_month=None, closing_year=None) -> Response:
+    def run(self) -> Response:
         from cards.models import CreditCard
+        rows = [
+            self._build_card_invoice(card)
+            for card in CreditCard.objects.filter(tenant_id=self.tenant_id)
+        ]
+        return Response(sorted(rows, key=lambda row: row['days_to_close']), status=status.HTTP_200_OK)
+
+    def _invoice_period(self, card):
+        if self.closing_month is not None and self.closing_year is not None:
+            invoice_month, invoice_year = shift_month(
+                self.closing_month, self.closing_year, 1,
+            )
+        else:
+            invoice_month, invoice_year = current_invoice_month(card)
+        return invoice_month, invoice_year, compute_invoice_period(
+            card, invoice_month, invoice_year,
+        )
+
+    def _build_card_invoice(self, card):
         from expenses.models import Expense
 
-        cards = CreditCard.objects.filter(tenant_id=self.tenant_id)
-        result = []
+        invoice_month, invoice_year, period = self._invoice_period(card)
+        period_start, period_end, due = period
+        aggregate = Expense.objects.filter(
+            tenant_id=self.tenant_id,
+            credit_card_id=card.id,
+            date__gte=period_start,
+            date__lte=period_end,
+        ).aggregate(total=Sum('amount'), count=Count('id'))
+        expenses_total = round(-float(aggregate['total'] or 0), 2)
+        shared = _shared_invoice_breakdown(card, period_start, period_end)
+        return {
+            'card_id': card.id,
+            'card_name': card.name,
+            'last_four_digits': card.last_four_digits,
+            **invoice_meta(invoice_month, invoice_year, period_start, period_end, due),
+            'days_to_close': (period_end - date.today()).days,
+            'total': round(expenses_total + shared['total'], 2),
+            'expenses_total': expenses_total,
+            'shared_total': shared['my_total'],
+            'shared_gross_total': shared['total'],
+            'shared_groups': [
+                {
+                    'group_id': group['group_id'],
+                    'group_name': group['group_name'],
+                    'total': group['total'],
+                    'my_portion': group['my_portion'],
+                }
+                for group in shared['groups']
+            ],
+            'count': aggregate['count'] or 0,
+        }
 
-        for card in cards:
-            if closing_month is not None and closing_year is not None:
-                invoice_month, invoice_year = shift_month(closing_month, closing_year, 1)
-            else:
-                invoice_month, invoice_year = current_invoice_month(card)
-            period_start, period_end, due = compute_invoice_period(
-                card, invoice_month, invoice_year
-            )
 
-            agg = (
-                Expense.objects
-                .filter(
-                    tenant_id=self.tenant_id,
-                    credit_card_id=card.id,
-                    date__gte=period_start,
-                    date__lte=period_end,
-                )
-                .aggregate(total=Sum('amount'), count=Count('id'))
-            )
+class CreditCardInvoiceViewBehavior:
+    """Composes the read model used by the credit card invoice screen."""
 
-            days_to_close = (period_end - date.today()).days
-            expenses_total = round(-float(agg['total'] or 0), 2)
-            shared = _shared_invoice_breakdown(card, period_start, period_end)
+    def __init__(self, card, request, params: dict):
+        self.card = card
+        self.request = request
+        self.params = params
 
-            result.append({
-                'card_id': card.id,
-                'card_name': card.name,
-                'last_four_digits': card.last_four_digits,
-                **invoice_meta(invoice_month, invoice_year, period_start, period_end, due),
-                'days_to_close': days_to_close,
-                'total': round(expenses_total + shared['total'], 2),
-                'expenses_total': expenses_total,
-                'shared_total': shared['my_total'],
-                'shared_gross_total': shared['total'],
-                'shared_groups': [
-                    {
-                        'group_id': g['group_id'],
-                        'group_name': g['group_name'],
-                        'total': g['total'],
-                        'my_portion': g['my_portion'],
-                    }
-                    for g in shared['groups']
-                ],
-                'count': agg['count'] or 0,
-            })
+    def run(self) -> Response:
+        invoices = InvoicesBehavior(self.card).run().data
+        selected = self._select_invoice(invoices)
+        if isinstance(selected, Response):
+            return selected
+        invoice_data = self._invoice_data(selected)
+        chart_data = self._chart_data(selected)
+        return self._build_response(invoices, selected, invoice_data, chart_data)
 
-        result.sort(key=lambda x: x['days_to_close'])
-        return Response(result, status=status.HTTP_200_OK)
+    def _select_invoice(self, invoices):
+        selected = next((row for row in invoices if row['is_current']), invoices[0])
+        if 'invoice_month' not in self.params:
+            return selected
+        selected = next((row for row in invoices if
+                         row['invoice_month'] == self.params['invoice_month'] and
+                         row['invoice_year'] == self.params['invoice_year']), None)
+        if selected is None:
+            return Response({'detail': 'Fatura não encontrada para este cartão.'}, status=404)
+        return selected
+
+    def _invoice_data(self, selected):
+        return InvoiceExpensesBehavior(
+            self.card, selected['invoice_month'], selected['invoice_year'],
+            self.params.get('category_id'), page=self.params['page'],
+            page_size=self.params['page_size'], search=self.params.get('search'),
+        ).run().data
+
+    def _chart_data(self, selected):
+        return InvoiceExpensesBehavior(
+            self.card, selected['invoice_month'], selected['invoice_year'],
+            page=1, page_size=200,
+        ).run().data
+
+    def _build_response(self, invoices, selected, invoice_data, chart_data):
+        from catalog.models import ExpenseCategory
+        from catalog.serializer import ExpenseCategorySerializer
+        from debts.models import SharedEntry
+        from debts.serializer import SharedEntrySerializer
+        from cards.serializer import CreditCardSerializer
+
+        shared_entries = SharedEntry.objects.filter(
+            credit_card_id=self.card.id,
+            paid_by__tenant_id=self.card.tenant_id,
+            date__gte=selected['period_start'], date__lte=selected['period_end'],
+        ).select_related('paid_by', 'shared_debt', 'credit_card', 'category') \
+         .prefetch_related('participants', 'shared_debt__members').order_by('-date', '-id')
+        categories = ExpenseCategory.objects.filter(
+            tenant_id__in=['system', self.card.tenant_id],
+        ).order_by('name')
+        return Response({
+            'card': CreditCardSerializer(self.card).data,
+            'invoices': invoices,
+            'selected_invoice': selected,
+            'invoice_data': invoice_data,
+            'chart_data': chart_data,
+            'shared_entries': SharedEntrySerializer(
+                shared_entries, many=True, context={'request': self.request},
+            ).data,
+            'categories': ExpenseCategorySerializer(categories, many=True).data,
+            'annual_invoice_totals': self._annual_totals(invoices, selected),
+        })
+
+    def _annual_totals(self, invoices, selected):
+        from django.db.models import Sum
+        from django.db.models.functions import Abs
+        from expenses.models import Expense
+
+        totals = [0.0] * 12
+        year_invoices = [row for row in invoices if row['invoice_year'] == selected['invoice_year']]
+        for invoice in year_invoices:
+            total = Expense.objects.filter(
+                tenant_id=self.card.tenant_id, credit_card_id=self.card.id,
+                date__gte=invoice['period_start'], date__lte=invoice['period_end'], amount__lt=0,
+            ).aggregate(total=Sum(Abs('amount')))['total'] or 0
+            totals[invoice['invoice_month'] - 1] = round(float(total), 2)
+        return totals

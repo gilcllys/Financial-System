@@ -1,16 +1,16 @@
 import {
-  Component, OnInit, OnDestroy, AfterViewInit,
+  Component, OnInit, OnDestroy,
   ElementRef, ViewChild, inject, signal, computed, effect
 } from '@angular/core';
 import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { CurrencyPipe, DatePipe, SlicePipe } from '@angular/common';
+import { SlicePipe } from '@angular/common';
 import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
 
 import { HomeService, InstallmentGroup } from '../../core/services/home.service';
-import { CategoryService } from '../../core/services/category.service';
-import { AnalyticsService, MonthlyAnalytics, CategoryAnalytics, ConsolidatedSummary } from '../../core/services/analytics.service';
+
+import { MonthlyAnalytics, CategoryAnalytics, ConsolidatedSummary } from '../../core/services/analytics.service';
 import { OpenInvoice, Expense, ExpenseCategory } from '../../core/models';
 import { ExpenseService, RecurringExpenseTemplate } from '../../core/services/expense.service';
 import * as d3 from 'd3';
@@ -32,18 +32,18 @@ const EMPTY_CONSOLIDATED: ConsolidatedSummary = {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CurrencyPipe, RouterLink, FormsModule, SlicePipe, DatePipe],
+  imports: [RouterLink, FormsModule, SlicePipe],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss'],
 })
-export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
+export class HomeComponent implements OnInit, OnDestroy {
   private confirmDialog = inject(ConfirmDialogService);
   private homeService      = inject(HomeService);
   private expenseService   = inject(ExpenseService);
-  private categoryService  = inject(CategoryService);
-  private analyticsService = inject(AnalyticsService);
+
+
   private sharedDebtService = inject(SharedDebtService);
-  private expSvc = inject(ExpenseService);
+
 
   recurringTemplates = signal<RecurringExpenseTemplate[]>([]);
   private destroy$         = new Subject<void>();
@@ -141,7 +141,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
 
   // ────────────────────────────────────────────────────────────────────────
   ngOnInit(): void {
-    this.categoryService.list().subscribe({ next: cats => this.categories.set(cats) });
+
 
     this.searchSubject.pipe(
       debounceTime(400),
@@ -150,11 +150,11 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     ).subscribe(() => { this.currentPage.set(1); this.loadTable(); });
 
     this.loadDashboard();
-    this.loadTable();
-    this.loadRecurringTemplates();
+
+
   }
 
-  ngAfterViewInit(): void { }
+
 
   ngOnDestroy(): void {
     this.destroy$.next();
@@ -174,6 +174,11 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
           this.byCategory.set(data.byCategory);
           this.installmentGroups.set(data.installmentGroups);
           this.evolution.set(data.evolution);
+          this.categories.set(data.categories);
+          this.recurringTemplates.set(data.recurringTemplates);
+          this.expenses.set(data.expensePage.results);
+          this.totalCount.set(data.expensePage.count);
+          this.tableLoading.set(false);
           this.dashLoading.set(false);
         },
         error: () => this.dashLoading.set(false),
@@ -199,27 +204,16 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
         },
         error: () => this.tableLoading.set(false),
       });
+  }
 
-    // KPIs consolidados: recarrega ao trocar mês/ano
-    this.analyticsService.consolidatedSummary(
-      this.filterMonth(), this.filterYear(), this.filterMonth(), this.filterYear()
-    )
-    .pipe(takeUntil(this.destroy$))
-      .subscribe({ next: data => this.consolidated.set(data) });
-
-    // Categorias: recarrega ao trocar mês/ano
-    this.analyticsService.homeCharts(this.filterMonth(), this.filterYear())
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({ next: data => this.byCategory.set(data.by_category) });
-  }
 
   onFilterChange(): void {
     this.currentPage.set(1);
+    this.loadDashboard();
     this.loadTable();
+
     if (this.activeTab() === 'compartilhada') this.loadSharedEntries();
-    this.loadRecurringTemplates();
   }
-
   switchTab(tab: 'individual' | 'compartilhada'): void {
     this.activeTab.set(tab);
     if (tab === 'compartilhada' && this.sharedEntries().length === 0) {
@@ -250,6 +244,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     if (page < 1 || page > this.totalPages()) return;
     this.currentPage.set(page);
     this.loadTable();
+
   }
 
   async delete(id: number): Promise<void> {
@@ -344,7 +339,6 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     });
   }
-
   // ?? SVG Chart rendering (D3) ??
   renderCharts(data: MonthlyAnalytics[]): void {
     if (!this.lineChartEl || !this.compChartEl) return;
@@ -505,11 +499,6 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
   }
 
-  loadRecurringTemplates(): void {
-    this.expSvc.listRecurringTemplates().subscribe({
-      next: tpls => this.recurringTemplates.set(tpls),
-    });
-  }
 
 }
 

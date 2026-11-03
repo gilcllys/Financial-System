@@ -58,6 +58,25 @@ class CreateSharedEntryInputSerializer(serializers.Serializer):
     )
 
 
+class SharedEntryCreateInputSerializer(CreateSharedEntryInputSerializer):
+    shared_debt = serializers.IntegerField(required=True, min_value=1)
+
+
+class SharedDebtScreenQuerySerializer(serializers.Serializer):
+    month = serializers.IntegerField(required=False, min_value=1, max_value=12)
+    year = serializers.IntegerField(required=False, min_value=1, max_value=9999)
+    category = serializers.IntegerField(required=False, min_value=1)
+    search = serializers.CharField(required=False, allow_blank=True, max_length=200)
+    page = serializers.IntegerField(required=False, min_value=1)
+    page_size = serializers.IntegerField(required=False, min_value=1, max_value=100)
+
+
+class ByPersonQuerySerializer(serializers.Serializer):
+    mode = serializers.ChoiceField(required=False, choices=['closed', 'open'], default='closed')
+    month = serializers.IntegerField(required=False, min_value=1, max_value=12)
+    year = serializers.IntegerField(required=False, min_value=2000, max_value=2100)
+
+
 class JoinSharedDebtInputSerializer(serializers.Serializer):
     token = serializers.UUIDField(required=True)
     display_name = serializers.CharField(

@@ -1,9 +1,7 @@
 import * as d3 from 'd3';
 import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild } from '@angular/core';
 import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
-import { RouterLink } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { CurrencyPipe } from '@angular/common';
 import {
   SavingsService, SavingsSummary, SavingsGoal, SavingsDeposit,
   CreateGoalPayload
@@ -12,7 +10,7 @@ import {
 @Component({
   selector: 'app-savings',
   standalone: true,
-  imports: [RouterLink, ReactiveFormsModule, CurrencyPipe],
+  imports: [ReactiveFormsModule],
   templateUrl: './savings.component.html',
   styleUrls: ['./savings.component.scss'],
 })

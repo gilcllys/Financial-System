@@ -132,12 +132,6 @@ export class ExpenseService {
     );
   }
 
-  listByCard(cardId: number): Observable<Expense[]> {
-    return this.http.get<any[]>(`${this.base}/per-credit-card/${cardId}/`).pipe(
-      map(list => list.map(normalize))
-    );
-  }
-
   get(id: number): Observable<Expense> {
     return this.http.get<any>(`${this.base}/${id}/`).pipe(map(normalize));
   }

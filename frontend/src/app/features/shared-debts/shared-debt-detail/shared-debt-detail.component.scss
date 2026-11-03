@@ -12,6 +12,11 @@
   &__actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 }
 
+.detail-header__left { min-width: 240px; }
+.detail-members { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.detail-member { display: inline-flex; align-items: center; gap: 6px; color: var(--color-body); font-size: 12px; }
+.detail-member__avatar { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: var(--color-primary); background: #edf2ff; font-size: 10px; font-weight: 700; }
+
 .btn-back {
   background: none; border: 1px solid var(--color-hairline);
   border-radius: 8px; padding: 7px 14px; font-size: 13px;
@@ -38,17 +43,24 @@
 
 /* ── Settlement Banner ── */
 .settle-banner {
-  background: #fffbeb;
-  border: 1px solid #f4b000;
-  border-radius: 10px;
-  padding: 12px 20px;
+  background: #ffffff;
+  border: 1px solid var(--color-hairline);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--rounded-md);
+  padding: 16px 20px;
   margin-bottom: 20px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: var(--shadow-sm);
   flex-wrap: wrap;
   font-size: 14px;
 }
+.settle-banner__intro { display: grid; gap: 3px; }
+.settle-banner__intro strong { font-size: 14px; }
+.settle-banner__intro small, .settle-banner__label { color: var(--color-muted); font-size: 11px; }
+.settle-banner__label { text-transform: uppercase; font-weight: 700; letter-spacing: .06em; }
 .settle-item { display: flex; align-items: center; gap: 6px; }
 .settle-arrow { color: var(--color-muted); }
 .settle-amount { color: #cf202f; }
@@ -89,6 +101,30 @@
   display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
   padding: 16px 20px;
   border-bottom: 1px solid var(--color-hairline);
+}
+
+.shared-entry-search { display: flex; align-items: center; gap: 8px; min-width: min(100%, 260px); flex: 1; padding: 0 11px; border: 1px solid var(--color-hairline); border-radius: var(--rounded-sm); background: #fff; color: var(--color-muted); }
+.shared-entry-search input { width: 100%; min-height: 38px; border: 0; outline: 0; background: transparent; color: var(--color-ink); font: inherit; }
+.shared-entry-search input:focus-visible { outline: 0 !important; }
+.shared-entry-list { display: grid; gap: 10px; padding: 14px; }
+.shared-entry-card { padding: 15px 16px; border: 1px solid var(--color-hairline); border-radius: var(--rounded-sm); background: #fff; }
+.shared-entry-card__top, .shared-entry-card__bottom { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.shared-entry-card__top h3 { margin: 0; font-size: 14px; font-weight: 650; }
+.shared-entry-card__top p { margin: 4px 0 0; color: var(--color-muted); font-size: 11px; }
+.entry-status { flex: none; padding: 4px 9px; border-radius: var(--rounded-pill); background: #fbf3e5; color: #a96f16; font-size: 10px; font-weight: 650; }
+.entry-status--paid { background: #e8f5ef; color: #16805b; }
+.shared-entry-card__meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 13px 0; color: var(--color-muted); font-size: 11px; }
+.shared-entry-card__meta strong { color: var(--color-ink); font-weight: 600; }
+.shared-entry-card__bottom { padding-top: 11px; border-top: 1px solid var(--color-hairline-soft); }
+.shared-entry-card__bottom > div:not(.shared-entry-card__actions) { display: grid; gap: 3px; }
+.shared-entry-card__bottom > div > span { color: var(--color-muted); font-size: 10px; }
+.shared-entry-card__bottom > div > strong { font-family: var(--font-mono); font-size: 12px; }
+.shared-entry-card__actions { display: flex; align-items: center; gap: 6px; }
+
+@media (max-width: 700px) {
+  .shared-entry-card__bottom { align-items: flex-start; flex-wrap: wrap; }
+  .shared-entry-card__actions { flex-basis: 100%; flex-wrap: wrap; }
+  .detail-filters > select { max-width: none !important; flex: 1; }
 }
 
 /* ── Tables ── */

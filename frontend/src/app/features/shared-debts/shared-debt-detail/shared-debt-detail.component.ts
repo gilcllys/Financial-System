@@ -2,7 +2,6 @@ import * as d3 from 'd3';
 import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild, effect } from '@angular/core';
 import { ToastService } from '../../../core/services/toast.service';
 import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
-import { SlicePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { ReactiveFormsModule, FormsModule, FormBuilder, Validators } from '@angular/forms';
@@ -19,7 +18,6 @@ import {
   BalancesResponse,
   MonthlyHistoryEntry,
   RecurringTemplate,
-  PaginatedResponse,
   ByPersonResponse,
   ByPersonBlock,
   ByPersonEntry,
@@ -43,7 +41,7 @@ interface DraftSharedEntry {
 @Component({
   selector: 'app-shared-debt-detail',
   standalone: true,
-  imports: [RouterLink, ReactiveFormsModule, FormsModule, SlicePipe],
+  imports: [RouterLink, ReactiveFormsModule, FormsModule],
   templateUrl: './shared-debt-detail.component.html',
   styleUrls: ['./shared-debt-detail.component.scss'],
 })
@@ -58,7 +56,7 @@ export class SharedDebtDetailComponent implements OnInit {
   private categorySvc = inject(CategoryService);
   private fb = inject(FormBuilder);
 
-  private myTenantId = this.auth.userProfile.sub ?? null;
+  readonly myTenantId = this.auth.userProfile.sub ?? null;
 
   groupId = 0;
   group = signal<SharedDebtGroup | null>(null);
@@ -70,6 +68,7 @@ export class SharedDebtDetailComponent implements OnInit {
   readonly PAGE_SIZE = 20;
   filterMonth = signal<number | null>(null);
   filterCategory = signal<number | null>(null);
+  filterSearch = signal('');
   currentPage = signal(1);
   totalCount = signal(0);
   private openedEntryFromQuery = false;
@@ -233,43 +232,42 @@ export class SharedDebtDetailComponent implements OnInit {
   ngOnInit(): void {
     this.groupId = +this.route.snapshot.paramMap.get('id')!;
     this.loadAll();
-    this.cardSvc.list().subscribe({ next: c => this.cards.set(c) });
-    this.categorySvc.list().subscribe({ next: cats => this.categories.set(cats) });
   }
 
   private loadAll(): void {
     this.loading.set(true);
-    this.svc.getGroup(this.groupId).subscribe({ next: g => this.group.set(g) });
-    this.svc.members(this.groupId).subscribe({
-      next: m => {
-        this.members.set(m);
-        this.participantIds.set(new Set(m.map(x => x.id)));
-        this.batchParticipantIds.set(new Set(m.map(x => x.id)));
+    this.svc.screenSummary(this.groupId, this.filterMonth(), this.filterCategory(), this.currentPage(), this.filterSearch()).subscribe({
+      next: data => {
+        this.group.set(data.group);
+        this.members.set(data.members);
+        this.participantIds.set(new Set(data.members.map(member => member.id)));
+        this.batchParticipantIds.set(new Set(data.members.map(member => member.id)));
+        this.balances.set(data.balances);
+        this.entries.set(data.entries.results);
+        this.totalCount.set(data.entries.count);
+        this.monthlyHistory.set(data.monthly_history);
+        this.recurringTemplates.set(data.recurring_templates);
         this.openEntryFromQuery();
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
     });
-    this.refreshEntriesAndBalances();
-    this.loadMonthlyHistory();
-    this.loadRecurringTemplates();
   }
 
   private refreshEntriesAndBalances(resetPage = false): void {
     if (resetPage) this.currentPage.set(1);
-    this.svc.listEntries({
-      shared_debt: this.groupId,
-      month: this.filterMonth() ?? undefined,
-      category: this.filterCategory() ?? undefined,
-      page: this.currentPage(),
-    }).subscribe({
-      next: (res: PaginatedResponse<SharedDebtEntry>) => {
-        this.entries.set(res.results);
-        this.totalCount.set(res.count);
+    this.svc.screenSummary(this.groupId, this.filterMonth(), this.filterCategory(), this.currentPage(), this.filterSearch()).subscribe({
+      next: data => {
+        this.group.set(data.group);
+        this.members.set(data.members);
+        this.entries.set(data.entries.results);
+        this.totalCount.set(data.entries.count);
+        this.balances.set(data.balances);
+        this.monthlyHistory.set(data.monthly_history);
+        this.recurringTemplates.set(data.recurring_templates);
         this.openEntryFromQuery();
       }
     });
-    this.svc.balances(this.groupId).subscribe({ next: b => this.balances.set(b) });
     if (this.bpData()) this.loadByPerson();
   }
 
@@ -293,6 +291,7 @@ export class SharedDebtDetailComponent implements OnInit {
   clearFilters(): void {
     this.filterMonth.set(null);
     this.filterCategory.set(null);
+    this.filterSearch.set('');
     this.refreshEntriesAndBalances(true);
   }
 
@@ -338,12 +337,19 @@ export class SharedDebtDetailComponent implements OnInit {
     this.showEntryForm.set(!this.showEntryForm());
     this.editingEntryId.set(null);
     this.entryError.set('');
+    if (this.showEntryForm()) this.loadEntryLookups();
+  }
+
+  private loadEntryLookups(): void {
+    if (this.cards().length === 0) this.cardSvc.list().subscribe({ next: cards => this.cards.set(cards) });
+    if (this.categories().length === 0) this.categorySvc.list().subscribe({ next: categories => this.categories.set(categories) });
   }
 
   /** Open the form pre-filled for editing an existing entry.
    *  NOTE: The list endpoint does not return participant_ids, so we default
    *  to ALL members when editing. The user can uncheck before saving. */
   editEntry(entry: SharedDebtEntry): void {
+    this.loadEntryLookups();
     this.editingEntryId.set(entry.id);
     this.entryError.set('');
     this.form.reset({
@@ -355,8 +361,7 @@ export class SharedDebtDetailComponent implements OnInit {
       credit_card_id: entry.credit_card ?? null,
       category_id: entry.category ?? null,
     });
-    // Default all members as participants — editing re-sends all unless user unchecks.
-    this.participantIds.set(new Set(this.members().map(m => m.id)));
+    this.participantIds.set(new Set(entry.participant_ids));
     this.showEntryForm.set(true);
   }
 
@@ -479,6 +484,7 @@ export class SharedDebtDetailComponent implements OnInit {
   toggleRecurringForm(): void {
     this.showRecurringForm.set(!this.showRecurringForm());
     this.recurringError.set('');
+    if (this.showRecurringForm()) this.loadEntryLookups();
   }
 
   saveRecurring(): void {
@@ -534,7 +540,10 @@ export class SharedDebtDetailComponent implements OnInit {
 
 
   // ── Batch methods ─────────────────────────────────────────────────────────
-  toggleBatchSection(): void { this.showBatchSection.set(!this.showBatchSection()); }
+  toggleBatchSection(): void {
+    this.showBatchSection.set(!this.showBatchSection());
+    if (this.showBatchSection()) this.loadEntryLookups();
+  }
 
   isBatchParticipant(id: number): boolean { return this.batchParticipantIds().has(id); }
 
@@ -688,6 +697,13 @@ export class SharedDebtDetailComponent implements OnInit {
 
   myPortion(e: SharedDebtEntry): number {
     return e.amount / (e.participant_count || 1);
+  }
+
+  participantNames(entry: SharedDebtEntry): string {
+    return this.members()
+      .filter(member => entry.participant_ids.includes(member.id))
+      .map(member => member.tenant_id === this.myTenantId ? 'Você' : member.display_name)
+      .join(', ');
   }
 
   isPaid(e: SharedDebtEntry): boolean {

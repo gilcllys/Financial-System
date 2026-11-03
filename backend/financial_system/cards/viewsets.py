@@ -1,9 +1,13 @@
-from rest_framework import status, viewsets
+from rest_framework import viewsets
 from rest_framework.decorators import action
-from rest_framework.response import Response
 
 from cards import models, serializer
-from cards.behaviors import InvoiceExpensesBehavior, InvoicesBehavior, OpenInvoicesBehavior
+from cards.behaviors import (
+    CreditCardInvoiceViewBehavior,
+    InvoiceExpensesBehavior,
+    InvoicesBehavior,
+    OpenInvoicesBehavior,
+)
 
 
 class CreditCardViewSet(viewsets.ModelViewSet):
@@ -20,126 +24,33 @@ class CreditCardViewSet(viewsets.ModelViewSet):
         """[SEC-A01] Defense-in-depth: garante que tenant_id não muda em updates."""
         serializer.save(tenant_id=self.request.user.tenant_id)
 
-    # ------------------------------------------------------------------
-    # Invoice actions
-    # ------------------------------------------------------------------
-
     @action(detail=True, methods=['get'], url_path='invoices')
     def invoices(self, request, pk=None):
-        """GET /api/cards/credit-cards/{id}/invoices/"""
-        card = self._get_card_or_404(pk, request.user.tenant_id)
-        if isinstance(card, Response):
-            return card
-        return InvoicesBehavior(card).run()
+        return InvoicesBehavior(self.get_object()).run()
 
     @action(detail=True, methods=['get'], url_path='invoice-expenses')
     def invoice_expenses(self, request, pk=None):
-        """
-        GET /api/cards/credit-cards/{id}/invoice-expenses/
-            ?invoice_month=7&invoice_year=2026[&category_id=1]
-        """
-        card = self._get_card_or_404(pk, request.user.tenant_id)
-        if isinstance(card, Response):
-            return card
-
-        invoice_month, err = self._parse_int_param(
-            request.query_params.get('invoice_month'),
-            'invoice_month', required=True, min_val=1, max_val=12,
-        )
-        if err:
-            return err
-
-        invoice_year, err = self._parse_int_param(
-            request.query_params.get('invoice_year'),
-            'invoice_year', required=True, min_val=1,
-        )
-        if err:
-            return err
-
-        category_id, err = self._parse_int_param(
-            request.query_params.get('category_id'),
-            'category_id', required=False,
-        )
-        if err:
-            return err
-
-        page, err = self._parse_int_param(
-            request.query_params.get('page'), 'page', required=False, min_val=1,
-        )
-        if err:
-            return err
-        page_size, err = self._parse_int_param(
-            request.query_params.get('page_size'), 'page_size', required=False, min_val=1, max_val=500,
-        )
-        if err:
-            return err
-
-        search = request.query_params.get('search', '').strip() or None
-
+        query = serializer.InvoiceExpensesQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        params = query.validated_data
         return InvoiceExpensesBehavior(
-            card, invoice_month, invoice_year, category_id,
-            page=page or 1, page_size=page_size or 20,
-            search=search,
+            self.get_object(), params['invoice_month'], params['invoice_year'],
+            category_id=params.get('category_id'), page=params['page'],
+            page_size=params['page_size'], search=params.get('search'),
         ).run()
 
+    @action(detail=True, methods=['get'], url_path='invoice-view')
+    def invoice_view(self, request, pk=None):
+        query = serializer.InvoiceViewQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        return CreditCardInvoiceViewBehavior(
+            self.get_object(), request, query.validated_data,
+        ).run()
 
     @action(detail=False, methods=['get'], url_path='open-invoices')
     def open_invoices(self, request):
-        """GET /api/cards/credit-cards/open-invoices/?closing_month=11&closing_year=2026"""
-        closing_month, err = self._parse_int_param(
-            request.query_params.get('closing_month'),
-            'closing_month', required=False, min_val=1, max_val=12,
-        )
-        if err:
-            return err
-        closing_year, err = self._parse_int_param(
-            request.query_params.get('closing_year'),
-            'closing_year', required=False, min_val=1,
-        )
-        if err:
-            return err
-        if (closing_month is None) != (closing_year is None):
-            return Response(
-                {'detail': 'closing_month e closing_year devem ser enviados juntos.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        return OpenInvoicesBehavior(request.user.tenant_id).run(closing_month, closing_year)
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
-    def _get_card_or_404(self, pk, tenant_id):
-        try:
-            return models.CreditCard.objects.get(pk=pk, tenant_id=tenant_id)
-        except models.CreditCard.DoesNotExist:
-            return Response({'detail': 'Cartão não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
-
-    @staticmethod
-    def _parse_int_param(raw, name, *, required=False, min_val=None, max_val=None):
-        """Retorna (value, None) em sucesso ou (None, Response) em erro."""
-        if raw is None:
-            if required:
-                return None, Response(
-                    {'detail': f'{name} é obrigatório.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            return None, None
-        try:
-            value = int(raw)
-        except (ValueError, TypeError):
-            return None, Response(
-                {'detail': f'{name} deve ser um inteiro.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if min_val is not None and value < min_val:
-            return None, Response(
-                {'detail': f'{name} deve ser >= {min_val}.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if max_val is not None and value > max_val:
-            return None, Response(
-                {'detail': f'{name} deve ser <= {max_val}.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        return value, None
+        query = serializer.OpenInvoicesQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        return OpenInvoicesBehavior(
+            request.user.tenant_id, **query.validated_data,
+        ).run()

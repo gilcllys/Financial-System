@@ -58,7 +58,7 @@
             Fecha dia {{ card.closing_day }} | Vence dia {{ card.due_day }}
           </span>
           <span class="cc-card__total">
-            {{ formatAmount(invoiceTotals()[card.id] ?? 0) }}
+            {{ formatAmount(invoiceTotals()[card.id]) }}
           </span>
         </div>
       </div>

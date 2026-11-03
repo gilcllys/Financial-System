@@ -1,8 +1,14 @@
 ﻿<!-- Page Header -->
 <div class="detail-header">
   <div class="detail-header__left">
-    <h1 class="detail-header__title">Grupo: {{ group()?.name ?? "..." }}</h1>
-    <p class="detail-header__sub">{{ members().length }} membros &middot; {{ totalCount() }} lancamentos</p>
+    <p class="page-eyebrow">Grupo compartilhado</p>
+    <h1 class="detail-header__title">{{ group()?.name ?? "Grupo" }}</h1>
+    <div class="detail-members" aria-label="Participantes do grupo">
+      @for (member of members(); track member.id) {
+        <span class="detail-member"><span class="detail-member__avatar">{{ initials(member.display_name) }}</span>{{ member.tenant_id === myTenantId ? 'Você' : member.display_name }}</span>
+      }
+      <span class="detail-header__sub">{{ members().length }} participantes · {{ totalCount() }} lançamentos</span>
+    </div>
   </div>
   <div class="detail-header__actions">
     <a routerLink="/shared-debts" class="btn-back">&larr; Grupos</a>
@@ -11,7 +17,7 @@
         Excluir grupo
       </button>
     }
-    <button class="btn-primary" type="button" (click)="toggleEntryForm()">+ Novo Gasto</button>
+    <button class="btn-primary" type="button" (click)="toggleEntryForm()">+ Novo gasto</button>
   </div>
 </div>
 
@@ -22,17 +28,19 @@
   <!-- Settlement Banner -->
   @if (balances(); as bal) {
     @if (bal.settlement.length > 0) {
-      <div class="settle-banner">
+      <section class="settle-banner" aria-label="Acerto acumulado do grupo">
+        <div class="settle-banner__intro"><span class="settle-banner__label">Acerto acumulado</span><strong>Saldo entre participantes</strong><small>Com base nos lançamentos registrados no grupo.</small></div>
         @for (s of bal.settlement; track s.from_member_id) {
           <span class="settle-item">
             <strong>{{ s.from_name }}</strong>
-            <span class="settle-arrow">&rarr;</span>
-            pagar <strong class="settle-amount">{{ formatCurrency(s.amount) }}</strong>
-            para <strong>{{ s.to_name }}</strong>
+            <span class="settle-arrow">paga</span>
+            <strong class="settle-amount">{{ formatCurrency(s.amount) }}</strong>
+            <span class="settle-arrow">para</span>
+            <strong>{{ s.to_name }}</strong>
           </span>
           @if (!$last) { <span class="settle-divider">|</span> }
         }
-      </div>
+      </section>
     }
   }
 
@@ -42,7 +50,7 @@
       [class.tabs__tab--active]="activeTab() === 'entries'"
       (click)="selectTab('entries')"
       [attr.aria-selected]="activeTab() === 'entries'">
-      Por lancamento
+      Por lançamento
     </button>
     <button class="tabs__tab" role="tab"
       [class.tabs__tab--active]="activeTab() === 'installments'"
@@ -62,10 +70,15 @@
   @if (activeTab() === 'entries') {
     <div class="section-card">
       <div class="detail-filters">
+        <label class="shared-entry-search">
+          <span aria-hidden="true">⌕</span>
+          <input type="search" placeholder="Buscar lançamento…" aria-label="Buscar lançamentos do grupo"
+            [ngModel]="filterSearch()" (ngModelChange)="filterSearch.set($event)" (keyup.enter)="applyFilter()">
+        </label>
         <select class="form-select" style="max-width:170px"
           [ngModel]="filterMonth()"
           (ngModelChange)="filterMonth.set($event ? +$event : null); applyFilter()"
-          aria-label="Filtrar por mes">
+          aria-label="Filtrar por mês">
           <option [value]="null">Todos os meses</option>
           @for (m of MONTHS; track m.value) {
             <option [value]="m.value">{{ m.label }}</option>
@@ -80,8 +93,9 @@
             <option [value]="c.id">{{ c.name }}</option>
           }
         </select>
-        @if (filterMonth() || filterCategory()) {
-          <button class="btn-ghost" type="button" (click)="clearFilters()">x Limpar</button>
+        <button class="btn-ghost" type="button" (click)="applyFilter()">Aplicar</button>
+        @if (filterMonth() || filterCategory() || filterSearch()) {
+          <button class="btn-ghost" type="button" (click)="clearFilters()">Limpar filtros</button>
         }
       </div>
 
@@ -92,70 +106,32 @@
           <p class="empty-state__text">Adicione um gasto compartilhado para comecar.</p>
         </div>
       } @else {
-        <div class="table-wrap">
-          <table class="entries-table" aria-label="Lancamentos do grupo">
-            <thead>
-              <tr>
-                <th>DESCRICAO</th>
-                <th>METODO</th>
-                <th>PAGO POR</th>
-                <th>DIVIDIDO COM</th>
-                <th>DATA</th>
-                <th class="text-right">TOTAL</th>
-                <th class="text-right">MINHA PARTE</th>
-                <th class="text-center">PAGO</th>
-                <th>ACOES</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (e of entries(); track e.id) {
-                <tr>
-                  <td class="col-desc">
-                    <span class="entry-name">{{ e.description }}</span>
-                    @if (e.total_installments > 1) {
-                      <span class="badge-parcela">{{ e.installment_number }} de {{ e.total_installments }} parcelas</span>
-                    }
-                  </td>
-                  <td>
-                    @if (e.payment_method === 'cartao') {
-                      @if (e.credit_card_name) {
-                        <span class="chip chip--card" [title]="e.credit_card_name">
-                          💳 {{ e.credit_card_name }}
-                        </span>
-                      } @else {
-                        <span class="chip chip--card">Cartao</span>
-                      }
-                    } @else {
-                      <span class="chip chip--cash">Dinheiro</span>
-                    }
-                  </td>
-                  <td class="col-paidby">{{ e.paid_by_name }}</td>
-                  <td class="col-divided">
-                    @for (m of members(); track m.id) {
-                      @if (m.id !== e.paid_by) {
-                        <span class="member-chip">{{ m.display_name }}</span>
-                      }
-                    }
-                  </td>
-                  <td class="col-date text-muted">{{ formatDate(e.date) }}</td>
-                  <td class="col-total text-right mono">{{ formatCurrency(e.amount) }}</td>
-                  <td class="col-mine text-right">
-                    <span class="value-red mono">{{ formatCurrency(myPortion(e)) }}</span>
-                  </td>
-                  <td class="col-paid text-center">
-                    <button type="button" class="badge-paid" [class.badge-paid--yes]="e.paid"
-                      (click)="togglePaid(e)" [attr.aria-label]="e.paid ? 'Marcar como nao pago' : 'Marcar como pago'">
-                      {{ e.paid ? 'Sim' : 'Nao' }}
-                    </button>
-                  </td>
-                  <td class="col-actions">
-                    <button class="icon-btn" type="button" (click)="editEntry(e)" aria-label="Editar">&#9998;</button>
-                    <button class="icon-btn icon-btn--danger" type="button" (click)="deleteEntry(e)" aria-label="Excluir">&#128465;</button>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
+        <div class="shared-entry-list" aria-label="Lançamentos do grupo">
+          @for (e of entries(); track e.id) {
+            <article class="shared-entry-card">
+              <div class="shared-entry-card__top">
+                <div><h3>{{ e.description }}</h3><p>{{ formatDate(e.date) }}
+                  @if (e.total_installments > 1) { <span>· Parcela {{ e.installment_number }}/{{ e.total_installments }}</span> }
+                </p></div>
+                <span class="entry-status" [class.entry-status--paid]="e.paid">{{ e.paid ? 'Pago' : 'Não pago' }}</span>
+              </div>
+              <div class="shared-entry-card__meta">
+                <span>{{ e.payment_method === 'cartao' ? (e.credit_card_name ?? 'Cartão de crédito') : 'Dinheiro' }}</span>
+                <span>Pago por <strong>{{ e.paid_by_name }}</strong></span>
+                <span>Dividido com <strong>{{ participantNames(e) }}</strong></span>
+              </div>
+              <div class="shared-entry-card__bottom">
+                <div><span>Total da compra</span><strong>{{ formatCurrency(e.amount) }}</strong></div>
+                <div><span>Sua parte</span><strong>{{ formatCurrency(myPortion(e)) }}</strong></div>
+                <div class="shared-entry-card__actions">
+                  <button type="button" class="badge-paid" [class.badge-paid--yes]="e.paid"
+                    (click)="togglePaid(e)" [attr.aria-label]="e.paid ? 'Marcar como não pago' : 'Marcar como pago'">{{ e.paid ? 'Pago' : 'Marcar pago' }}</button>
+                  <button class="icon-btn" type="button" (click)="editEntry(e)" aria-label="Editar lançamento">Editar</button>
+                  <button class="icon-btn icon-btn--danger" type="button" (click)="deleteEntry(e)" aria-label="Excluir lançamento">Excluir</button>
+                </div>
+              </div>
+            </article>
+          }
         </div>
 
         @if (totalPages() > 1) {

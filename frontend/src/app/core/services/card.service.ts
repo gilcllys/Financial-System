@@ -4,6 +4,18 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { CreditCard, CreateCreditCardPayload, Expense, Invoice, InvoiceExpensesResponse } from '../models';
+import { SharedDebtEntry } from './shared-debt.service';
+
+export interface InvoiceViewResponse {
+  card: CreditCard;
+  invoices: Invoice[];
+  selected_invoice: Invoice;
+  invoice_data: InvoiceExpensesResponse;
+  chart_data: InvoiceExpensesResponse;
+  shared_entries: SharedDebtEntry[];
+  categories: import('../models').ExpenseCategory[];
+  annual_invoice_totals: number[];
+}
 
 @Injectable({ providedIn: 'root' })
 export class CardService {
@@ -36,11 +48,23 @@ export class CardService {
     });
   }
 
-  getAllCardExpenses(cardId: number): Observable<Expense[]> {
-    return this.http.get<Expense[]>(
-      `${environment.apiBaseUrl}/api/expenses/expenses/per-credit-card/${cardId}/`
-    ).pipe(
-      map(list => list.map(e => ({ ...e, amount: parseFloat(e.amount as any) })))
+  getInvoiceView(
+    id: number,
+    invoice?: Pick<Invoice, 'invoice_month' | 'invoice_year'>,
+    filters: { category_id?: number | null; page?: number; page_size?: number; search?: string } = {},
+  ): Observable<InvoiceViewResponse> {
+    let params = new HttpParams();
+    if (invoice) params = params.set('invoice_month', invoice.invoice_month).set('invoice_year', invoice.invoice_year);
+    if (filters.category_id != null) params = params.set('category_id', filters.category_id);
+    if (filters.page != null) params = params.set('page', filters.page);
+    if (filters.page_size != null) params = params.set('page_size', filters.page_size);
+    if (filters.search?.trim()) params = params.set('search', filters.search.trim());
+    return this.http.get<InvoiceViewResponse>(`${this.base}/${id}/invoice-view/`, { params }).pipe(
+      map(view => ({
+        ...view,
+        invoice_data: { ...view.invoice_data, expenses: view.invoice_data.expenses.map(e => ({ ...e, amount: Number(e.amount) })) },
+        chart_data: { ...view.chart_data, expenses: view.chart_data.expenses.map(e => ({ ...e, amount: Number(e.amount) })) },
+      }))
     );
   }
 
@@ -72,12 +96,4 @@ export class CardService {
     );
   }
 
-  /** Fetches up to 200 expenses (no filters) for client-side chart aggregation. */
-  getInvoiceChart(
-    id: number,
-    invoiceMonth: number,
-    invoiceYear: number,
-  ): Observable<InvoiceExpensesResponse> {
-    return this.getInvoiceExpenses(id, invoiceMonth, invoiceYear, undefined, 1, 200);
-  }
 }

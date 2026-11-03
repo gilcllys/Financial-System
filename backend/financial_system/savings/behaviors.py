@@ -69,7 +69,7 @@ class SavingsSummaryBehavior:
             })
         return breakdown
 
-    def build(self) -> dict:
+    def run(self) -> dict:
         goals = goals_with_totals(self.tenant_id)
         return {
             'goals': ser.SavingsGoalSerializer(goals, many=True).data,
@@ -81,14 +81,12 @@ class SavingsSummaryBehavior:
 class CreateDepositBehavior:
     """Cria um aporte, garantindo que o cofrinho pertence ao tenant."""
 
-    def __init__(self, tenant_id: str):
+    def __init__(self, tenant_id: str, data: dict):
         self.tenant_id = tenant_id
+        self.data = data
 
-    def create(self, data: dict) -> Response:
-        s = ser.CreateDepositInputSerializer(data=data)
-        s.is_valid(raise_exception=True)
-        v = s.validated_data
-
+    def run(self) -> Response:
+        v = self.data
         try:
             goal = SavingsGoal.objects.get(
                 id=v['goal_id'], tenant_id=self.tenant_id)

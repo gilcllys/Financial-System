@@ -1,0 +1,138 @@
+/* Shared presentation layer for the approved minimal finance prototype. */
+.page-content {
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-size: 14px;
+}
+
+.page-content .container {
+  max-width: 1440px;
+}
+
+.page-content h1,
+.page-content .page-header__title {
+  font-size: clamp(1.45rem, 2vw, 1.8rem);
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.045em;
+}
+
+.page-content h2,
+.page-content h3 {
+  letter-spacing: -0.025em;
+}
+
+.page-content .card,
+.page-content .panel,
+.page-content .kpi-clean-card,
+.page-content .sd-group,
+.page-content .invoice-section,
+.page-content .section-card {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.page-content .btn,
+.page-content button.btn,
+.page-content a.btn {
+  min-height: 38px;
+  height: auto;
+  padding: 8px 13px;
+  border-radius: var(--rounded-sm);
+  font-size: 12px;
+  font-weight: 600;
+  margin-inline-end: 0;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.page-content .btn--primary,
+.page-content .btn--primary:visited {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.page-content .btn--secondary {
+  border: 1px solid var(--color-hairline);
+  background: #fff;
+  color: var(--color-ink);
+}
+
+.page-content .form-input,
+.page-content .form-select,
+.page-content .form-textarea,
+.page-content input:not([type='checkbox']):not([type='radio']),
+.page-content select,
+.page-content textarea {
+  min-height: 40px;
+  height: auto;
+  border-radius: var(--rounded-sm);
+  font-size: 13px;
+}
+
+.page-content :is(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid rgb(0 82 255 / 35%);
+  outline-offset: 2px;
+}
+
+.page-content .page-header {
+  margin-bottom: 22px;
+}
+
+.page-content .page-header__subtitle,
+.page-content .card__subtitle,
+.page-content .page-header p {
+  color: var(--color-body);
+  font-size: 12px;
+}
+
+.page-content table th {
+  background: #fafbfc;
+  color: var(--color-muted);
+  font-size: 10px;
+  letter-spacing: 0.055em;
+}
+
+.page-content table td {
+  border-color: var(--color-hairline-soft);
+}
+
+.page-content .empty-state,
+.page-content .empty-msg {
+  color: var(--color-body);
+}
+
+.page-eyebrow {
+  margin: 0 0 5px;
+  color: var(--color-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.sd-group__members {
+  margin: 0;
+  color: var(--color-body);
+  font-size: 13px;
+}
+
+.group-create-card {
+  margin-bottom: var(--space-lg);
+  padding: var(--space-lg);
+}
+
+@media (max-width: 767px) {
+  .page-content .container { padding-inline: var(--space-base); }
+  .page-content .page-header { align-items: flex-start; }
+  .page-content .kpi-clean-card { min-width: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-content *, .page-content *::before, .page-content *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

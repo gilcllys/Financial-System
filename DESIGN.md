@@ -7,8 +7,8 @@ colors:
   primary-active: "#003ecc"
   danger: "#cf202f"
   success: "#05b169"
-  background: "#ffffff"
-  surface: "#f7f7f7"
+  background: "#f6f7f9"
+  surface: "#ffffff"
   surface-strong: "#eef0f3"
   text: "#0a0b0d"
   text-muted: "#5b616e"
@@ -24,7 +24,7 @@ rounded:
   lg: "16px"
 spacing:
   base: "16px"
-  page-max: "72rem"
+  page-max: "90rem"
 components:
   button: {}
   card: {}
@@ -38,7 +38,7 @@ components:
 
 ### Creative North Star
 
-A clear monthly ledger: familiar, compact financial software where the amount and its period are always easy to identify. Preserve the existing blue accent and white canvas; hierarchy comes from spacing, typography, and restrained semantic color.
+A clear monthly ledger: familiar, compact financial software where the amount and its period are always easy to identify. Preserve the existing blue accent, use a light gray page canvas and white surfaces, and build hierarchy through spacing, typography, and restrained semantic color.
 
 ### Product context and register
 

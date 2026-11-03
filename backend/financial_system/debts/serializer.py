@@ -23,10 +23,14 @@ class SharedEntrySerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True, default=None)
     shared_debt_name = serializers.CharField(source='shared_debt.name', read_only=True)
     participant_count = serializers.SerializerMethodField()
+    participant_ids = serializers.SerializerMethodField()
     credit_card_name = serializers.SerializerMethodField()
 
     def get_participant_count(self, obj):
         return len(obj.participant_ids()) or 1
+
+    def get_participant_ids(self, obj):
+        return obj.participant_ids()
 
     def get_credit_card_name(self, obj):
         # So exibe o nome do cartao para o proprio pagador
@@ -56,6 +60,7 @@ class SharedEntrySerializer(serializers.ModelSerializer):
             'category',
             'category_name',
             'participant_count',
+            'participant_ids',
             'installment_group_id',
             'total_installments',
             'installment_number',

@@ -1,5 +1,4 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ExpenseService } from '../../core/services/expense.service';
@@ -9,7 +8,7 @@ import { Expense, ExpenseCategory } from '../../core/models';
 @Component({
   selector: 'app-uncategorized',
   standalone: true,
-  imports: [RouterLink, FormsModule, SlicePipe],
+  imports: [FormsModule, SlicePipe],
   template: `
     <div class="page-header">
       <div>

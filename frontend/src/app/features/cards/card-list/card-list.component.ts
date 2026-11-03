@@ -1,7 +1,6 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
 import { RouterLink } from '@angular/router';
-import { DecimalPipe } from '@angular/common';
 import { CardService } from '../../../core/services/card.service';
 import { CreditCard, Expense, Invoice, InvoiceExpensesResponse } from '../../../core/models';
 
@@ -20,7 +19,7 @@ const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
 @Component({
   selector: 'app-card-list',
   standalone: true,
-  imports: [RouterLink, DecimalPipe],
+  imports: [RouterLink],
   templateUrl: './card-list.component.html',
   styleUrls: ['./card-list.component.scss'],
 })

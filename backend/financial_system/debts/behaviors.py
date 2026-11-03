@@ -7,6 +7,8 @@ from django.db.models import Count, Sum
 from django.db.models.functions import Abs
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from cards.models import CreditCard
 from catalog.constants import _MONTH_NAMES
@@ -21,6 +23,7 @@ from debts.models import (
 )
 from debts.serializer import (
     SharedDebtSerializer,
+    SharedDebtMemberSerializer,
     SharedEntrySerializer,
     SharedRecurringTemplateSerializer,
 )
@@ -105,22 +108,31 @@ class JoinSharedDebtBehavior:
 
     @transaction.atomic
     def run(self) -> Response:
+        invite = self._find_invite()
+        if isinstance(invite, Response):
+            return invite
+        error = self._validate_invite(invite)
+        if error:
+            return error
+        self._add_user_if_needed(invite.shared_debt)
+        return Response(SharedDebtSerializer(invite.shared_debt).data, status=status.HTTP_200_OK)
+
+    def _find_invite(self):
         try:
-            invite = SharedDebtInvite.objects.select_related('shared_debt').get(
-                token=self.token,
-            )
+            return SharedDebtInvite.objects.select_related('shared_debt').get(token=self.token)
         except SharedDebtInvite.DoesNotExist:
-            return Response(
-                {'detail': 'Convite inválido.'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return Response({'detail': 'Convite inválido.'}, status=status.HTTP_404_NOT_FOUND)
+
+    @staticmethod
+    def _validate_invite(invite):
         if invite.expires_at is not None and invite.expires_at < timezone.now():
             return Response(
                 {'detail': 'Convite expirado.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        shared_debt = invite.shared_debt
-        # Usuário já é membro → apenas retorna o grupo.
+        return None
+
+    def _add_user_if_needed(self, shared_debt):
         already_member = SharedDebtMember.objects.filter(
             shared_debt=shared_debt,
             tenant_id=self.user.tenant_id,
@@ -137,10 +149,6 @@ class JoinSharedDebtBehavior:
                 display_name=display_name,
                 email=self.user.email or None,
             )
-        return Response(
-            SharedDebtSerializer(shared_debt).data,
-            status=status.HTTP_200_OK,
-        )
 
 
 def _category_available_to_tenant(category_id, tenant_id) -> bool:
@@ -246,40 +254,62 @@ class CreateSharedEntryBehavior:
         self.data = data
 
     def run(self) -> Response:
-        data = self.data
+        data = dict(self.data)
+        if not self._resolve_shared_debt(data):
+            raise PermissionDenied(
+                'Você não é membro deste grupo de dívida compartilhada.'
+            )
         try:
-            rules = validate_entry_rules(self.shared_debt, self.user, data)
+            rules = self._validate_rules(data)
         except EntryRuleError as exc:
             return _bad_request(exc)
+        entries = self._create_entries(data, rules)
+        return Response(SharedEntrySerializer(entries[0]).data, status=status.HTTP_201_CREATED)
 
+    def _resolve_shared_debt(self, data):
+        if self.shared_debt is not None:
+            return True
+        shared_debt_id = data.pop('shared_debt', None)
+        self.shared_debt = (
+            SharedDebt.objects
+            .filter(id=shared_debt_id, members__tenant_id=self.user.tenant_id)
+            .distinct()
+            .first()
+        )
+        return self.shared_debt is not None
+
+    def _validate_rules(self, data):
+        return validate_entry_rules(self.shared_debt, self.user, data)
+
+    @transaction.atomic
+    def _create_entries(self, data, rules):
         total = int(data.get('total_installments_input', 1) or 1)
         group_id = uuid.uuid4() if total > 1 else None
-        # O valor informado e o TOTAL da compra: cada parcela recebe sua fracao.
         installment_amounts = _split_installments(data['amount'], total)
         base_description = _strip_installment_suffix(data['description'])
-        with transaction.atomic():
-            entries = []
-            for i in range(total):
-                entry = SharedEntry.objects.create(
-                    shared_debt=self.shared_debt,
-                    paid_by_id=rules['paid_by_id'],
-                    description=f"{base_description} ({i + 1}/{total})" if total > 1 else base_description,
-                    amount=installment_amounts[i],
-                    date=data['date'] + relativedelta(months=i) if total > 1 else data['date'],
-                    payment_method=rules['payment_method'],
-                    credit_card_id=rules['credit_card_id'],
-                    category_id=rules['category_id'],
-                    created_by_tenant_id=self.user.tenant_id,
-                    installment_group_id=group_id,
-                    total_installments=total,
-                    installment_number=i + 1,
-                    paid=bool(data.get('paid', False)),
-                )
-                SharedEntryParticipant.objects.bulk_create(
-                    [SharedEntryParticipant(entry=entry, member_id=mid) for mid in rules['participant_ids']]
-                )
-                entries.append(entry)
-        return Response(SharedEntrySerializer(entries[0]).data, status=status.HTTP_201_CREATED)
+        entries = []
+        for index in range(total):
+            entry = SharedEntry.objects.create(
+                shared_debt=self.shared_debt,
+                paid_by_id=rules['paid_by_id'],
+                description=f"{base_description} ({index + 1}/{total})" if total > 1 else base_description,
+                amount=installment_amounts[index],
+                date=data['date'] + relativedelta(months=index) if total > 1 else data['date'],
+                payment_method=rules['payment_method'],
+                credit_card_id=rules['credit_card_id'],
+                category_id=rules['category_id'],
+                created_by_tenant_id=self.user.tenant_id,
+                installment_group_id=group_id,
+                total_installments=total,
+                installment_number=index + 1,
+                paid=bool(data.get('paid', False)),
+            )
+            SharedEntryParticipant.objects.bulk_create([
+                SharedEntryParticipant(entry=entry, member_id=member_id)
+                for member_id in rules['participant_ids']
+            ])
+            entries.append(entry)
+        return entries
 
 
 class UpdateSharedEntryBehavior:
@@ -330,25 +360,28 @@ class BalancesBehavior:
         self.shared_debt = shared_debt
 
     def run(self) -> Response:
-        members = list(self.shared_debt.members.all())
+        members, entries = self._load_members_and_entries()
         members_by_id = {m.id: m for m in members}
         paid = {m.id: Decimal('0') for m in members}
         owed = {m.id: Decimal('0') for m in members}
-        # Evita N+1: carrega entries com seus participantes de uma vez.
-        entries = (
-            self.shared_debt.entries
-            .prefetch_related('participants')
-            .all()
-        )
+        self._accumulate_balances(entries, paid, owed)
+        balance = {m.id: _round2(paid[m.id] - owed[m.id]) for m in members}
+        return self._build_response(members, members_by_id, paid, owed, balance)
+
+    def _load_members_and_entries(self):
+        members = list(self.shared_debt.members.all())
+        entries = self.shared_debt.entries.prefetch_related('participants').all()
+        return members, entries
+
+    @staticmethod
+    def _accumulate_balances(entries, paid, owed):
         for entry in entries:
             paid[entry.paid_by_id] = paid.get(entry.paid_by_id, Decimal('0')) + entry.amount
             share = entry.share_per_participant()
             for pid in entry.participant_ids():
                 owed[pid] = owed.get(pid, Decimal('0')) + share
-        balance = {
-            m.id: _round2(paid[m.id] - owed[m.id])
-            for m in members
-        }
+
+    def _build_response(self, members, members_by_id, paid, owed, balance):
         members_payload = [
             {
                 'member_id': m.id,
@@ -361,10 +394,7 @@ class BalancesBehavior:
             for m in members
         ]
         settlement = self._settlement(balance, members_by_id)
-        return Response(
-            {'members': members_payload, 'settlement': settlement},
-            status=status.HTTP_200_OK,
-        )
+        return Response({'members': members_payload, 'settlement': settlement}, status=status.HTTP_200_OK)
 
     @staticmethod
     def _settlement(balance: dict, members_by_id: dict):
@@ -418,25 +448,27 @@ class PersonalSummaryBehavior:
 
     def run(self) -> Response:
         today = timezone.localdate()
-        installments = (
-            Expense.objects
-            .filter(
-                tenant_id=self.user.tenant_id,
-                description__iregex=self._INSTALLMENT_REGEX,
-                date__gte=today,
-            )
-            .aggregate(total=Sum(Abs('amount')), count=Count('id'))
-        )
-        card = (
-            Expense.objects
-            .filter(
-                tenant_id=self.user.tenant_id,
-                payment_method='cartao',
-                date__year=today.year,
-                date__month=today.month,
-            )
-            .aggregate(total=Sum(Abs('amount')), count=Count('id'))
-        )
+        installments = self._installment_summary(today)
+        card = self._card_summary(today)
+        return self._build_response(installments, card)
+
+    def _installment_summary(self, today):
+        return Expense.objects.filter(
+            tenant_id=self.user.tenant_id,
+            description__iregex=self._INSTALLMENT_REGEX,
+            date__gte=today,
+        ).aggregate(total=Sum(Abs('amount')), count=Count('id'))
+
+    def _card_summary(self, today):
+        return Expense.objects.filter(
+            tenant_id=self.user.tenant_id,
+            payment_method='cartao',
+            date__year=today.year,
+            date__month=today.month,
+        ).aggregate(total=Sum(Abs('amount')), count=Count('id'))
+
+    @staticmethod
+    def _build_response(installments, card):
         data = {
             'installments_remaining': {
                 'total': to_float(installments['total']),
@@ -467,14 +499,19 @@ class HomeSummaryBehavior:
         self.user = user
 
     def run(self) -> Response:
-        # Grupos nos quais sou membro
-        groups = list(
+        groups = self._get_groups()
+        return Response(self._build_group_summaries(groups), status=status.HTTP_200_OK)
+
+    def _get_groups(self):
+        return list(
             SharedDebt.objects
             .filter(members__tenant_id=self.user.tenant_id)
             .distinct()
             .prefetch_related('members', 'entries__participants')
             .order_by('-id')
         )
+
+    def _build_group_summaries(self, groups):
         my_member_ids_by_group = {}
         for g in groups:
             for m in g.members.all():
@@ -494,11 +531,15 @@ class HomeSummaryBehavior:
                 'id': g.id,
                 'name': g.name,
                 'members': members_names,
+                'member_details': [
+                    {'member_id': m.id, 'display_name': m.display_name}
+                    for m in g.members.all()
+                ],
                 'total_amount': to_float(total_amount),
                 'my_portion': to_float(my_portion),
                 'entry_count': g.entries.count(),
             })
-        return Response(result, status=status.HTTP_200_OK)
+        return result
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Monthly History: histórico mensal de um grupo
@@ -517,11 +558,15 @@ class MonthlyHistoryBehavior:
         self.user = user
 
     def run(self) -> Response:
-        # Descobrir meu member_id neste grupo
-        my_member = self.shared_debt.members.filter(
-            tenant_id=self.user.tenant_id
-        ).first()
-        my_member_id = my_member.id if my_member else None
+        my_member_id = self._current_member_id()
+        buckets = self._aggregate_months(my_member_id)
+        return Response(self._serialize_buckets(buckets), status=status.HTTP_200_OK)
+
+    def _current_member_id(self):
+        member = self.shared_debt.members.filter(tenant_id=self.user.tenant_id).first()
+        return member.id if member else None
+
+    def _aggregate_months(self, my_member_id):
         entries = (
             self.shared_debt.entries
             .prefetch_related('participants')
@@ -537,7 +582,11 @@ class MonthlyHistoryBehavior:
             buckets[key]['count'] += 1
             if my_member_id is not None:
                 buckets[key]['my_portion'] += entry.share_of(my_member_id)
-        result = [
+        return buckets
+
+    @staticmethod
+    def _serialize_buckets(buckets):
+        return [
             {
                 'year': year,
                 'month': month,
@@ -548,7 +597,6 @@ class MonthlyHistoryBehavior:
             }
             for (year, month), data in sorted(buckets.items(), reverse=True)
         ]
-        return Response(result, status=status.HTTP_200_OK)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Recurring Templates CRUD + generate_month
@@ -558,11 +606,26 @@ class MonthlyHistoryBehavior:
 class RecurringTemplateBehavior:
     """Cria, lista e materializa templates recorrentes de um grupo."""
 
-    def __init__(self, shared_debt, user):
+    def __init__(self, shared_debt, user, operation: str, **params):
         self.shared_debt = shared_debt
         self.user = user
+        self.operation = operation
+        self.params = params
 
-    def list(self) -> Response:
+    def run(self) -> Response:
+        operations = {
+            'list': self._list,
+            'create': self._create,
+            'toggle_active': self._toggle_active,
+            'delete': self._delete,
+            'generate_month': self._generate_month,
+        }
+        operation = operations.get(self.operation)
+        if operation is None:
+            raise ValueError(f'Operação recorrente compartilhada desconhecida: {self.operation}')
+        return operation(**self.params)
+
+    def _list(self) -> Response:
         qs = SharedRecurringTemplate.objects.filter(
             shared_debt=self.shared_debt
         ).select_related('paid_by', 'category').order_by('id')
@@ -571,7 +634,7 @@ class RecurringTemplateBehavior:
             status=status.HTTP_200_OK,
         )
 
-    def create(self, data: dict) -> Response:
+    def _create(self, data: dict) -> Response:
         """`data` ja validado por SharedRecurringTemplateInputSerializer."""
         try:
             rules = validate_entry_rules(self.shared_debt, self.user, data)
@@ -593,7 +656,7 @@ class RecurringTemplateBehavior:
     def _get(self, template_id: int):
         return get_or_404(SharedRecurringTemplate.objects, 'Template não encontrado.', id=template_id, shared_debt=self.shared_debt)
 
-    def toggle_active(self, template_id: int) -> Response:
+    def _toggle_active(self, template_id: int) -> Response:
         tpl, err = self._get(template_id)
         if err:
             return err
@@ -601,14 +664,14 @@ class RecurringTemplateBehavior:
         tpl.save(update_fields=['is_active', 'updated_at'])
         return Response(SharedRecurringTemplateSerializer(tpl).data)
 
-    def delete(self, template_id: int) -> Response:
+    def _delete(self, template_id: int) -> Response:
         tpl, err = self._get(template_id)
         if err:
             return err
         tpl.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def generate_month(self, month: int, year: int) -> Response:
+    def _generate_month(self, month: int, year: int) -> Response:
         """
         Materializa todos os templates ativos para o mês/ano informado.
         Cria um SharedEntry apenas se ainda não existir um com a mesma
@@ -655,3 +718,113 @@ class RecurringTemplateBehavior:
             {'created': created, 'skipped': skipped},
             status=status.HTTP_200_OK,
         )
+
+
+class SharedDebtMembersBehavior:
+    def __init__(self, shared_debt: SharedDebt):
+        self.shared_debt = shared_debt
+
+    def run(self) -> Response:
+        members = self.shared_debt.members.all().order_by('id')
+        return Response(SharedDebtMemberSerializer(members, many=True).data)
+
+
+class SharedDebtScreenSummaryBehavior:
+    """Builds the initial read model for a shared group detail screen."""
+
+    def __init__(self, shared_debt: SharedDebt, user, filters: dict, request):
+        self.shared_debt = shared_debt
+        self.user = user
+        self.filters = filters
+        self.request = request
+
+    def run(self) -> Response:
+        entries = self._get_entries()
+        entries = self._filter_entries(entries)
+        page = self._paginate_entries(entries)
+        return self._build_screen_response(page)
+
+    def _get_entries(self):
+        return (
+            SharedEntry.objects.filter(shared_debt=self.shared_debt)
+            .select_related('paid_by', 'shared_debt', 'credit_card', 'category')
+            .prefetch_related('participants', 'shared_debt__members')
+            .order_by('-date', '-id')
+        )
+
+    def _filter_entries(self, entries):
+        filters = self.filters
+        if filters.get('month') is not None:
+            entries = entries.filter(date__month=filters['month'])
+        if filters.get('year') is not None:
+            entries = entries.filter(date__year=filters['year'])
+        if filters.get('category') is not None:
+            entries = entries.filter(category_id=filters['category'])
+        search = filters.get('search', '').strip()
+        if search:
+            entries = entries.filter(description__icontains=search)
+        return entries
+
+    def _paginate_entries(self, entries):
+        paginator = PageNumberPagination()
+        paginator.page_size = 20
+        paginator.page_size_query_param = 'page_size'
+        paginator.max_page_size = 100
+        return paginator, paginator.paginate_queryset(entries, self.request)
+
+    def _build_screen_response(self, page):
+        paginator, entries = page
+        members = self.shared_debt.members.all().order_by('id')
+        return Response({
+            'group': SharedDebtSerializer(self.shared_debt).data,
+            'members': SharedDebtMemberSerializer(members, many=True).data,
+            'balances': BalancesBehavior(self.shared_debt).run().data,
+            'entries': paginator.get_paginated_response(
+                SharedEntrySerializer(entries, many=True, context={'request': self.request}).data
+            ).data,
+            'monthly_history': MonthlyHistoryBehavior(self.shared_debt, self.user).run().data,
+            'recurring_templates': RecurringTemplateBehavior(
+                self.shared_debt, self.user, 'list',
+            ).run().data,
+        })
+
+
+class DeleteSharedInstallmentsBehavior:
+    def __init__(self, tenant_id: str, installment_group_id):
+        self.tenant_id = tenant_id
+        self.installment_group_id = installment_group_id
+
+    def run(self) -> Response:
+        entries = SharedEntry.objects.filter(
+            installment_group_id=self.installment_group_id,
+            shared_debt__members__tenant_id=self.tenant_id,
+        ).distinct()
+        if not entries.exists():
+            return Response(
+                {'detail': 'Nenhuma parcela encontrada para este parcelamento.'}, status=404,
+            )
+        ids = list(entries.values_list('id', flat=True))
+        with transaction.atomic():
+            _, per_model = SharedEntry.objects.filter(id__in=ids).delete()
+        deleted = per_model.get('debts.SharedEntry', 0)
+        return Response({
+            'deleted': deleted,
+            'installment_group_id': str(self.installment_group_id),
+        }, status=200)
+
+
+class DeleteSharedDebtBehavior:
+    """Apaga um grupo após validar a propriedade e limpar dependências."""
+
+    def __init__(self, shared_debt: SharedDebt, user):
+        self.shared_debt = shared_debt
+        self.user = user
+
+    @transaction.atomic
+    def run(self):
+        if self.shared_debt.owner_tenant_id != self.user.tenant_id:
+            raise PermissionDenied("Apenas o criador do grupo pode excluí-lo.")
+
+        # SharedEntry.paid_by usa PROTECT, então entradas saem antes dos membros.
+        self.shared_debt.entries.all().delete()
+        self.shared_debt.delete()

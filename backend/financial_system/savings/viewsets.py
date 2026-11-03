@@ -26,7 +26,7 @@ class SavingsGoalViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='summary')
     def summary(self, request):
         """GET /api/savings/goals/summary/ — totais por cofrinho + breakdown mensal."""
-        return Response(SavingsSummaryBehavior(request.user.tenant_id).build())
+        return Response(SavingsSummaryBehavior(request.user.tenant_id).run())
 
 
 class SavingsDepositViewSet(viewsets.ModelViewSet):
@@ -42,4 +42,8 @@ class SavingsDepositViewSet(viewsets.ModelViewSet):
         return qs
 
     def create(self, request, *args, **kwargs):
-        return CreateDepositBehavior(request.user.tenant_id).create(request.data)
+        payload = ser.CreateDepositInputSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        return CreateDepositBehavior(
+            request.user.tenant_id, payload.validated_data,
+        ).run()

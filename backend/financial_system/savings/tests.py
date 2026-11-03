@@ -1,16 +1,3 @@
-"""
-Testes de CARACTERIZACAO do app `savings` (cofrinhos / metas de investimento).
-
-O app nasceu sem nenhum teste e sem `behaviors.py`, ficando fora do padrao do
-resto do projeto (viewsets = HTTP fino, behaviors = regra de negocio). Estes
-testes gravam o comportamento ATUAL, nao o ideal -- inclusive divergencias
-conhecidas, marcadas com o prefixo `test_COMPORTAMENTO_ATUAL_`.
-
-Servem de rede de seguranca para uma futura extracao de `savings/viewsets.py`
-para `savings/behaviors.py`. Se algum destes testes quebrar durante um refactor,
-a regra de negocio mudou -- investigue antes de ajustar a expectativa.
-"""
-
 from datetime import date
 from decimal import Decimal
 
