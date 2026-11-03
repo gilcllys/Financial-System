@@ -97,9 +97,6 @@ export class LayoutComponent implements OnInit {
     this.auth.logout();
   }
 
-  goToNewExpense(): void {
-    this.router.navigate(['/expenses/new']);
-  }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {

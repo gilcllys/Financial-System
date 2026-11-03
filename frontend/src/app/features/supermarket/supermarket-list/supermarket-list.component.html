@@ -4,7 +4,9 @@
     <h1 class="page-header__title">Supermercado</h1>
     <p class="page-header__subtitle">Uma visão das compras, itens e total por visita.</p>
   </div>
-  <a routerLink="/supermarket/new" class="btn btn--primary desktop-only">+ Nova Compra</a>
+  @if (expenses().length > 0) {
+    <a routerLink="/supermarket/new" class="btn btn--primary">+ Nova compra</a>
+  }
 </div>
 
 @if (errorMessage()) {
@@ -62,9 +64,5 @@
     }
   </div>
 
-  <!-- FAB mobile -->
-  <div class="mobile-fab-placeholder" aria-hidden="true"></div>
 }
 
-<!-- Botão flutuante mobile -->
-<a routerLink="/supermarket/new" class="fab-sm mobile-only" aria-label="Nova compra">+</a>

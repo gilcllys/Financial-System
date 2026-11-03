@@ -3,17 +3,17 @@ version: 1
 name: Financial App
 description: Controle financeiro pessoal com foco em leitura rápida de faturas, gastos e compromissos compartilhados.
 colors:
-  primary: "#0052ff"
-  primary-active: "#003ecc"
-  primary-soft: "#edf3ff"
-  danger: "#cf202f"
-  success: "#05b169"
+  primary: "#2858d8"
+  primary-active: "#1d49c2"
+  primary-soft: "#edf2ff"
+  danger: "#bd4552"
+  success: "#16805b"
   background: "#f6f7f9"
   surface: "#ffffff"
   surface-strong: "#eef0f3"
-  text: "#0a0b0d"
-  text-muted: "#5b616e"
-  border: "#dee1e6"
+  text: "#17202e"
+  text-muted: "#707989"
+  border: "#e7eaf0"
 typography:
   sans:
     fontFamily: "Inter, -apple-system, system-ui, sans-serif"
@@ -21,7 +21,7 @@ typography:
     fontFamily: "JetBrains Mono, Courier New, monospace"
 rounded:
   sm: "8px"
-  md: "12px"
+  md: "14px"
   lg: "16px"
 spacing:
   base: "16px"
@@ -55,7 +55,7 @@ A clear monthly ledger: familiar, compact financial software where the amount an
 
 ## Colors
 
-Blue `#0052ff` is the primary action and focus accent; pale blue `#edf3ff` marks the active navigation item; red `#cf202f` and green `#05b169` communicate negative and positive values only when accompanied by text or a sign. White and soft gray form the canvas and cards, with `#dee1e6` borders. Maintain visible focus rings and do not rely on color alone for chart or status meaning. The current runtime supports the light theme.
+Blue `#2858d8` is the primary action and focus accent; pale blue `#edf2ff` marks the active navigation item; red `#bd4552` and green `#16805b` communicate negative and positive values only when accompanied by text or a sign. The page canvas is `#f6f7f9`, cards are white, and borders use `#e7eaf0`. Maintain visible focus rings and do not rely on color alone for chart or status meaning. The current runtime supports the light theme.
 
 ## Typography
 
@@ -63,7 +63,7 @@ Use Inter for interface text and JetBrains Mono for aligned numeric values. Use 
 
 ## Layout
 
-Use the existing 240px desktop sidebar, 64px navigation geometry, 16px base spacing, and responsive feature layouts. Keep dense lists readable and reserve full-width regions for summaries and tables. Preserve existing route-specific structure unless a task requires a behavior change.
+Use the prototype's 244px desktop sidebar, 68px sticky page header, 16px base spacing, and responsive feature layouts. Keep dense lists readable and reserve full-width regions for summaries and tables. Preserve each route's real data and operations while following the shared prototype hierarchy.
 
 ## Elevation & Depth
 
@@ -71,7 +71,7 @@ Use white cards, subtle gray surfaces, hairline borders, and existing soft shado
 
 ## Shapes
 
-Use the existing 8px, 12px, and 16px radius tokens for controls, cards, and larger panels. Keep table geometry square enough for clear row scanning.
+Use 8px controls, 14px cards and panels, and 16px large panels. Keep table geometry square enough for clear row scanning.
 
 ## Components
 

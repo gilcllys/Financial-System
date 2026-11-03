@@ -1,8 +1,10 @@
-/* Shared presentation layer for the approved minimal finance prototype. */
+/* Shared presentation layer for the approved minimal finance prototype.
+   Keep feature pages on the same visual system through existing app primitives. */
 .page-content {
   background: var(--color-page);
   color: var(--color-ink);
   font-size: 14px;
+  line-height: 1.45;
 }
 
 .page-content .container {
@@ -11,15 +13,51 @@
 
 .page-content h1,
 .page-content .page-header__title {
-  font-size: clamp(1.45rem, 2vw, 1.8rem);
-  line-height: 1.2;
+  font-size: clamp(1.45rem, 2vw, 1.5625rem);
+  line-height: 1.18;
   font-weight: 650;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.05em;
 }
 
 .page-content h2,
 .page-content h3 {
   letter-spacing: -0.025em;
+}
+
+.page-content .page-header,
+.page-content .page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 23px;
+}
+
+.page-content .page-header__subtitle,
+.page-content .page-header p,
+.page-content .page-head > div > p:not(.eyebrow):not(.page-eyebrow) {
+  margin-top: 6px;
+  color: var(--color-body);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.page-content .page-eyebrow,
+.page-content .eyebrow {
+  margin: 0 0 6px;
+  color: #87909f;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.page-content .page-header__actions,
+.page-content .actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .page-content .card,
@@ -34,6 +72,75 @@
   box-shadow: var(--shadow-sm);
 }
 
+.page-content .card,
+.page-content .panel {
+  padding: 18px 20px;
+}
+
+.page-content .table-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.page-content .card__header,
+.page-content .panel-head,
+.page-content .section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.page-content .card__title,
+.page-content .panel-title,
+.page-content .section-title {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.page-content .card__subtitle,
+.page-content .panel-sub {
+  margin-top: 4px;
+  color: var(--color-body);
+  font-size: 11px;
+}
+
+.page-content .kpi-grid,
+.page-content .kpi-grid--3 {
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.page-content .kpi-clean-card {
+  min-width: 0;
+  padding: 17px 19px;
+  border-radius: var(--rounded-md);
+}
+
+.page-content .kpi-clean-card__label {
+  color: #7b8492;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.page-content .kpi-clean-card__value {
+  margin: 11px 0 5px;
+  font-family: var(--font-mono);
+  font-size: clamp(18px, 2vw, 24px);
+  font-weight: 600;
+  letter-spacing: -0.055em;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.page-content .kpi-clean-card__hint {
+  color: var(--color-body);
+  font-size: 11px;
+}
+
 .page-content .btn,
 .page-content button.btn,
 .page-content a.btn {
@@ -45,6 +152,23 @@
   font-weight: 600;
   margin-inline-end: 0;
   transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.page-content .btn:not(.btn--primary):not(.btn--danger):not(.btn--outline),
+.page-content .btn--secondary {
+  border: 1px solid var(--color-hairline);
+  background: #fff;
+  color: #374154;
+}
+
+.page-content .btn--primary,
+.page-content .btn--primary:visited {
+  border: 1px solid var(--color-primary);
+}
+
+.page-content .btn--ghost {
+  min-height: 36px;
+  padding: 7px 10px;
 }
 
 .page-content .btn--primary,
@@ -96,6 +220,55 @@
 
 .page-content table td {
   border-color: var(--color-hairline-soft);
+  padding-block: 12px;
+  font-size: 11px;
+}
+
+.page-content table th {
+  padding-block: 11px;
+}
+
+.page-content .table-wrap,
+.page-content .table-responsive {
+  overflow-x: auto;
+  border-radius: 0 0 var(--rounded-md) var(--rounded-md);
+}
+
+.page-content .form-group,
+.page-content .form-field,
+.page-content .field {
+  gap: 6px;
+}
+
+.page-content .form-label,
+.page-content .field-label,
+.page-content .field label {
+  color: #4e5868;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.page-content .form-row,
+.page-content .form-grid {
+  gap: 14px 16px;
+}
+
+.page-content .form-input,
+.page-content .form-select,
+.page-content .form-textarea,
+.page-content input:not([type='checkbox']):not([type='radio']),
+.page-content select,
+.page-content textarea {
+  padding: 9px 11px;
+  color: var(--color-ink);
+  border-color: var(--color-hairline);
+  background-color: #fff;
+}
+
+.page-content .form-actions {
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-hairline);
 }
 
 .page-content .empty-state,
@@ -125,8 +298,12 @@
 
 @media (max-width: 767px) {
   .page-content .container { padding-inline: var(--space-base); }
-  .page-content .page-header { align-items: flex-start; }
+  .page-content .page-header,
+  .page-content .page-head { align-items: flex-start; flex-direction: column; }
   .page-content .kpi-clean-card { min-width: 0; }
+  .page-content .kpi-grid--3 { grid-template-columns: 1fr; }
+  .page-content .page-header__actions,
+  .page-content .actions { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
