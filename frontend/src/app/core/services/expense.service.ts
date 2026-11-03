@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, forkJoin, of } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { Expense, CreateExpensePayload, ExpenseFilters, PaginatedResponse } from '../models';
@@ -29,6 +30,39 @@ export interface RecurringExpenseTemplate {
   created_at: string;
 }
 
+
+export interface HistoryEntry {
+  id: number;
+  type: 'individual' | 'shared';
+  description: string;
+  date: string;
+  amount: number;
+  category_id: number | null;
+  category_name: string;
+  payment_method: 'dinheiro' | 'cartao';
+  credit_card_id: number | null;
+  card_name: string | null;
+  group_id: number | null;
+  group_name: string | null;
+  paid_by_name: string | null;
+  installment_number: number | null;
+  total_installments: number | null;
+  participant_count?: number;
+  own_portion?: number;
+  is_recurring: boolean;
+}
+
+export interface HistoryTotals {
+  count: number;
+  income: number;
+  expenses: number;
+  net: number;
+}
+
+export interface HistoryResponse extends PaginatedResponse<HistoryEntry> {
+  totals: HistoryTotals;
+}
+
 export interface GenerateMonthResult {
   created: string[];
   skipped: string[];
@@ -41,11 +75,12 @@ export class ExpenseService {
   private http = inject(HttpClient);
   private base = `${environment.apiBaseUrl}/api/expenses/expenses`;
 
-  list(filters?: ExpenseFilters & { page?: number; page_size?: number }): Observable<PaginatedResponse<Expense>> {
+  list(filters?: ExpenseFilters & { category_key?: string; page?: number; page_size?: number }): Observable<PaginatedResponse<Expense>> {
     let params = new HttpParams();
     if (filters?.month)          params = params.set('month', filters.month);
     if (filters?.year)           params = params.set('year', filters.year);
     if (filters?.category_id)    params = params.set('category_id', filters.category_id);
+    if (filters?.category_key)   params = params.set('category_key', filters.category_key);
     if (filters?.payment_method) params = params.set('payment_method', filters.payment_method);
     if (filters?.credit_card_id) params = params.set('credit_card_id', filters.credit_card_id);
     if (filters?.start_date)     params = params.set('start_date', filters.start_date);
@@ -56,6 +91,44 @@ export class ExpenseService {
 
     return this.http.get<PaginatedResponse<any>>(`${this.base}/`, { params }).pipe(
       map(res => ({ ...res, results: res.results.map(normalize) }))
+    );
+  }
+
+  history(filters: Record<string, string | number | boolean | null | undefined> = {}): Observable<HistoryResponse> {
+    let params = new HttpParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== null && value !== '') params = params.set(key, String(value));
+    }
+    return this.http.get<HistoryResponse>(`${this.base}/history/`, { params });
+  }
+
+  downloadHistoryCsv(filters: Record<string, string | number | boolean | null | undefined> = {}): Observable<Blob> {
+    let params = new HttpParams().set('export', 'csv');
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== null && value !== '') params = params.set(key, String(value));
+    }
+    return this.http.get(`${this.base}/history/`, { params, responseType: 'blob' });
+  }
+
+  updateHistoryCategories(expenseIds: number[], categoryId: number): Observable<{ updated: number }> {
+    return this.http.post<{ updated: number }>(`${this.base}/history/bulk-category/`, {
+      expense_ids: expenseIds, category_id: categoryId,
+    });
+  }
+
+  listAll(filters?: ExpenseFilters & { category_key?: string }): Observable<Expense[]> {
+    const pageSize = 100;
+    return this.list({ ...filters, page: 1, page_size: pageSize }).pipe(
+      switchMap(first => {
+        const pageCount = Math.ceil(first.count / pageSize);
+        if (pageCount <= 1) return of(first.results);
+        const requests = Array.from({ length: pageCount - 1 }, (_, index) =>
+          this.list({ ...filters, page: index + 2, page_size: pageSize })
+        );
+        return forkJoin(requests).pipe(
+          map(pages => [first, ...pages].flatMap(page => page.results))
+        );
+      })
     );
   }
 
@@ -95,10 +168,11 @@ export class ExpenseService {
     return this.http.post<any>(`${this.base}/import-excel/`, fd);
   }
 
-  deleteInstallments(descriptionPrefix: string, totalInstallments: number): Observable<{ deleted: number }> {
+  deleteInstallments(descriptionPrefix: string, totalInstallments: number, expenseIds?: number[]): Observable<{ deleted: number }> {
     return this.http.post<{ deleted: number }>(`${this.base}/delete-installments/`, {
       description_prefix: descriptionPrefix,
       total_installments: totalInstallments,
+      ...(expenseIds ? { expense_ids: expenseIds } : {}),
     });
   }
   listRecurringTemplates(): Observable<RecurringExpenseTemplate[]> {

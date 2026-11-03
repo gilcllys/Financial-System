@@ -24,6 +24,7 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
 
   selectedYear = signal(new Date().getFullYear());
   selectedMonth = signal(new Date().getMonth() + 1);
+  cardPeriod = signal<'cycle' | 'purchase_month'>('cycle');
   loading = signal(true);
 
   monthlyData = signal<MonthlyAnalytics[]>([]);
@@ -35,7 +36,7 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
   years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
   months = [
     { value: 1, label: 'Janeiro' }, { value: 2, label: 'Fevereiro' },
-    { value: 3, label: 'Marco' }, { value: 4, label: 'Abril' },
+    { value: 3, label: 'Março' }, { value: 4, label: 'Abril' },
     { value: 5, label: 'Maio' }, { value: 6, label: 'Junho' },
     { value: 7, label: 'Julho' }, { value: 8, label: 'Agosto' },
     { value: 9, label: 'Setembro' }, { value: 10, label: 'Outubro' },
@@ -49,6 +50,12 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
     return active.reduce((s, d) => s + d.total, 0) / active.length;
   };
   maxDaily = () => Math.max(0, ...this.dailyData().map(d => d.total));
+  medianDaily = () => {
+    const values = this.dailyData().map(d => d.total).filter(value => value > 0).sort((a, b) => a - b);
+    if (!values.length) return 0;
+    const middle = Math.floor(values.length / 2);
+    return values.length % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
+  };
   daysWithExpense = () => this.dailyData().filter(d => d.total > 0).length;
 
   private viewReady = false;
@@ -64,7 +71,7 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
     const done = () => { if (--pending === 0) { this.dataReady = true; this.loading.set(false); if (this.viewReady) this.renderCharts(); } };
     this.analyticsService.monthly(this.selectedYear()).subscribe({ next: d => { this.monthlyData.set(d); done(); }, error: () => done() });
     this.analyticsService.byCategory(this.selectedMonth(), this.selectedYear()).subscribe({ next: d => { this.categoryData.set(d); done(); }, error: () => done() });
-    this.analyticsService.byCard(this.selectedMonth(), this.selectedYear()).subscribe({ next: d => { this.cardData.set(d); done(); }, error: () => done() });
+    this.analyticsService.byCard(this.selectedMonth(), this.selectedYear(), this.cardPeriod()).subscribe({ next: d => { this.cardData.set(d); done(); }, error: () => done() });
     this.analyticsService.byCategory(this.selectedMonth(), this.selectedYear(), 'dinheiro').subscribe({ next: d => { this.cashCategoryData.set(d); done(); }, error: () => done() });
     this.analyticsService.daily(this.selectedMonth(), this.selectedYear()).subscribe({ next: d => { this.dailyData.set(d); done(); }, error: () => done() });
   }

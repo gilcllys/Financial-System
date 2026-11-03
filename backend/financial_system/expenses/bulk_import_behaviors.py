@@ -231,10 +231,14 @@ class BulkImportExpenseBehavior:
             return Response({'detail': f'Erro ao importar gastos: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'created': len(created), 'message': f'{len(created)} gasto(s) importado(s) com sucesso'}, status=status.HTTP_201_CREATED)
 
-    def delete_installments(self, description_prefix, total_installments) -> Response:
-        """Remove todas as parcelas de uma despesa parcelada de uma so vez."""
+    def delete_installments(self, description_prefix, total_installments, expense_ids=None) -> Response:
+        """Remove parcelas selecionadas do próprio tenant; IDs evitam atingir grupos homônimos."""
         pattern = rf'^{re.escape(description_prefix)} - Parcela \d+/{total_installments}$'
         qs = models.Expense.objects.filter(tenant_id=self.tenant_id, description__iregex=pattern)
+        if expense_ids is not None:
+            qs = qs.filter(id__in=expense_ids)
+            if qs.count() != len(expense_ids):
+                return Response({'detail': 'Uma ou mais parcelas não pertencem a este grupo.'}, status=status.HTTP_400_BAD_REQUEST)
         with transaction.atomic():
             deleted_count, _ = qs.delete()
         if deleted_count == 0:

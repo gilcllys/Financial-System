@@ -3,6 +3,7 @@ from financial_system.base_model import BaseModel
 
 
 class ExpenseCategory(BaseModel):
+    KIND_CHOICES = [('despesa', 'Despesa'), ('receita', 'Receita')]
     tenant_id = models.CharField(
         max_length=36,
         db_column='tenant_id',
@@ -21,6 +22,8 @@ class ExpenseCategory(BaseModel):
         null=True,
         blank=True,
     )
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default='despesa', db_index=True)
+    key = models.CharField(max_length=40, null=True, blank=True, db_index=True)
 
     class Meta:
         db_table = 'expense_categories'

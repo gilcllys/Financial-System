@@ -196,6 +196,57 @@ class AnalyticsByCardCharacterizationTests(AnalyticsCharacterizationBase):
         self.assertEqual(len(resp.data), 1)
         self.assertEqual(resp.data[0]['total'], 50.0)
 
+    def test_periodo_ciclo_usa_data_de_fechamento_em_vez_do_mes_da_compra(self):
+        self._expense('Compra depois do fechamento', '-80.00', date(2026, 3, 22),
+                      payment_method='cartao', credit_card=self.card)
+        cycle = self.client.get(
+            '/api/expenses/expenses/analytics/by-card/?year=2026&month=5&period=cycle')
+        purchase_month = self.client.get(
+            '/api/expenses/expenses/analytics/by-card/?year=2026&month=5&period=purchase_month')
+
+        self.assertEqual(cycle.data[0]['total'], 80.0)
+        self.assertEqual(cycle.data[0]['period'], 'cycle')
+        self.assertEqual(list(purchase_month.data), [])
+
+
+class HistoryCharacterizationTests(AnalyticsCharacterizationBase):
+
+    def test_historico_busca_por_faixa_de_valor_e_csv_exporta_os_filtros(self):
+        self._expense('Supermercado', '-82.50', date(2026, 3, 6))
+        self._expense('Salário', '250.00', date(2026, 3, 1))
+
+        response = self.client.get('/api/expenses/expenses/history/?min_amount=80&max_amount=90')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['totals']['count'], 1)
+        self.assertEqual(response.data['results'][0]['description'], 'Supermercado')
+
+        csv_response = self.client.get(
+            '/api/expenses/expenses/history/?min_amount=80&max_amount=90&export=csv')
+        self.assertEqual(csv_response.status_code, 200)
+        self.assertIn('Supermercado', csv_response.content.decode('utf-8'))
+        self.assertNotIn('Salário', csv_response.content.decode('utf-8'))
+
+    def test_historico_compartilhado_mostra_valor_bruto_e_rateio_do_usuario(self):
+        from debts.models import SharedDebt, SharedDebtMember, SharedEntry
+
+        group = SharedDebt.objects.create(name='Casa', owner_tenant_id=self.TENANT)
+        me = SharedDebtMember.objects.create(
+            shared_debt=group, tenant_id=self.TENANT, display_name='Teste')
+        SharedDebtMember.objects.create(
+            shared_debt=group, tenant_id='tenant-outro', display_name='Outro')
+        SharedEntry.objects.create(
+            shared_debt=group, paid_by=me, description='Aluguel dividido',
+            amount='1200.00', date=date(2026, 3, 1), payment_method='dinheiro',
+            created_by_tenant_id=self.TENANT,
+        )
+
+        response = self.client.get('/api/expenses/expenses/history/?type=shared')
+        self.assertEqual(response.status_code, 200)
+        row = response.data['results'][0]
+        self.assertEqual(row['amount'], -1200.0)
+        self.assertEqual(row['own_portion'], 600.0)
+        self.assertEqual(response.data['totals']['expenses'], 600.0)
+
 
 class ConsolidatedSummaryCharacterizationTests(AnalyticsCharacterizationBase):
 
@@ -227,6 +278,47 @@ class ConsolidatedSummaryCharacterizationTests(AnalyticsCharacterizationBase):
         resp = self.client.get('/api/expenses/expenses/consolidated-summary/?year=2026&month=3')
         self.assertEqual(resp.data['cash_expenses'], 0.0)
         self.assertEqual(resp.data['cash_count'], 0)
+
+    def test_resumo_da_home_usa_o_ciclo_que_fecha_no_mes_selecionado(self):
+        self._expense('Compra antes do fechamento', '-120.00', date(2026, 3, 10),
+                      payment_method='cartao', credit_card=self.card)
+        self._expense('Compra do ciclo seguinte', '-45.00', date(2026, 3, 22),
+                      payment_method='cartao', credit_card=self.card)
+
+        response = self.client.get(
+            '/api/expenses/expenses/consolidated-summary/?month=3&year=2026'
+            '&closing_month=3&closing_year=2026&include_obligations=1')
+
+        self.assertEqual(response.data['card_invoices'], 120.0)
+        self.assertEqual(response.data['card_invoices_detail'][0]['invoice_month'], 4)
+
+
+class StableCategoryKeyTests(AnalyticsCharacterizationBase):
+
+    def test_list_filter_uses_stable_uncategorized_key(self):
+        uncategorized = ExpenseCategory.objects.create(
+            tenant_id='system', name='Sem categoria', key='uncategorized')
+        self._expense('Sem rótulo', '-15.00', date(2026, 3, 2), category=uncategorized)
+
+        response = self.client.get('/api/expenses/expenses/?category_key=uncategorized')
+
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['description'], 'Sem rótulo')
+
+    def test_livre_para_gastar_desconta_gastos_fixos_ainda_nao_gerados(self):
+        from expenses.models import RecurringExpenseTemplate
+
+        self._expense('Salário', '5000.00', date(2026, 3, 1))
+        RecurringExpenseTemplate.objects.create(
+            tenant_id=self.TENANT, description='Internet', amount='120.00',
+            day_of_month=10, payment_method='dinheiro', is_active=True,
+        )
+        response = self.client.get(
+            '/api/expenses/expenses/consolidated-summary/?year=2026&month=3&include_obligations=1')
+
+        self.assertEqual(response.data['upcoming_fixed'], 120.0)
+        self.assertEqual(response.data['personal_cost'], 0.0)
+        self.assertEqual(response.data['free_to_spend'], 4880.0)
 
 
 class HomeChartsCharacterizationTests(AnalyticsCharacterizationBase):

@@ -54,3 +54,28 @@
   &--indigo { background: #6366f1; }
   &--blue   { background: #3b82f6; }
 }
+
+.app-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: var(--space-base);
+  background: rgb(10 11 13 / 56%);
+}
+
+.app-confirm-dialog {
+  width: min(100%, 28rem);
+  padding: var(--space-lg);
+  color: var(--color-ink);
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.app-confirm-dialog h2 { margin: 0 0 var(--space-sm); font-size: 1.125rem; }
+.app-confirm-dialog p { margin: 0; line-height: 1.5; }
+.app-confirm-dialog__actions { display: flex; justify-content: flex-end; gap: var(--space-xs); margin-top: var(--space-lg); }
+.app-confirm-dialog :focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }

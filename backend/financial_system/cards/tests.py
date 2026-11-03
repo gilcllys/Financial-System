@@ -57,6 +57,10 @@ class InvoicePeriodTests(SimpleTestCase):
         with patch('cards.behaviors.date', FixedDate):
             self.assertEqual(current_invoice_month(card), (11, 2026))
 
+    def test_current_invoice_accepts_reference_date_for_historical_calculations(self):
+        card = SimpleNamespace(closing_day=21)
+        self.assertEqual(current_invoice_month(card, real_date(2026, 9, 28)), (11, 2026))
+
 
 # ---------------------------------------------------------------------------
 # Regressao: credito na fatura deve ABATER, nao somar
@@ -171,9 +175,9 @@ class OpenInvoicesSharedTests(TestCase):
             SharedEntryParticipant.objects.create(entry=entry, member=m)
         return entry
 
-    def _run(self):
+    def _run(self, closing_month=None, closing_year=None):
         with patch('cards.behaviors.date', _FixedToday):
-            rows = OpenInvoicesBehavior(self.TENANT).run().data
+            rows = OpenInvoicesBehavior(self.TENANT).run(closing_month, closing_year).data
         self.assertEqual(len(rows), 1)
         return rows[0]
 
@@ -182,6 +186,26 @@ class OpenInvoicesSharedTests(TestCase):
         self.assertEqual(row['invoice_month'], 9)
         self.assertEqual(row['period_start'], '2026-07-22')
         self.assertEqual(row['period_end'], '2026-08-21')
+
+    def test_selected_closing_month_maps_to_invoice_due_next_month(self):
+        Expense.objects.create(
+            tenant_id=self.TENANT, category=self.category, credit_card=self.card,
+            description='Dentro do ciclo', quantity=1, amount=Decimal('-22.00'),
+            date=real_date(2026, 7, 10), payment_method='cartao',
+        )
+        Expense.objects.create(
+            tenant_id=self.TENANT, category=self.category, credit_card=self.card,
+            description='Após fechamento', quantity=1, amount=Decimal('-99.00'),
+            date=real_date(2026, 7, 22), payment_method='cartao',
+        )
+
+        row = self._run(closing_month=7, closing_year=2026)
+
+        self.assertEqual(row['invoice_month'], 8)
+        self.assertEqual(row['period_start'], '2026-06-20')
+        self.assertEqual(row['period_end'], '2026-07-21')
+        self.assertEqual(row['due_date'], '2026-08-01')
+        self.assertEqual(row['expenses_total'], 22.00)
 
     def test_total_is_gross_individual_plus_full_shared(self):
         self._expense('-100.00', 10)

@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { CurrencyPipe } from '@angular/common';
 import { SupermarketService } from '../../../core/services/supermarket.service';
 import { SupermarketExpense } from '../../../core/models';
+import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
 
 @Component({
   selector: 'app-supermarket-list',
@@ -12,6 +13,7 @@ import { SupermarketExpense } from '../../../core/models';
   styleUrls: ['./supermarket-list.component.scss'],
 })
 export class SupermarketListComponent implements OnInit {
+  private confirmDialog = inject(ConfirmDialogService);
   private service = inject(SupermarketService);
 
   expenses = signal<SupermarketExpense[]>([]);
@@ -38,8 +40,8 @@ export class SupermarketListComponent implements OnInit {
     });
   }
 
-  delete(expense: SupermarketExpense): void {
-    if (!confirm(`Deseja excluir a compra em "${expense.store_name}"? Esta ação não pode ser desfeita.`)) return;
+  async delete(expense: SupermarketExpense): Promise<void> {
+    if (!(await this.confirmDialog.confirm(`Deseja excluir a compra em "${expense.store_name}"? Esta ação não pode ser desfeita.`))) return;
     this.deletingId.set(expense.id);
     this.service.delete(expense.id).subscribe({
       next: () => {

@@ -4,6 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { SupermarketService } from '../../../core/services/supermarket.service';
 import { SupermarketExpense, SupermarketExpenseItem } from '../../../core/models';
+import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
 
 @Component({
   selector: 'app-supermarket-detail',
@@ -13,6 +14,7 @@ import { SupermarketExpense, SupermarketExpenseItem } from '../../../core/models
   styleUrls: ['./supermarket-detail.component.scss'],
 })
 export class SupermarketDetailComponent implements OnInit {
+  private confirmDialog = inject(ConfirmDialogService);
   private route = inject(ActivatedRoute);
   private service = inject(SupermarketService);
   private fb = inject(FormBuilder);
@@ -87,8 +89,8 @@ export class SupermarketDetailComponent implements OnInit {
     });
   }
 
-  deleteItem(item: SupermarketExpenseItem): void {
-    if (!confirm(`Deseja remover "${item.description}"?`)) return;
+  async deleteItem(item: SupermarketExpenseItem): Promise<void> {
+    if (!(await this.confirmDialog.confirm(`Deseja remover "${item.description}"?`))) return;
     this.deletingItemId.set(item.id);
     this.errorMessage.set('');
 

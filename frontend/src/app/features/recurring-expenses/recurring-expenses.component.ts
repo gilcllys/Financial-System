@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
 import { RouterLink } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 
@@ -20,6 +21,7 @@ const MONTH_NAMES = [
   styleUrl: './recurring-expenses.component.scss',
 })
 export class RecurringExpensesComponent implements OnInit {
+  private confirmDialog = inject(ConfirmDialogService);
   private expenseService = inject(ExpenseService);
   private cardService = inject(CardService);
   private categoryService = inject(CategoryService);
@@ -176,8 +178,8 @@ export class RecurringExpensesComponent implements OnInit {
     this.expenseService.toggleRecurringTemplate(t.id).subscribe({ next: () => this.load() });
   }
 
-  remove(t: RecurringExpenseTemplate): void {
-    if (!confirm(`Excluir o gasto fixo \"${t.description}\"? Os lancamentos ja gerados nao sao afetados.`)) return;
+  async remove(t: RecurringExpenseTemplate): Promise<void> {
+    if (!(await this.confirmDialog.confirm(`Excluir o gasto fixo \"${t.description}\"? Os lancamentos ja gerados nao sao afetados.`))) return;
     this.expenseService.deleteRecurringTemplate(t.id).subscribe({ next: () => this.load() });
   }
 

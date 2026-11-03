@@ -64,6 +64,15 @@ class DeleteInstallmentsInputSerializer(serializers.Serializer):
         min_value=2,
         help_text='Total de parcelas do grupo (ex: 10 para "Parcela X/10").',
     )
+    expense_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), required=False,
+        allow_empty=False, max_length=60,
+    )
+
+    def validate_expense_ids(self, value):
+        if len(set(value)) != len(value):
+            raise serializers.ValidationError('IDs de parcelas duplicados.')
+        return value
 
 
 class RecurringExpenseTemplateSerializer(serializers.ModelSerializer):

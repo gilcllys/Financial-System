@@ -29,7 +29,7 @@
   <!-- FATURAS ABERTAS (bruto: o que o banco cobra) -->
   <div class="kpi-clean-card">
     <div class="kpi-clean-card__top">
-      <span class="kpi-clean-card__label">FATURAS ABERTAS</span>
+      <span class="kpi-clean-card__label">DEVIDO AO BANCO</span>
       <span class="kpi-clean-card__icon kpi-clean-card__icon--red">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
       </span>
@@ -43,7 +43,7 @@
   <!-- SALDO = Receitas − Faturas − Dinheiro -->
   <div class="kpi-clean-card">
     <div class="kpi-clean-card__top">
-      <span class="kpi-clean-card__label">SALDO</span>
+      <span class="kpi-clean-card__label">LIVRE PARA GASTAR</span>
       <span class="kpi-clean-card__icon kpi-clean-card__icon--blue">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
       </span>
@@ -51,11 +51,11 @@
     <div class="kpi-clean-card__value" [class.kpi-clean-card__value--red]="balance() < 0">
       {{ balance() < 0 ? "-" : "" }}{{ formatCurrency(Math.abs(balance())) }}
     </div>
-    <p class="kpi-clean-card__sub">Fora do cartão (dinheiro): {{ formatCurrency(consolidated().cash_expenses) }}</p>
+    <p class="kpi-clean-card__sub">Custo pessoal no período: {{ formatCurrency(consolidated().personal_cost ?? consolidated().total_expenses) }}</p>
   </div>
 </div>
 
-<!-- ?? Faturas Abertas (full-width, uma linha por cartão) ?? -->
+<!-- Faturas do ciclo que fecha no mês selecionado -->
 <div class="card invoices-card" style="margin-bottom: var(--space-base)">
   <div class="card__header">
     <div class="card__header-title">
@@ -63,8 +63,8 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
       </span>
       <div>
-        <span class="card__title">Faturas Abertas</span>
-        <p class="card__subtitle">Despesas do mês = soma de todas as faturas em aberto</p>
+        <span class="card__title">Faturas que fecham em {{ currentMonthName }}</span>
+        <p class="card__subtitle">Compras do ciclo que fecha neste mês; vencimento no mês seguinte.</p>
       </div>
     </div>
     <a routerLink="/cards" class="card__link">Ver todos os cartões &rsaquo;</a>
@@ -298,8 +298,8 @@
           </div>
           <div class="expense-item__right">
             <span class="expense-item__date text-muted">{{ exp.date | slice:8:10 }}/{{ exp.date | slice:5:7 }}</span>
-            <span class="expense-item__amount mono" [class.value-down]="exp.amount > 0">
-              -{{ formatCurrency(exp.amount) }}
+            <span class="expense-item__amount mono" [class.value-up]="exp.amount > 0" [class.value-down]="exp.amount < 0">
+              {{ amountPrefix(exp.amount) }}{{ formatCurrency(exp.amount) }}
             </span>
           </div>
         </div>
