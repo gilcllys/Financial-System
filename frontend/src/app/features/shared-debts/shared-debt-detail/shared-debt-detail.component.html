@@ -44,6 +44,47 @@
     }
   }
 
+  <section class="shared-detail-kpis" aria-label="Resumo do grupo">
+    <article class="shared-detail-kpi">
+      <span class="shared-detail-kpi__label">Participantes</span>
+      <div class="shared-detail-kpi__value">
+        <span class="shared-detail-kpi__avatars" aria-hidden="true">
+          @for (member of members(); track member.id) {
+            <span class="detail-member__avatar">{{ initials(member.display_name) }}</span>
+          }
+        </span>
+        <strong>{{ members().length }} {{ members().length === 1 ? 'pessoa' : 'pessoas' }}</strong>
+      </div>
+      <span class="shared-detail-kpi__note">Participantes deste grupo</span>
+    </article>
+
+    <article class="shared-detail-kpi">
+      <span class="shared-detail-kpi__label">Lançamentos compartilhados</span>
+      <strong class="shared-detail-kpi__count">{{ groupEntryCount() }}</strong>
+      <span class="shared-detail-kpi__note">Em diferentes cartões e ciclos</span>
+    </article>
+
+    <article class="shared-detail-kpi shared-detail-kpi--forecast">
+      <span class="shared-detail-kpi__label">Previsão das faturas abertas</span>
+      @if (bpLoading() && !bpData()) {
+        <strong class="shared-detail-kpi__forecast">Calculando previsão…</strong>
+      } @else if (bpData(); as forecast) {
+        @if (forecast.settlement.length > 0) {
+          <div class="shared-detail-kpi__settlements">
+            @for (settlement of forecast.settlement; track settlement.from_member_id + '-' + settlement.to_member_id) {
+              <strong>{{ settlement.from_name }} paga <span>{{ formatCurrency(settlement.amount) }}</span> a {{ settlement.to_name }}</strong>
+            }
+          </div>
+        } @else {
+          <strong class="shared-detail-kpi__forecast">Sem saldo previsto nas faturas abertas</strong>
+        }
+      } @else {
+        <strong class="shared-detail-kpi__forecast">Previsão indisponível</strong>
+      }
+      <span class="shared-detail-kpi__note">Estimativa: pode mudar até as faturas fecharem</span>
+    </article>
+  </section>
+
   <!-- Tabs -->
   <div class="tabs" role="tablist">
     <button class="tabs__tab" role="tab"
@@ -66,9 +107,16 @@
     </button>
   </div>
 
-  <!-- TAB: Por lancamento -->
+  <!-- TAB: Por lançamento -->
   @if (activeTab() === 'entries') {
     <div class="section-card">
+      <div class="shared-ledger-heading">
+        <div>
+          <h2>Lançamentos do grupo</h2>
+          <p>Confira quem pagou, como foi dividido e a sua parte.</p>
+        </div>
+        <span class="shared-ledger-count">{{ groupEntryCount() }} lançamentos</span>
+      </div>
       <div class="detail-filters">
         <label class="shared-entry-search">
           <span aria-hidden="true">⌕</span>
@@ -101,29 +149,34 @@
 
       @if (entries().length === 0) {
         <div class="empty-state">
-          <div class="empty-state__icon">🧾</div>
-          <p class="empty-state__title">Nenhum lancamento</p>
-          <p class="empty-state__text">Adicione um gasto compartilhado para comecar.</p>
+          <div class="empty-state__icon" aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+          </div>
+          <p class="empty-state__title">Nenhum lançamento encontrado</p>
+          <p class="empty-state__text">Ajuste os filtros ou adicione um gasto compartilhado.</p>
         </div>
       } @else {
         <div class="shared-entry-list" aria-label="Lançamentos do grupo">
           @for (e of entries(); track e.id) {
-            <article class="shared-entry-card">
-              <div class="shared-entry-card__top">
-                <div><h3>{{ e.description }}</h3><p>{{ formatDate(e.date) }}
-                  @if (e.total_installments > 1) { <span>· Parcela {{ e.installment_number }}/{{ e.total_installments }}</span> }
-                </p></div>
+            <article class="shared-ledger-row">
+              <div class="shared-ledger-row__main">
+                <div>
+                  <h3>{{ e.description }}</h3>
+                  <span class="shared-ledger-row__sub">{{ formatDate(e.date) }}
+                    @if (e.total_installments > 1) { <span> · {{ e.installment_number }}ª de {{ e.total_installments }} parcelas</span> }
+                  </span>
+                </div>
                 <span class="entry-status" [class.entry-status--paid]="e.paid">{{ e.paid ? 'Pago' : 'Não pago' }}</span>
               </div>
-              <div class="shared-entry-card__meta">
+              <div class="shared-ledger-row__meta">
                 <span>{{ e.payment_method === 'cartao' ? (e.credit_card_name ?? 'Cartão de crédito') : 'Dinheiro' }}</span>
                 <span>Pago por <strong>{{ e.paid_by_name }}</strong></span>
                 <span>Dividido com <strong>{{ participantNames(e) }}</strong></span>
               </div>
-              <div class="shared-entry-card__bottom">
-                <div><span>Total da compra</span><strong>{{ formatCurrency(e.amount) }}</strong></div>
-                <div><span>Sua parte</span><strong>{{ formatCurrency(myPortion(e)) }}</strong></div>
-                <div class="shared-entry-card__actions">
+              <div class="shared-ledger-row__amounts">
+                <span>Total da compra <strong>{{ formatCurrency(e.amount) }}</strong></span>
+                <span>Sua parte <strong>{{ formatCurrency(myPortion(e)) }}</strong></span>
+                <div class="shared-ledger-row__actions">
                   <button type="button" class="badge-paid" [class.badge-paid--yes]="e.paid"
                     (click)="togglePaid(e)" [attr.aria-label]="e.paid ? 'Marcar como não pago' : 'Marcar como pago'">{{ e.paid ? 'Pago' : 'Marcar pago' }}</button>
                   <button class="icon-btn" type="button" (click)="editEntry(e)" aria-label="Editar lançamento">Editar</button>
@@ -141,7 +194,7 @@
               <button class="page-btn" [class.page-btn--active]="p===currentPage()" (click)="goToPage(p)">{{ p }}</button>
             }
             <button class="page-btn" [disabled]="currentPage()===totalPages()" (click)="goToPage(currentPage()+1)">&#8250;</button>
-            <span class="text-muted" style="font-size:13px">{{ totalCount() }} lancamentos</span>
+            <span class="text-muted" style="font-size:13px">{{ totalCount() }} lançamentos</span>
           </div>
         }
       }
@@ -152,21 +205,28 @@
   @if (activeTab() === 'installments') {
     @if (installmentGroups().length === 0) {
       <div class="empty-state">
-        <div class="empty-state__icon">📦</div>
+        <div class="empty-state__icon" aria-hidden="true"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg></div>
         <p class="empty-state__title">Nenhum parcelamento</p>
-        <p class="empty-state__text">Lancamentos parcelados aparecem aqui agrupados.</p>
+        <p class="empty-state__text">Lançamentos parcelados aparecem aqui agrupados.</p>
       </div>
     } @else {
-      <div class="section-card">
+      <section class="installment-panel" aria-labelledby="installment-heading">
+        <div class="installment-panel__heading">
+          <div>
+            <h2 id="installment-heading">Parcelamentos</h2>
+            <p>Veja quanto já foi pago e quanto falta da sua parte.</p>
+          </div>
+          <span class="shared-ledger-count">{{ installmentGroups().length }} {{ installmentGroups().length === 1 ? 'parcelamento' : 'parcelamentos' }}</span>
+        </div>
         <div class="installment-groups">
           @for (grp of installmentGroups(); track grp.groupId) {
-            <div class="inst-card">
+            <article class="inst-card">
               <div class="inst-card__header">
                 <div class="inst-card__name-row">
                   <h3 class="inst-card__name">{{ grp.description }}</h3>
                   <span class="inst-badge"
                     [class.inst-badge--ok]="grp.status === 'Em andamento'"
-                    [class.inst-badge--done]="grp.status === 'Concluido'"
+                    [class.inst-badge--done]="grp.status === 'Concluído'"
                     [class.inst-badge--late]="grp.status === 'Atrasada'">
                     {{ grp.status }}
                   </span>
@@ -184,9 +244,9 @@
                 <span class="inst-pct">{{ grp.progressPct }}%</span>
               </div>
               <div class="inst-card__summary-row">
-                <span>{{ grp.paid }}/{{ grp.total }} parcelas pagas</span>
-                <span>{{ formatCurrency(grp.myPortionPerInstallment) }}/mes minha parte</span>
-                <strong class="value-red">Restante: {{ formatCurrency(grp.remaining) }}</strong>
+                  <span>{{ grp.paid }}/{{ grp.total }} parcelas pagas</span>
+                  <span><strong class="mono">{{ formatCurrency(grp.myPortionPerInstallment) }}</strong> / mês · sua parte</span>
+                  <strong class="value-red">Restante: {{ formatCurrency(grp.remaining) }}</strong>
               </div>
               @if (grp.expanded) {
                 <div class="table-wrap" style="margin-top:12px">
@@ -215,7 +275,7 @@
                             }
                           </td>
                           <td class="col-paid text-center">
-                            <button class="badge-paid" [class.badge-paid--yes]="e.paid" (click)="togglePaid(e)">{{ e.paid ? 'Sim' : 'Nao' }}</button>
+                            <button class="badge-paid" [class.badge-paid--yes]="e.paid" (click)="togglePaid(e)" [attr.aria-label]="e.paid ? 'Marcar parcela como não paga' : 'Marcar parcela como paga'">{{ e.paid ? 'Sim' : 'Não' }}</button>
                           </td>
                         </tr>
                       }
@@ -226,33 +286,34 @@
               } @else {
                 <button class="btn-ghost" style="margin-top:8px" type="button" (click)="grp.expanded = true">+ Ver parcelas</button>
               }
-            </div>
+            </article>
           }
         </div>
-      </div>
+      </section>
     }
   }
 
   <!-- TAB: Por pessoa -->
   @if (activeTab() === 'byPerson') {
     <div class="bp">
-
-      <!-- Toolbar -->
-      <div class="bp-toolbar">
-        <div class="bp-segment" role="tablist" aria-label="Modo de visualizacao">
-          <button type="button" role="tab" class="bp-segment__btn" [class.bp-segment__btn--active]="bpMode() === 'closed'" [attr.aria-selected]="bpMode() === 'closed'" (click)="bpSetMode('closed')">Faturas fechadas</button>
-          <button type="button" role="tab" class="bp-segment__btn" [class.bp-segment__btn--active]="bpMode() === 'open'" [attr.aria-selected]="bpMode() === 'open'" (click)="bpSetMode('open')">Em aberto</button>
+      <div class="bp-panel-intro">
+        <div>
+          <h2>Acerto por pessoa</h2>
+          <p>Separando faturas já fechadas da previsão das que continuam abertas.</p>
         </div>
-        @if (bpMode() === 'closed') {
-          <select class="form-select bp-toolbar__month" [value]="bpMonthKey()" (change)="bpSetMonth($any($event.target).value)" aria-label="Mes de fechamento">
-            @for (o of bpMonthOptions; track o.label) {
-              <option [value]="o.year + '-' + o.month">{{ o.label }}</option>
-            }
-          </select>
-          <span class="bp-toolbar__hint">Faturas que fecharam neste mes &middot; so lancamentos dentro do periodo de cada fatura</span>
-        } @else if (bpData(); as d) {
-          <span class="bp-toolbar__hint">Hoje, {{ bpFormatToday() }} &middot; {{ bpOpenCount() }} fatura(s) em aberto</span>
-        }
+        <div class="bp-toolbar">
+          <div class="bp-segment" role="group" aria-label="Tipo de fatura">
+            <button type="button" class="bp-segment__btn" [class.bp-segment__btn--active]="bpMode() === 'open'" [attr.aria-pressed]="bpMode() === 'open'" (click)="bpSetMode('open')">Em aberto@if (bpOpenCount() > 0) { · {{ bpOpenCount() }} }</button>
+            <button type="button" class="bp-segment__btn" [class.bp-segment__btn--active]="bpMode() === 'closed'" [attr.aria-pressed]="bpMode() === 'closed'" (click)="bpSetMode('closed')">Fechadas</button>
+          </div>
+          @if (bpMode() === 'closed') {
+            <select class="form-select bp-toolbar__month" [value]="bpMonthKey()" (change)="bpSetMonth($any($event.target).value)" aria-label="Mês de fechamento">
+              @for (o of bpMonthOptions; track o.label) {
+                <option [value]="o.year + '-' + o.month">{{ o.label }}</option>
+              }
+            </select>
+          }
+        </div>
       </div>
 
       @if (bpLoading()) {
@@ -261,7 +322,8 @@
 
         @if (d.mode === 'open') {
           <div class="bp-alert bp-alert--info" role="status">
-            <strong>Previsao:</strong> estas faturas ainda nao fecharam. Novos lancamentos ate o fechamento mudam os valores &mdash; o acerto so e gerado depois que cada fatura fechar.
+            <strong>Previsão até hoje, {{ bpFormatToday() }}</strong>
+            <span>Novos gastos até o fechamento podem alterar o acerto.</span>
           </div>
         }
 
@@ -272,22 +334,10 @@
           </div>
         } @else {
 
-          <!-- Cabecalho de colunas -->
-          <div class="bp-head">
-            <span class="bp-head__label">@if (d.mode === 'closed') { Fatura fechada &middot; cartao de quem pagou } @else { Fatura em aberto &middot; cartao de quem vai pagar }</span>
-            <div class="bp-head__members">
-              @for (m of d.members; track m.id) {
-                <div class="bp-head__member" [class.bp-head__member--me]="bpIsMe(m)">
-                  <span class="bp-avatar" aria-hidden="true">{{ initials(m.display_name) }}</span>
-                  <span class="bp-head__name">{{ m.display_name }}</span>
-                </div>
-              }
-            </div>
-          </div>
-
           <!-- Um card por bloco -->
+          <div class="bp-card-list">
           @for (b of d.blocks; track bpKey(b)) {
-            <div class="bp-card" [class.bp-card--open]="b.status === 'open'">
+            <article class="bp-card" [class.bp-card--open]="b.status === 'open'">
               <div class="bp-card__main">
                 <div class="bp-card__icon" [class.bp-card__icon--cash]="b.kind === 'cash'" aria-hidden="true">
                   @if (b.kind === 'card') {
@@ -298,7 +348,7 @@
                 </div>
                 <div class="bp-card__info">
                   @if (b.kind === 'card') {
-                    <div class="bp-card__title">Cartao de {{ b.owner_name }}</div>
+                    <div class="bp-card__title">Fatura de {{ b.owner_name }}</div>
                     <div class="bp-card__sub">
                       <span>{{ b.card_name }} &bull;&bull;&bull;&bull; {{ b.last_four_digits }} &middot; {{ b.invoice_name }}</span>
                       @if (b.status === 'closed') {
@@ -308,8 +358,8 @@
                         <span class="bp-badge" [class]="'bp-badge ' + bpDaysClass(b.days_to_close)">{{ bpDaysLabel(b.days_to_close) }}</span>
                       }
                     </div>
-                    <div class="bp-card__meta">Periodo {{ bpPeriod(b) }} &middot; fecha {{ formatDate(b.period_end!) }} &middot; vence {{ formatDate(b.due_date!) }}</div>
-                    <div class="bp-card__total">{{ b.status === 'open' ? 'Compartilhado ate agora' : 'Total compartilhado' }} <strong class="mono">{{ formatCurrency(b.total) }}</strong></div>
+                    <div class="bp-card__meta">Período {{ bpPeriod(b) }} &middot; fecha {{ formatDate(b.period_end!) }} &middot; vence {{ formatDate(b.due_date!) }}</div>
+                    <div class="bp-card__total">Gastos do grupo nesta fatura <strong class="mono">{{ formatCurrency(b.total) }}</strong></div>
                   } @else {
                     <div class="bp-card__title">Dinheiro</div>
                     <div class="bp-card__sub"><span class="bp-badge bp-badge--yellow">Sem fatura</span></div>
@@ -320,7 +370,8 @@
                 <div class="bp-card__cells">
                   @for (m of d.members; track m.id) {
                     <div class="bp-card__cell mono" [class.bp-card__cell--me]="bpIsMe(m)">
-                      @if (bpShare(b, m.id) > 0) { {{ formatCurrency(bpShare(b, m.id)) }} } @else { <span class="text-muted">&mdash;</span> }
+                      <span class="bp-card__cell-label">{{ m.display_name }} <small>{{ b.kind === 'card' && b.owner_member_id === m.id ? 'paga ao banco' : 'sua parte' }}</small></span>
+                      <strong>@if (bpShare(b, m.id) > 0) { {{ formatCurrency(bpShare(b, m.id)) }} } @else { <span class="text-muted">&mdash;</span> }</strong>
                     </div>
                   }
                 </div>
@@ -328,16 +379,16 @@
 
               <!-- Detalhes -->
               @if (b.entries.length === 0) {
-                <div class="bp-card__details bp-card__details--empty">Nenhum lancamento compartilhado neste periodo ainda</div>
+                <div class="bp-card__details bp-card__details--empty">Nenhum lançamento compartilhado neste período ainda.</div>
               } @else {
                 <button type="button" class="bp-card__toggle" (click)="bpToggle(bpKey(b))" [attr.aria-expanded]="bpIsOpen(bpKey(b))">
                   <span class="bp-card__chevron" aria-hidden="true">{{ bpIsOpen(bpKey(b)) ? '▾' : '▸' }}</span>
-                  Detalhes &middot; {{ b.entries.length }} lancamento(s) dentro do periodo
+                  Detalhes &middot; {{ b.entries.length }} lançamento(s) dentro do período
                 </button>
                 @if (bpIsOpen(bpKey(b))) {
                   <div class="bp-card__details">
                     <div class="bp-detail-row bp-detail-row--head">
-                      <span class="bp-detail-row__desc">Lancamento &middot; data &middot; dividido com</span>
+                      <span class="bp-detail-row__desc">Lançamento &middot; data &middot; divisão</span>
                       <div class="bp-detail-row__cells">
                         @for (m of d.members; track m.id) { <span class="bp-detail-row__cell">{{ m.display_name }}</span> }
                       </div>
@@ -360,8 +411,9 @@
                   </div>
                 }
               }
-            </div>
+            </article>
           }
+          </div>
 
           <!-- Total -->
           <div class="bp-total" [class.bp-total--forecast]="d.mode === 'open'">
@@ -370,6 +422,7 @@
               <div class="bp-total__cells">
                 @for (m of d.members; track m.id) {
                   <div class="bp-total__cell">
+                    <small class="bp-total__member">{{ m.display_name }}</small>
                     <strong class="mono bp-total__value">{{ formatCurrency(bpTotal('share', m.id)) }}</strong>
                     <span class="bp-badge bp-badge--gray">{{ bpPct(m.id) }}%</span>
                   </div>
@@ -377,7 +430,7 @@
               </div>
             </div>
             <div class="bp-total__row">
-              <span class="bp-total__label">{{ d.mode === 'open' ? 'Vai pagar ao banco' : 'Ja pagou' }}</span>
+              <span class="bp-total__label">{{ d.mode === 'open' ? 'Vai pagar ao banco' : 'Já pagou' }}</span>
               <div class="bp-total__cells">
                 @for (m of d.members; track m.id) { <div class="bp-total__cell mono">{{ formatCurrency(bpTotal('paid', m.id)) }}</div> }
               </div>
@@ -392,6 +445,21 @@
                 }
               </div>
             </div>
+            @if (d.mode === 'open') {
+              <div class="bp-total__row bp-total__row--forecast">
+                <span class="bp-total__label">Se fechassem hoje</span>
+                <div class="bp-total__forecast">
+                  @if (d.settlement.length > 0) {
+                    @for (s of d.settlement; track s.from_member_id + '-' + s.to_member_id) {
+                      <strong>{{ s.from_name }} paga <span class="mono">{{ formatCurrency(s.amount) }}</span> a {{ s.to_name }}</strong>
+                    }
+                  } @else {
+                    <span>Sem acerto previsto neste momento.</span>
+                  }
+                  <small>Previsão, ainda não é o acerto oficial.</small>
+                </div>
+              </div>
+            }
           </div>
 
           <!-- Acerto -->
@@ -406,34 +474,17 @@
                 </div>
               }
             } @else {
-              <div class="bp-settle bp-settle--ok">Tudo certo &mdash; ninguem deve nada neste periodo.</div>
+              <div class="bp-settle bp-settle--ok">Tudo certo &mdash; ninguém deve nada neste período.</div>
             }
-          } @else {
-            <div class="bp-settle bp-settle--forecast">
-              <div class="bp-settle__row">
-                <span class="bp-settle__clock" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
-                <div>
-                  @if (d.settlement.length > 0) {
-                    @for (s of d.settlement; track s.from_member_id + '-' + s.to_member_id) {
-                      <div>Se as faturas fechassem hoje: <strong>{{ s.from_name }}</strong> pagaria <strong class="mono">{{ formatCurrency(s.amount) }}</strong> para <strong>{{ s.to_name }}</strong>.</div>
-                    }
-                  } @else {
-                    <div>Se as faturas fechassem hoje, ninguem deveria nada.</div>
-                  }
-                  <div class="bp-settle__sub">O acerto oficial so aparece em Faturas fechadas depois que cada fatura fechar.@if (d.next_closing; as nc) { Proximo fechamento: {{ nc.card_name }} em {{ formatDate(nc.date) }}. }</div>
-                </div>
-              </div>
-              <button type="button" class="btn btn--secondary btn--sm" disabled>Acerto apos o fechamento</button>
-            </div>
           }
 
           <!-- Nota final -->
           @if (d.mode === 'closed') {
             @if (d.outside && d.outside.count > 0) {
-              <p class="bp-note">Fora desta conta: {{ d.outside.count }} lancamento(s) ({{ formatCurrency(d.outside.total) }}) em faturas ainda abertas &mdash; entram quando as faturas fecharem.</p>
+              <p class="bp-note">Fora desta conta: {{ d.outside.count }} lançamento(s) ({{ formatCurrency(d.outside.total) }}) em faturas ainda abertas &mdash; entram quando as faturas fecharem.</p>
             }
           } @else {
-            <p class="bp-note">Gastos em dinheiro nao aparecem aqui: nao tem fatura e ja contam no mes em que foram pagos, em Faturas fechadas.</p>
+            <p class="bp-note">Gastos em dinheiro não aparecem aqui: não têm fatura e já contam no mês em que foram pagos, em Faturas fechadas.</p>
           }
         }
       }
@@ -451,12 +502,12 @@
     </div>
     <div class="modal__body">
       <form [formGroup]="form" (ngSubmit)="saveEntry()" novalidate>
-        <p class="modal__section-title">1. Identificacao</p>
+        <p class="modal__section-title">1. Identificação</p>
         <div class="form-group">
-          <label class="form-label" for="eg-desc">Descricao *</label>
+          <label class="form-label" for="eg-desc">Descrição *</label>
           <input id="eg-desc" class="form-input" type="text" formControlName="description" placeholder="Ex: Geladeira, Viagem..."/>
           @if (form.get('description')?.invalid && form.get('description')?.touched) {
-            <span class="form-error">Descricao e obrigatoria.</span>
+            <span class="form-error">Descrição é obrigatória.</span>
           }
         </div>
         <div class="form-group">
@@ -494,18 +545,21 @@
               (click)="form.patchValue({payment_method:'dinheiro', credit_card_id:null})">Dinheiro</button>
             <button type="button" class="payment-toggle__btn"
               [class.payment-toggle__btn--active]="form.value.payment_method === 'cartao'"
-              (click)="form.patchValue({payment_method:'cartao'})">Cartao de Credito</button>
+              (click)="form.patchValue({payment_method:'cartao'})">Cartão de crédito</button>
           </div>
         </div>
-        @if (form.value.payment_method === 'cartao' && payerIsMe) {
+        @if (form.value.payment_method === 'cartao') {
           <div class="form-group">
-            <label class="form-label" for="eg-card">Cartao</label>
+            <label class="form-label" for="eg-card">Cartão{{ payerIsMe ? ' *' : '' }}</label>
             <select id="eg-card" class="form-select" formControlName="credit_card_id">
               <option [ngValue]="null">Selecione o cartao...</option>
               @for (c of cards(); track c.id) {
-                <option [value]="c.id">{{ c.name }} (****{{ c.last_four_digits }} | Fecha dia {{ c.closing_day }})</option>
+                <option [ngValue]="c.id">{{ c.name }} (****{{ c.last_four_digits }} | Fecha dia {{ c.closing_day }})</option>
               }
             </select>
+            @if (cards().length === 0) {
+              <span class="form-hint">Nenhum cartão de crédito cadastrado.</span>
+            }
           </div>
         }
         <p class="modal__section-title">3. Parcelamento (opcional)</p>

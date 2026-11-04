@@ -148,7 +148,11 @@
         }
 
         <div class="form-actions">
-          <a routerLink="/history" class="btn-secondary">Cancelar</a>
+          @if (isEdit()) {
+            <button type="button" class="btn-secondary" (click)="returnToPreviousPage()">Cancelar</button>
+          } @else {
+            <a routerLink="/history" class="btn-secondary">Cancelar</a>
+          }
           <div class="form-actions__primary">
             @if (!isEdit()) {
               <button type="button" class="btn-secondary" [disabled]="saving()" (click)="submit(true)">Salvar e adicionar outro</button>

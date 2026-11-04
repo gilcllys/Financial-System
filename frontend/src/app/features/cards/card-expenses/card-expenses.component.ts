@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { ToastService } from '../../../core/services/toast.service';
 import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ReactiveFormsModule, FormsModule, FormControl } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -89,6 +89,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   private toast = inject(ToastService);
   private confirmDialog = inject(ConfirmDialogService);
   private route      = inject(ActivatedRoute);
+  private router     = inject(Router);
   private cardSvc    = inject(CardService);
   private expenseSvc = inject(ExpenseService);
   private sharedSvc  = inject(SharedDebtService);
@@ -96,6 +97,8 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   private d3         = inject(D3ChartService);
   readonly myTenantId: string | null = this.auth.userProfile.sub ?? null;
   private destroy$   = new Subject<void>();
+
+  get currentReturnUrl(): string { return this.router.url; }
 
   @ViewChild('dailyChartEl')   dailyEl?:   ElementRef<HTMLDivElement>;
   @ViewChild('weeklyChartEl')  weeklyEl?:  ElementRef<HTMLDivElement>;

@@ -736,12 +736,22 @@
 
 .grid-2col {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-base);
   margin-bottom: var(--space-lg);
 
+  > .card {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .card__header,
+  .card__header-title,
+  .card__body { min-width: 0; }
+
   @media (max-width: 900px) {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -867,7 +877,64 @@
 }
 %row-sub { margin: 2px 0 0; font-size: 12px; color: var(--color-muted); }
 .kpi-clean-card__sub { margin: 6px 0 0; font-size: 13px; color: var(--color-body, #5b616e); }
-.card__subtitle      { margin: 2px 0 0; font-size: 13px; color: var(--color-muted, #7c828a); }
+.card__subtitle      { margin: 2px 0 0; font-size: 13px; color: var(--color-muted, #7c828a); }
+
+.bank-composition {
+  margin-top: 12px;
+  border-top: 1px solid var(--color-hairline, #e7eaf0);
+
+  summary {
+    width: fit-content;
+    padding: 10px 0 2px;
+    color: var(--color-primary, #2858d8);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  summary:focus-visible {
+    outline: 2px solid var(--color-primary, #2858d8);
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+
+  &[open] summary { margin-bottom: 10px; }
+  &__content { display: grid; gap: 12px; }
+
+  &__invoice {
+    min-width: 0;
+    padding: 11px 12px;
+    border: 1px solid var(--color-hairline, #e7eaf0);
+    border-radius: var(--rounded-sm, 8px);
+    background: var(--color-surface-soft, #f6f7f9);
+  }
+
+  &__invoice-head,
+  &__invoice-total {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--color-ink, #17202e);
+    font-size: 12px;
+  }
+
+  &__invoice-head { padding-bottom: 8px; border-bottom: 1px solid var(--color-hairline, #e7eaf0); font-weight: 650; }
+  &__invoice-head span { min-width: 0; overflow-wrap: anywhere; }
+  &__invoice-head strong,
+  &__invoice-total strong { flex: 0 0 auto; }
+  &__rows { display: grid; gap: 7px; margin: 9px 0; }
+  &__rows > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  &__rows dt { min-width: 0; color: var(--color-body, #5b616e); font-size: 11px; }
+  &__rows dt small { display: block; margin-top: 2px; color: var(--color-muted, #707989); font-size: 10px; }
+  &__rows dd { flex: 0 0 auto; margin: 0; color: var(--color-ink, #17202e); font-size: 11px; }
+  &__rows .bank-composition__portion dt,
+  &__rows .bank-composition__portion dd { color: var(--color-muted, #707989); }
+  &__rows .bank-composition__portion dt { font-size: 10px; }
+  &__invoice-total { padding-top: 8px; border-top: 1px solid var(--color-hairline, #e7eaf0); font-weight: 650; }
+  &__note { margin: 0; color: var(--color-muted, #707989); font-size: 10px; line-height: 1.45; }
+}
+
 // Uma fatura por cartão: cabeçalho + barra dividida (individual × compartilhado) + legenda
 .invoice-row {
   @extend %row-link;
@@ -944,4 +1011,17 @@
     color: var(--color-body, #5b616e);
     &--none { color: var(--color-muted); font-style: italic; }
   }
+}
+
+.category-card__list {
+  max-height: 174px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.category-card__list:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  border-radius: var(--rounded-sm);
 }

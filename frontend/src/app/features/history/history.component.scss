@@ -197,8 +197,11 @@
 }
 
 .actions-cell {
-  display: flex;
-  gap: 8px;
+  white-space: nowrap;
+}
+
+.actions-cell > .icon-btn + .icon-btn {
+  margin-left: 8px;
 }
 
 .icon-btn {

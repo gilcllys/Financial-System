@@ -149,6 +149,9 @@ export class SharedDebtDetailComponent implements OnInit {
 
   deletingGroup = signal(false);
   monthlyHistory = signal<MonthlyHistoryEntry[]>([]);
+  groupEntryCount = computed(() =>
+    this.monthlyHistory().reduce((total, month) => total + month.entry_count, 0),
+  );
   recurringTemplates = signal<RecurringTemplate[]>([]);
   showRecurringForm = signal(false);
   savingRecurring = signal(false);
@@ -249,6 +252,7 @@ export class SharedDebtDetailComponent implements OnInit {
         this.recurringTemplates.set(data.recurring_templates);
         this.openEntryFromQuery();
         this.loading.set(false);
+        this.loadByPerson();
       },
       error: () => this.loading.set(false),
     });
@@ -379,6 +383,10 @@ export class SharedDebtDetailComponent implements OnInit {
 
   saveEntry(): void {
     if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+    if (this.isCartao && this.payerIsMe && !this.form.value.credit_card_id) {
+      this.entryError.set('Selecione o cartão de crédito usado.');
+      return;
+    }
     const participants = [...this.participantIds()];
     if (participants.length === 0) {
       this.entryError.set('Selecione ao menos um participante.');
@@ -396,7 +404,7 @@ export class SharedDebtDetailComponent implements OnInit {
       paid_by: v.paid_by!,
       participant_ids: allSelected ? undefined : participants,
       payment_method: v.payment_method!,
-      credit_card_id: v.payment_method === 'cartao' && this.payerIsMe ? v.credit_card_id : null,
+      credit_card_id: v.payment_method === 'cartao' ? v.credit_card_id : null,
       category_id: v.category_id ?? null,
       total_installments_input: this.isParcelado() ? (v.total_installments_input ?? 2) : 1,
     };
@@ -650,7 +658,7 @@ export class SharedDebtDetailComponent implements OnInit {
       const first = entries[0];
       const last = entries[entries.length - 1];
       const total = first.total_installments;
-      const paid = entries.filter(e => new Date(e.date) <= now).length;
+      const paid = entries.filter(e => e.paid).length;
       const progressPct = Math.round((paid / total) * 100);
       const paidBy = first.paid_by_name;
       const participantCount = first.participant_count;
@@ -694,7 +702,6 @@ export class SharedDebtDetailComponent implements OnInit {
       };
     });
   });
-
   myPortion(e: SharedDebtEntry): number {
     return e.amount / (e.participant_count || 1);
   }
@@ -707,7 +714,7 @@ export class SharedDebtDetailComponent implements OnInit {
   }
 
   isPaid(e: SharedDebtEntry): boolean {
-    return new Date(e.date) <= new Date();
+    return e.paid;
   }
 
   formatMonthYear(d: string): string {
@@ -733,7 +740,7 @@ export class SharedDebtDetailComponent implements OnInit {
   }
 
   // ── Per-person view (faturas fechadas / em aberto) ──────────────────────
-  bpMode = signal<'closed' | 'open'>('closed');
+  bpMode = signal<'closed' | 'open'>('open');
   bpMonth = signal(new Date().getMonth() + 1);
   bpYear = signal(new Date().getFullYear());
   bpData = signal<ByPersonResponse | null>(null);

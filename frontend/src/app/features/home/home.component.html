@@ -39,6 +39,42 @@
       {{ formatCurrency(totalInvoices()) }}
     </div>
     <p class="kpi-clean-card__sub">{{ invoicesKpiSub() }}</p>
+    @if (openInvoices().length > 0) {
+      <details class="bank-composition">
+        <summary>Ver composição</summary>
+        <div class="bank-composition__content">
+          @for (invoice of openInvoices(); track invoice.card_id) {
+            <section class="bank-composition__invoice" [attr.aria-label]="'Fatura do cartão ' + invoice.card_name">
+              <div class="bank-composition__invoice-head">
+                <span>{{ invoice.card_name }} ···· {{ invoice.last_four_digits }}</span>
+                <strong class="mono">{{ formatCurrency(invoice.total) }}</strong>
+              </div>
+              <dl class="bank-composition__rows">
+                <div>
+                  <dt>Gastos individuais</dt>
+                  <dd class="mono">{{ formatCurrency(invoice.expenses_total) }}</dd>
+                </div>
+                <div>
+                  <dt>Compras compartilhadas <small>valor integral cobrado pelo banco</small></dt>
+                  <dd class="mono">{{ formatCurrency(invoice.shared_gross_total) }}</dd>
+                </div>
+                @if (invoice.shared_gross_total > 0) {
+                  <div class="bank-composition__portion">
+                    <dt>Sua parte nas compras compartilhadas</dt>
+                    <dd class="mono">{{ formatCurrency(invoice.shared_total) }}</dd>
+                  </div>
+                }
+              </dl>
+              <div class="bank-composition__invoice-total">
+                <span>Total desta fatura</span>
+                <strong class="mono">{{ formatCurrency(invoice.total) }}</strong>
+              </div>
+            </section>
+          }
+          <p class="bank-composition__note">O valor compartilhado aparece integralmente porque é o total cobrado na fatura. “Sua parte” é informativa e não é somada novamente.</p>
+        </div>
+      </details>
+    }
   </div>
 
   <!-- SALDO = Receitas − Faturas − Dinheiro -->
@@ -307,7 +343,7 @@
   </div>
 
   <!-- Gastos por Categoria -->
-  <div class="card">
+  <div class="card category-card">
     <div class="card__header">
       <div class="card__header-title">
         <span class="card__icon">
@@ -318,18 +354,20 @@
       <a routerLink="/analytics" class="card__link">Ver Gráfico</a>
     </div>
     <div class="card__body">
-      @if (byCategory().length === 0) {
-        <p class="empty-msg">Nenhum gasto categorizado.</p>
-      }
-      @for (cat of byCategory().slice(0, 6); track cat.category_id) {
-        <div class="cat-item">
-          <span class="cat-item__label">{{ cat.category_name }}</span>
-          <div class="cat-item__bar-wrap">
-            <div class="cat-item__bar" [style.width]="categoryBarWidth(cat.total)"></div>
+      <div class="category-card__list" role="region" aria-label="Gastos por categoria" tabindex="0">
+        @if (byCategory().length === 0) {
+          <p class="empty-msg">Nenhum gasto categorizado.</p>
+        }
+        @for (cat of byCategory().slice(0, 6); track cat.category_id) {
+          <div class="cat-item">
+            <span class="cat-item__label">{{ cat.category_name }}</span>
+            <div class="cat-item__bar-wrap">
+              <div class="cat-item__bar" [style.width]="categoryBarWidth(cat.total)"></div>
+            </div>
+            <span class="cat-item__value mono">{{ formatCurrency(cat.total) }}</span>
           </div>
-          <span class="cat-item__value mono">{{ formatCurrency(cat.total) }}</span>
-        </div>
-      }
+        }
+      </div>
     </div>
   </div>
 </div>

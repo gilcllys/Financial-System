@@ -448,6 +448,7 @@
                       @if (row.kind === 'individual' && row.expense; as e) {
                         <a
                           [routerLink]="['/expenses', e.id, 'edit']"
+                          [state]="{ returnUrl: currentReturnUrl }"
                           class="icon-btn"
                           [attr.aria-label]="'Editar ' + e.description"
                           title="Editar"
