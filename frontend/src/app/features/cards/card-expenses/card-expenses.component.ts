@@ -590,7 +590,9 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     const donutData: DonutData[] = data.labels.map((l, i) => ({
       label: l, value: data.values[i], color: CAT_COLORS[i % CAT_COLORS.length],
     }));
-    const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+    const fmt = new Intl.NumberFormat('pt-BR', {
+      style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2,
+    });
     this.d3.renderDonut(el, donutData, fmt.format(total));
   }
 

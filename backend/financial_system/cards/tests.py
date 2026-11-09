@@ -127,6 +127,76 @@ class InvoiceCreditSignTests(TestCase):
         self.assertEqual(by_category[0]['percentage'], 100.00)
 
 
+class SharedCategoryBreakdownTests(TestCase):
+    TENANT = 'tenant-shared-category'
+
+    def setUp(self):
+        self.card = CreditCard.objects.create(
+            tenant_id=self.TENANT, name='Azul', due_day=3,
+            closing_day=25, last_four_digits='9225',
+        )
+        self.individual_category = ExpenseCategory.objects.create(
+            tenant_id=self.TENANT, name='Gastos com carro',
+        )
+        self.clothes_category = ExpenseCategory.objects.create(
+            tenant_id=self.TENANT, name='Roupas',
+        )
+        self.shared_category = ExpenseCategory.objects.create(
+            tenant_id=self.TENANT, name='Compras para casa',
+        )
+        self.transport_category = ExpenseCategory.objects.create(
+            tenant_id=self.TENANT, name='Transporte',
+        )
+        self.group = SharedDebt.objects.create(
+            name='Casa', owner_tenant_id=self.TENANT,
+        )
+        self.payer = SharedDebtMember.objects.create(
+            shared_debt=self.group, tenant_id=self.TENANT, display_name='Eu',
+        )
+        self.other = SharedDebtMember.objects.create(
+            shared_debt=self.group, tenant_id='other-tenant', display_name='Outra pessoa',
+        )
+
+    def _shared(self, amount, date, paid_by, category):
+        return SharedEntry.objects.create(
+            shared_debt=self.group, paid_by=paid_by, description='Compra compartilhada',
+            amount=Decimal(amount), date=date, payment_method='cartao',
+            credit_card=self.card, category=category,
+            created_by_tenant_id=self.TENANT,
+        )
+
+    def test_category_chart_sums_individual_and_full_shared_invoice_amounts(self):
+        Expense.objects.create(
+            tenant_id=self.TENANT, category=self.individual_category,
+            credit_card=self.card, description='Compra individual', quantity=1,
+            amount=Decimal('-617.66'), date=real_date(2026, 11, 10),
+            payment_method='cartao',
+        )
+        Expense.objects.create(
+            tenant_id=self.TENANT, category=self.clothes_category,
+            credit_card=self.card, description='Roupa individual', quantity=1,
+            amount=Decimal('-449.58'), date=real_date(2026, 11, 10),
+            payment_method='cartao',
+        )
+        self._shared('243.72', real_date(2026, 11, 14), self.payer, self.individual_category)
+        self._shared('206.39', real_date(2026, 11, 14), self.payer, self.shared_category)
+        self._shared('122.69', real_date(2026, 11, 14), self.payer, self.transport_category)
+        self._shared('1000.00', real_date(2026, 11, 14), self.other, self.shared_category)
+        self._shared('500.00', real_date(2026, 11, 26), self.payer, self.shared_category)
+
+        data = InvoiceExpensesBehavior(
+            card=self.card, invoice_month=12, invoice_year=2026,
+        ).run().data
+        by_name = {row['category_name']: row for row in data['by_category']}
+
+        self.assertEqual(by_name['Gastos com carro']['total'], 861.38)
+        self.assertEqual(by_name['Compras para casa']['total'], 206.39)
+        self.assertEqual(by_name['Transporte']['total'], 122.69)
+        self.assertEqual(by_name['Roupas']['total'], 449.58)
+        self.assertEqual(sum(row['total'] for row in data['by_category']), 1640.04)
+        self.assertAlmostEqual(sum(row['percentage'] for row in data['by_category']), 100.0, places=1)
+
+
 # ---------------------------------------------------------------------------
 # Faturas abertas (Home): compartilhado entra no MESMO range da fatura
 # ---------------------------------------------------------------------------
