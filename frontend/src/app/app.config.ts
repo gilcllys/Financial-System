@@ -4,8 +4,12 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/auth/auth.interceptor';
 import { AuthService } from './core/auth/auth.service';
+import { RouteLoadingService } from './core/services/route-loading.service';
 
-function initializeKeycloak(auth: AuthService): () => Promise<boolean> {
+function initializeKeycloak(
+  auth: AuthService,
+  _routeLoading: RouteLoadingService
+): () => Promise<boolean> {
   return () => auth.init();
 }
 
@@ -16,7 +20,7 @@ export const appConfig: ApplicationConfig = {
     {
       provide: APP_INITIALIZER,
       useFactory: initializeKeycloak,
-      deps: [AuthService],
+      deps: [AuthService, RouteLoadingService],
       multi: true,
     },
   ],

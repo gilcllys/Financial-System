@@ -663,7 +663,7 @@
 }
 
 /* ---------------- individual expenses ---------------- */
-.ind-section { display: flex; flex-direction: column; gap: var(--space-sm); margin-top: var(--space-base); width: 100%; min-width: 0; }
+.ind-section { display: flex; flex-direction: column; gap: var(--space-sm); margin-top: var(--space-base); width: 100%; min-width: 0; max-width: 100%; }
 
 .ind-section__head {
   display: flex;
@@ -675,11 +675,18 @@
 
 .ind-section__sub { margin: 4px 0 0; font-size: 13px; color: var(--color-muted); }
 
-.filters { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
+.filters {
+  display: grid;
+  grid-template-columns: minmax(240px, 2fr) minmax(160px, 1fr) minmax(160px, 1fr) repeat(2, minmax(140px, .8fr));
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+}
 
 .filters__search {
   position: relative;
-  flex: 1 1 260px;
+  min-width: 0;
+  width: 100%;
   display: flex;
   align-items: center;
 }
@@ -695,6 +702,7 @@
 
 .filters__input {
   width: 100%;
+  min-width: 0;
   padding: 11px 38px 11px 40px;
   border: 1px solid var(--inv-line);
   border-radius: 12px;
@@ -725,7 +733,8 @@
 }
 
 .filters__select {
-  flex: 0 1 220px;
+  min-width: 0;
+  width: 100%;
   padding: 11px 14px;
   border: 1px solid var(--inv-line);
   border-radius: 12px;
@@ -741,6 +750,8 @@
 /* table */
 .ind-table {
   width: 100%;
+  min-width: 980px;
+  table-layout: fixed;
 
   th {
     font-size: 11px;
@@ -782,18 +793,21 @@
 }
 .th-sort-icon { width: 12px; height: 12px; flex-shrink: 0; }
 
-.ind-table__desc { display: block; font-size: 14px; font-weight: 600; color: var(--color-ink); }
+.ind-table__desc { display: block; max-width: 100%; overflow-wrap: anywhere; font-size: 14px; font-weight: 600; color: var(--color-ink); }
 .ind-table__note { display: block; margin-top: 2px; font-size: 12px; color: var(--color-muted); }
 .ind-table__date { font-size: 13px; color: var(--color-body); white-space: nowrap; }
 .ind-table__value { font-size: 14px; font-weight: 700; color: var(--color-ink); }
 
 .cat-badge {
   display: inline-flex;
+  max-width: 100%;
   align-items: center;
   padding: 4px 10px;
   border-radius: var(--rounded-pill);
   font-size: 12px;
   font-weight: 600;
+  white-space: normal;
+  overflow-wrap: anywhere;
   color: var(--c-color, var(--inv-blue));
   background: color-mix(in srgb, var(--c-color, #0052ff) 12%, transparent);
 }
@@ -801,7 +815,8 @@
 .row-actions { display: inline-flex; gap: 6px; justify-content: flex-end; }
 
 .filters__date {
-  flex: 0 1 160px;
+  min-width: 0;
+  width: 100%;
   padding: 11px 14px;
   border: 1px solid var(--inv-line);
   border-radius: 12px;
@@ -911,4 +926,22 @@
   .sum-card__hero-value { font-size: 26px; }
   .ind-table th, .ind-table td { padding: 12px var(--space-sm); }
   .pagination__info { margin-left: 0; width: 100%; }
+}
+
+@media (max-width: 1180px) {
+  .filters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .filters__search { grid-column: span 2; }
+  .filters__select:not(.filters__date) { grid-column: span 1; }
+  .filters__date { grid-column: span 2; }
+}
+
+@media (max-width: 760px) {
+  .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .filters__search { grid-column: 1 / -1; }
+  .filters__select:not(.filters__date), .filters__date { grid-column: span 1; }
+}
+
+@media (max-width: 420px) {
+  .filters { grid-template-columns: minmax(0, 1fr); }
+  .filters__search, .filters__select:not(.filters__date), .filters__date { grid-column: 1; }
 }

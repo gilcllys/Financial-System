@@ -1,5 +1,4 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ExpenseService } from '../../core/services/expense.service';
@@ -9,11 +8,11 @@ import { Expense, ExpenseCategory } from '../../core/models';
 @Component({
   selector: 'app-uncategorized',
   standalone: true,
-  imports: [RouterLink, FormsModule, SlicePipe],
+  imports: [FormsModule, SlicePipe],
   template: `
     <div class="page-header">
       <div>
-        <h1 class="page-header__title">⚠️ Sem Categoria</h1>
+        <h1 class="page-header__title">Sem categoria</h1>
         <p class="page-header__subtitle">{{ items().length }} lançamentos sem categoria</p>
       </div>
     </div>
@@ -31,6 +30,7 @@ import { Expense, ExpenseCategory } from '../../core/models';
           <thead>
             <tr>
               <th>Descrição</th>
+              <th>Fixo</th>
               <th>Data</th>
               <th class="text-right">Valor</th>
               <th>Categorizar</th>
@@ -40,6 +40,7 @@ import { Expense, ExpenseCategory } from '../../core/models';
             @for (e of items(); track e.id) {
               <tr>
                 <td>{{ e.description }}</td>
+                <td>@if (e.is_recurrent) { <span class="badge badge--success">Sim</span> }</td>
                 <td class="mono text-muted">{{ e.date | slice:8:10 }}/{{ e.date | slice:5:7 }}</td>
                 <td class="text-right mono" [class.value-up]="e.amount >= 0" [class.value-down]="e.amount < 0">
                   {{ e.amount >= 0 ? '+' : '-' }}{{ fmt(e.amount) }}

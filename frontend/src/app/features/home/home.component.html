@@ -1,12 +1,13 @@
 <!-- ?? Page Header ?? -->
 <div class="home-header">
   <div>
-    <h1 class="home-header__title">Início</h1>
-    <p class="home-header__subtitle">{{ currentMonthName }} {{ currentYear }} · Suas faturas abertas em um só lugar.</p>
+    <p class="home-header__eyebrow">Visão do mês</p>
+    <h1 class="home-header__title">Suas finanças, sem ruído.</h1>
+    <p class="home-header__subtitle">{{ currentMonthName }} de {{ currentYear }} · resumo do período selecionado</p>
   </div>
   <div class="home-header__actions">
     <a routerLink="/recurring-expenses" class="btn btn--secondary btn--sm">Gastos Fixos</a>
-    <a routerLink="/expenses/new" class="btn btn--primary btn--sm">+ Novo Gasto</a>
+    <a routerLink="/expenses/new" class="btn btn--primary btn--sm">+ Novo lançamento</a>
   </div>
 </div>
 
@@ -15,7 +16,7 @@
   <!-- RECEITAS -->
   <div class="kpi-clean-card">
     <div class="kpi-clean-card__top">
-      <span class="kpi-clean-card__label">RECEITAS</span>
+      <span class="kpi-clean-card__label">RECEITAS DO MÊS</span>
       <span class="kpi-clean-card__icon kpi-clean-card__icon--green">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="7" x2="17" y2="17"/><polyline points="17 7 17 17 7 17"/></svg>
       </span>
@@ -38,6 +39,42 @@
       {{ formatCurrency(totalInvoices()) }}
     </div>
     <p class="kpi-clean-card__sub">{{ invoicesKpiSub() }}</p>
+    @if (openInvoices().length > 0) {
+      <details class="bank-composition">
+        <summary>Ver composição</summary>
+        <div class="bank-composition__content">
+          @for (invoice of openInvoices(); track invoice.card_id) {
+            <section class="bank-composition__invoice" [attr.aria-label]="'Fatura do cartão ' + invoice.card_name">
+              <div class="bank-composition__invoice-head">
+                <span>{{ invoice.card_name }} ···· {{ invoice.last_four_digits }}</span>
+                <strong class="mono">{{ formatCurrency(invoice.total) }}</strong>
+              </div>
+              <dl class="bank-composition__rows">
+                <div>
+                  <dt>Gastos individuais</dt>
+                  <dd class="mono">{{ formatCurrency(invoice.expenses_total) }}</dd>
+                </div>
+                <div>
+                  <dt>Compras compartilhadas <small>valor integral cobrado pelo banco</small></dt>
+                  <dd class="mono">{{ formatCurrency(invoice.shared_gross_total) }}</dd>
+                </div>
+                @if (invoice.shared_gross_total > 0) {
+                  <div class="bank-composition__portion">
+                    <dt>Sua parte nas compras compartilhadas</dt>
+                    <dd class="mono">{{ formatCurrency(invoice.shared_total) }}</dd>
+                  </div>
+                }
+              </dl>
+              <div class="bank-composition__invoice-total">
+                <span>Total desta fatura</span>
+                <strong class="mono">{{ formatCurrency(invoice.total) }}</strong>
+              </div>
+            </section>
+          }
+          <p class="bank-composition__note">O valor compartilhado aparece integralmente porque é o total cobrado na fatura. “Sua parte” é informativa e não é somada novamente.</p>
+        </div>
+      </details>
+    }
   </div>
 
   <!-- SALDO = Receitas − Faturas − Dinheiro -->
@@ -55,6 +92,31 @@
   </div>
 </div>
 
+<!-- Ritmo anual — visão compacta do gasto mês a mês -->
+<article class="card rhythm-card">
+  <div class="card__header">
+    <div>
+      <h2 class="card__title">Ritmo do ano</h2>
+      <p class="card__subtitle">Despesas por mês · {{ currentYear }}</p>
+    </div>
+  </div>
+  @if (recentYearMonths().length > 0) {
+    <div class="rhythm-bars" role="img" aria-label="Despesas dos últimos meses do ano">
+      @for (month of recentYearMonths(); track month.month) {
+        <div class="rhythm-bars__item">
+          <div class="rhythm-bars__track">
+            <span class="rhythm-bars__bar" [class.rhythm-bars__bar--current]="month.month === filterMonth()" [style.height.%]="monthlyExpensePct(month.expenses)" [attr.title]="formatCurrency(month.expenses)"></span>
+          </div>
+          <span class="rhythm-bars__label">{{ month.month_name.slice(0, 3).toLowerCase() }}</span>
+        </div>
+      }
+    </div>
+  } @else {
+    <p class="empty-msg">Ainda não há despesas neste ano.</p>
+  }
+</article>
+
+<div class="prototype-home-grid">
 <!-- Faturas do ciclo que fecha no mês selecionado -->
 <div class="card invoices-card" style="margin-bottom: var(--space-base)">
   <div class="card__header">
@@ -63,8 +125,8 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
       </span>
       <div>
-        <span class="card__title">Faturas que fecham em {{ currentMonthName }}</span>
-        <p class="card__subtitle">Compras do ciclo que fecha neste mês; vencimento no mês seguinte.</p>
+        <span class="card__title">Faturas do ciclo</span>
+        <p class="card__subtitle">Início, fechamento e vencimento de cada cartão</p>
       </div>
     </div>
     <a routerLink="/cards" class="card__link">Ver todos os cartões &rsaquo;</a>
@@ -80,9 +142,9 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
           </div>
           <div class="invoice-row__info">
-            <p class="invoice-row__name">{{ inv.card_name }} &bull;&bull;&bull;&bull; {{ inv.last_four_digits }}</p>
+            <p class="invoice-row__name">{{ inv.card_name }}</p>
             <p class="invoice-row__meta">
-              Vence {{ ddmm(inv.due_date) }}
+              •••• {{ inv.last_four_digits }} · ciclo: {{ cycleRange(inv) }} · vence {{ ddmm(inv.due_date) }}
               @if (inv.shared_groups.length > 0) {
                 · {{ inv.shared_groups.length }} {{ inv.shared_groups.length === 1 ? 'grupo compartilhado' : 'grupos compartilhados' }}
               } @else {
@@ -116,6 +178,46 @@
       </div>
     }
   </div>
+</div>
+
+  <!-- Últimos Lançamentos -->
+  <div class="card">
+    <div class="card__header">
+      <div class="card__header-title">
+        <span class="card__icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </span>
+        <span class="card__title">Últimos Lançamentos</span>
+      </div>
+      <a routerLink="/history" class="card__link">Ver Extrato</a>
+    </div>
+    <div class="card__body">
+      @if (expenses().length === 0 && !tableLoading()) {
+        <p class="empty-msg">Nenhum lançamento neste mês.</p>
+      }
+      @for (exp of expenses().slice(0, 5); track exp.id) {
+        <div class="expense-item">
+          <div class="expense-item__icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+          </div>
+          <div class="expense-item__info">
+            <p class="expense-item__desc">{{ exp.description }}</p>
+            <p class="expense-item__meta">
+              {{ expenseCategoryName(exp) }}
+            </p>
+          </div>
+          <div class="expense-item__right">
+            <span class="expense-item__date text-muted">{{ exp.date | slice:8:10 }}/{{ exp.date | slice:5:7 }}</span>
+            <span class="expense-item__amount mono" [class.value-up]="exp.amount > 0" [class.value-down]="exp.amount < 0">
+              {{ amountPrefix(exp.amount) }}{{ formatCurrency(exp.amount) }}
+            </span>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+
 </div>
 
 <!-- ?? 2-Column Grid Row 1 (Gastos Fixos & Gastos Compartilhados) ?? -->
@@ -241,7 +343,7 @@
   </div>
 
   <!-- Gastos por Categoria -->
-  <div class="card">
+  <div class="card category-card">
     <div class="card__header">
       <div class="card__header-title">
         <span class="card__icon">
@@ -252,61 +354,26 @@
       <a routerLink="/analytics" class="card__link">Ver Gráfico</a>
     </div>
     <div class="card__body">
-      @if (byCategory().length === 0) {
-        <p class="empty-msg">Nenhum gasto categorizado.</p>
-      }
-      @for (cat of byCategory().slice(0, 6); track cat.category_id) {
-        <div class="cat-item">
-          <span class="cat-item__label">{{ cat.category_name }}</span>
-          <div class="cat-item__bar-wrap">
-            <div class="cat-item__bar" [style.width]="categoryBarWidth(cat.total)"></div>
+      <div class="category-card__list" role="region" aria-label="Gastos por categoria" tabindex="0">
+        @if (byCategory().length === 0) {
+          <p class="empty-msg">Nenhum gasto categorizado.</p>
+        }
+        @for (cat of byCategory().slice(0, 6); track cat.category_id) {
+          <div class="cat-item">
+            <span class="cat-item__label">{{ cat.category_name }}</span>
+            <div class="cat-item__bar-wrap">
+              <div class="cat-item__bar" [style.width]="categoryBarWidth(cat.total)"></div>
+            </div>
+            <span class="cat-item__value mono">{{ formatCurrency(cat.total) }}</span>
           </div>
-          <span class="cat-item__value mono">{{ formatCurrency(cat.total) }}</span>
-        </div>
-      }
+        }
+      </div>
     </div>
   </div>
 </div>
 
-<!-- —— 2-Column Grid Row 3 (Últimos Lançamentos & Evolução Mensal) —— -->
-<div class="grid-2col">
-  <!-- Últimos Lançamentos -->
-  <div class="card">
-    <div class="card__header">
-      <div class="card__header-title">
-        <span class="card__icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        </span>
-        <span class="card__title">Últimos Lançamentos</span>
-      </div>
-      <a routerLink="/history" class="card__link">Ver Extrato</a>
-    </div>
-    <div class="card__body">
-      @if (expenses().length === 0 && !tableLoading()) {
-        <p class="empty-msg">Nenhum lançamento neste mês.</p>
-      }
-      @for (exp of expenses().slice(0, 5); track exp.id) {
-        <div class="expense-item">
-          <div class="expense-item__icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
-          </div>
-          <div class="expense-item__info">
-            <p class="expense-item__desc">{{ exp.description }}</p>
-            <p class="expense-item__meta">
-              {{ expenseCategoryName(exp) }}
-            </p>
-          </div>
-          <div class="expense-item__right">
-            <span class="expense-item__date text-muted">{{ exp.date | slice:8:10 }}/{{ exp.date | slice:5:7 }}</span>
-            <span class="expense-item__amount mono" [class.value-up]="exp.amount > 0" [class.value-down]="exp.amount < 0">
-              {{ amountPrefix(exp.amount) }}{{ formatCurrency(exp.amount) }}
-            </span>
-          </div>
-        </div>
-      }
-    </div>
-  </div>
-
+<!-- Gráfico detalhado já disponível no app -->
+<div class="grid-2col grid-2col--single">
   <!-- Evolução Mensal (D3 Charts: lineChartEl & compChartEl) —— -->
   <div class="card">
     <div class="card__header">

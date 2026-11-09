@@ -11,14 +11,13 @@ import {
 } from '@angular/core';
 import { ToastService } from '../../../core/services/toast.service';
 import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ReactiveFormsModule, FormsModule, FormControl } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { CardService } from '../../../core/services/card.service';
 import { ExpenseService } from '../../../core/services/expense.service';
 import { SharedDebtService, SharedDebtEntry } from '../../../core/services/shared-debt.service';
-import { CategoryService } from '../../../core/services/category.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { D3ChartService, BarData, DonutData, AreaData } from '../../../core/services/d3-chart.service';
 import {
@@ -54,6 +53,7 @@ export interface CombinedExpenseRow {
   date: string;
   amount: number;
   installmentBadge: string | null;
+  isRecurrent: boolean;
   groupName: string | null;
   expense: Expense | null;
   sharedEntry: SharedDebtEntry | null;
@@ -90,14 +90,16 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   private toast = inject(ToastService);
   private confirmDialog = inject(ConfirmDialogService);
   private route      = inject(ActivatedRoute);
+  private router     = inject(Router);
   private cardSvc    = inject(CardService);
   private expenseSvc = inject(ExpenseService);
   private sharedSvc  = inject(SharedDebtService);
-  private categorySvc = inject(CategoryService);
   private auth       = inject(AuthService);
   private d3         = inject(D3ChartService);
   readonly myTenantId: string | null = this.auth.userProfile.sub ?? null;
   private destroy$   = new Subject<void>();
+
+  get currentReturnUrl(): string { return this.router.url; }
 
   @ViewChild('dailyChartEl')   dailyEl?:   ElementRef<HTMLDivElement>;
   @ViewChild('weeklyChartEl')  weeklyEl?:  ElementRef<HTMLDivElement>;
@@ -113,9 +115,9 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   selectedCategoryId = signal<number | null>(null);
   invoiceData        = signal<InvoiceExpensesResponse | null>(null);
   chartData          = signal<InvoiceExpensesResponse | null>(null);
-  allCardExpenses    = signal<Expense[]>([]);
   sharedEntries      = signal<SharedDebtEntry[]>([]);
   allCategories      = signal<ExpenseCategory[]>([]);
+  annualInvoiceTotals = signal<number[] | null>(null);
 
   // Unified "Gastos da Fatura" table filters (all applied client-side).
   typeFilter      = signal<'all' | 'individual' | 'compartilhado'>('all');
@@ -250,6 +252,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
       date: e.date,
       amount: Math.abs(e.amount),
       installmentBadge: this.installmentBadge(e),
+      isRecurrent: e.is_recurrent ?? false,
       groupName: null,
       expense: e,
       sharedEntry: null,
@@ -263,6 +266,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
       date: e.date,
       amount: Math.abs(e.amount),
       installmentBadge: e.total_installments > 1 ? `${e.installment_number}/${e.total_installments}` : null,
+      isRecurrent: false,
       groupName: e.shared_debt_name,
       expense: null,
       sharedEntry: e,
@@ -363,15 +367,8 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
    * that rule here: the backend is the single source of truth.
    */
   monthlyChartDataSig = computed(() => {
-    const periods = this.invoices();
-    const year = this.selectedInvoice()?.invoice_year ?? new Date().getFullYear();
-    if (!periods.length) return null;
-
-    const totals = Array.from({ length: 12 }, () => 0);
-    for (const e of this.allCardExpenses()) {
-      const inv = periods.find(p => e.date >= p.period_start && e.date <= p.period_end);
-      if (inv && inv.invoice_year === year) totals[inv.invoice_month - 1] += Math.abs(e.amount);
-    }
+    const totals = this.annualInvoiceTotals();
+    if (!this.invoices().length || !totals) return null;
     if (!totals.some(t => t > 0)) return null;
     return { labels: MONTH_ABBR, values: totals.map(t => +t.toFixed(2)) };
   });
@@ -393,22 +390,21 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.cardId = +this.route.snapshot.paramMap.get('id')!;
-    this.cardSvc.get(this.cardId).subscribe({ next: c => this.card.set(c) });
-    this.cardSvc.getAllCardExpenses(this.cardId).subscribe({ next: e => this.allCardExpenses.set(e) });
-    this.categorySvc.list().subscribe({ next: cats => this.allCategories.set(cats) });
-    this.cardSvc.getInvoices(this.cardId).subscribe({
-      next: invoices => {
-        this.invoices.set(invoices);
+    this.cardSvc.getInvoiceView(this.cardId).subscribe({
+      next: view => {
+        this.card.set(view.card);
+        this.invoices.set(view.invoices);
+        this.selectedInvoice.set(view.selected_invoice);
+        this.invoiceData.set(view.invoice_data);
+        this.chartData.set(view.chart_data);
+        this.sharedEntries.set(view.shared_entries);
+        this.allCategories.set(view.categories);
+        this.annualInvoiceTotals.set(view.annual_invoice_totals);
         this.loadingInvoices.set(false);
-        const current = invoices.find(i => i.is_current) ?? invoices[0];
-        if (current) {
-          this.selectedInvoice.set(current);
-          this.loadPage(current);
-          this.loadChart(current);
-          this.loadSharedEntries(current);
-        }
+        this.loadingExpenses.set(false);
+        this.loadingChart.set(false);
       },
-      error: () => this.loadingInvoices.set(false),
+      error: () => { this.loadingInvoices.set(false); this.loadingExpenses.set(false); this.loadingChart.set(false); },
     });
     this.searchControl.valueChanges.pipe(
       takeUntil(this.destroy$),
@@ -428,8 +424,6 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
     this.searchTerm.set('');
     this.chartData.set(null);
     this.loadPage(invoice);
-    this.loadChart(invoice);
-    this.loadSharedEntries(invoice);
   }
 
   selectCategory(categoryId: number | null): void { this.selectedCategoryId.set(categoryId); this.currentPage.set(1); this.loadPage(); }
@@ -440,7 +434,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
   async deleteExpense(expense: Expense): Promise<void> {
     if (!(await this.confirmDialog.confirm(`Excluir "${expense.description}"?`))) return;
     this.expenseSvc.delete(expense.id).subscribe({
-      next:  () => { const inv = this.selectedInvoice(); if (inv) { this.loadPage(inv); this.loadChart(inv); } },
+      next:  () => { const inv = this.selectedInvoice(); if (inv) this.loadPage(inv); },
       error: () => this.toast.error('Erro ao excluir o gasto. Tente novamente.'),
     });
   }
@@ -544,54 +538,34 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
    * metodo pagina ate esgotar `next`, acumulando TODO o periodo da fatura de
    * uma vez (a paginacao da tabela em si e so client-side, sobre este total).
    */
-  private loadSharedEntries(invoice: Invoice): void {
-    this.fetchSharedEntriesPage(invoice, 1, []);
-  }
-
-  private fetchSharedEntriesPage(invoice: Invoice, page: number, acc: SharedDebtEntry[]): void {
-    this.sharedSvc.listEntries({
-      credit_card: this.cardId,
-      start_date: invoice.period_start,
-      end_date: invoice.period_end,
-      page,
-      page_size: 100,
-    }).subscribe({
-      next: res => {
-        const merged = [...acc, ...res.results];
-        if (res.next) {
-          this.fetchSharedEntriesPage(invoice, page + 1, merged);
-        } else {
-          this.sharedEntries.set(merged);
-        }
-      },
-      error: () => this.sharedEntries.set(acc),
-    });
-  }
-
   private reloadSharedEntries(): void {
     const inv = this.selectedInvoice();
-    if (inv) this.loadSharedEntries(inv);
+    if (inv) this.loadPage(inv);
   }
 
   private loadPage(invoice?: Invoice): void {
     const inv = invoice ?? this.selectedInvoice();
     if (!inv) return;
     this.loadingExpenses.set(true);
-    this.invoiceData.set(null);
-    this.cardSvc.getInvoiceExpenses(
-      this.cardId, inv.invoice_month, inv.invoice_year,
-      this.selectedCategoryId() ?? undefined, this.currentPage(), this.pageSize,
-    ).subscribe({
-      next:  data => { this.invoiceData.set(data); this.loadingExpenses.set(false); },
-      error: ()   => this.loadingExpenses.set(false),
-    });
-  }
-
-  private loadChart(invoice: Invoice): void {
     this.loadingChart.set(true);
-    this.cardSvc.getInvoiceChart(this.cardId, invoice.invoice_month, invoice.invoice_year).subscribe({
-      next:  data => { this.chartData.set(data); this.loadingChart.set(false); },
-      error: ()   => this.loadingChart.set(false),
+    this.invoiceData.set(null);
+    this.cardSvc.getInvoiceView(this.cardId, inv, {
+      category_id: this.selectedCategoryId(), page: this.currentPage(), page_size: this.pageSize,
+      search: this.searchTerm(),
+    }).subscribe({
+      next: view => {
+        this.card.set(view.card);
+        this.invoices.set(view.invoices);
+        this.selectedInvoice.set(view.selected_invoice);
+        this.invoiceData.set(view.invoice_data);
+        this.chartData.set(view.chart_data);
+        this.sharedEntries.set(view.shared_entries);
+        this.allCategories.set(view.categories);
+        this.annualInvoiceTotals.set(view.annual_invoice_totals);
+        this.loadingExpenses.set(false);
+        this.loadingChart.set(false);
+      },
+      error: () => { this.loadingExpenses.set(false); this.loadingChart.set(false); },
     });
   }
 

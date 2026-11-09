@@ -1,3 +1,14 @@
+# ADR-007: Comportamento de despesas
+
+- **Status:** Accepted
+- **Contexto:** Este documento registra a orientação atual do projeto para guia de comportamento de despesas.
+- **Decisão:** Manter estas regras e instruções como referência canônica para implementação e manutenção.
+- **Consequências:** Agentes devem consultar este ADR antes de alterar a área correspondente; mudanças de decisão devem atualizar este documento.
+
+## Conteúdo de referência
+
+O material abaixo foi preservado do documento original.
+
 # Behavior para Criação de Expenses com Parcelamento
 
 ## Arquivos Criados/Modificados:

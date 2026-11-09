@@ -94,13 +94,13 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .page-content {
-  // Mobile: offset from fixed mobile header + bottom nav
-  padding-top: calc(var(--mobile-header-h) + var(--space-sm));
-  padding-bottom: calc(var(--bottom-nav-h) + var(--space-xl));
+  // Keep the page clear of the shared top bar across screen sizes.
+  padding-top: var(--space-base);
+  padding-bottom: var(--space-xxl);
   min-height: 100vh;
 
   // Desktop: sidebar takes left side, no header offset needed
-  @media (min-width: 768px) {
+  @media (min-width: 721px) {
     margin-left: var(--sidebar-w);
     padding-top: var(--space-lg);
     padding-bottom: var(--space-xxl);

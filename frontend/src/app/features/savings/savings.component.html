@@ -1,31 +1,29 @@
 <div class="page-container">
   <div class="page-header">
-    <div>
-      <h1 class="page-header__title">🐷 Investimentos & Poupança</h1>
-      <p class="page-header__subtitle">Seus cofrinhos e metas de investimento</p>
+    <div class="page-header__left">
+      <p class="page-eyebrow">Reserva e metas</p>
+      <h1 class="page-header__title">Investimentos & Poupança</h1>
+      <p class="page-header__subtitle">Guarde por objetivo e acompanhe seus aportes.</p>
     </div>
     <div style="display:flex;gap:8px">
       <button class="btn btn--secondary btn--sm" type="button"
         (click)="showDepositForm.set(!showDepositForm())">
-        {{ showDepositForm() ? '✕ Fechar' : '💰 Novo aporte' }}
+        {{ showDepositForm() ? 'Fechar' : 'Novo aporte' }}
       </button>
       <button class="btn btn--primary btn--sm" type="button"
         (click)="showGoalForm.set(!showGoalForm())">
-        {{ showGoalForm() ? '✕ Fechar' : '＋ Novo cofrinho' }}
+        {{ showGoalForm() ? 'Fechar' : '+ Novo cofrinho' }}
       </button>
     </div>
   </div>
-
   @if (loading()) {
     <div class="loading-state"><span class="spinner"></span> Carregando...</div>
   } @else if (summary()) {
-
-    <!-- ── Grand Total ─────────────────────────────────────────────────── -->
-    <div class="savings-total-card">
-      <span class="savings-total-card__label">Total acumulado</span>
-      <span class="savings-total-card__value">{{ formatCurrency(summary()!.grand_total) }}</span>
-    </div>
-
+    <section class="savings-kpis" aria-label="Resumo dos investimentos">
+      <article><span>Total guardado</span><strong>{{ formatCurrency(summary()!.grand_total) }}</strong><small>Em {{ summary()!.goals.length }} objetivo(s)</small></article>
+      <article><span>Aportes do mês</span><strong>{{ formatCurrency(currentMonthDeposits()) }}</strong><small>Movimentações no período atual</small></article>
+      <article><span>Meta mais próxima</span>@if (nearestGoal(); as goal) { <strong>{{ goalProgress(goal) | number:'1.0-0' }}%</strong><small>{{ goal.name }}</small> } @else { <strong>—</strong><small>Adicione uma meta para acompanhar</small> }</article>
+    </section>
     <!-- ── New Goal Form ──────────────────────────────────────────────── -->
     @if (showGoalForm()) {
       <div class="card" style="margin-bottom:var(--space-md)">
@@ -60,7 +58,6 @@
         </form>
       </div>
     }
-
     <!-- ── New Deposit Form ───────────────────────────────────────────── -->
     @if (showDepositForm()) {
       <div class="card" style="margin-bottom:var(--space-md)">
@@ -98,11 +95,10 @@
         </form>
       </div>
     }
-
     <!-- ── Goals Grid ─────────────────────────────────────────────────── -->
     @if (summary()!.goals.length === 0) {
       <div class="empty-state">
-        <div class="empty-state__icon">🐷</div>
+        <div class="empty-state__icon"></div>
         <p class="empty-state__title">Nenhum cofrinho criado</p>
         <p class="empty-state__text">Crie seu primeiro cofrinho para começar a guardar dinheiro.</p>
       </div>
@@ -119,7 +115,7 @@
                 }
               </div>
               <button class="btn btn--danger btn--sm" type="button" (click)="deleteGoal(goal.id)"
-                style="margin-left:auto;opacity:0.6" title="Excluir cofrinho">🗑️</button>
+                style="margin-left:auto;opacity:0.6" title="Excluir cofrinho">Excluir</button>
             </div>
             <div class="goal-card__total" [style.color]="goal.color">
               {{ formatCurrency(goal.total_deposited) }}
@@ -139,7 +135,6 @@
           </div>
         }
       </div>
-
       <!-- ── Cumulative Chart ──────────────────────────────────────────── -->
       @if (summary()!.monthly_breakdown.length > 0) {
         <div class="card" style="margin-top:var(--space-lg)">
@@ -151,7 +146,6 @@
           </div>
         </div>
       }
-
       <!-- ── Recent Deposits Table ─────────────────────────────────────── -->
       @if (summary()!.monthly_breakdown.length > 0) {
         <div class="card" style="margin-top:var(--space-lg)">
@@ -187,12 +181,11 @@
     }
   }
 </div>
-
 @if (savTooltip()) {
   <div class="chart-tooltip"
     [style.left.px]="savTooltip()!.cx"
     [style.top.px]="savTooltip()!.cy">
-    <div class="chart-tooltip__title">📅 {{ savTooltip()!.label }}</div>
+    <div class="chart-tooltip__title">{{ savTooltip()!.label }}</div>
     <div class="chart-tooltip__row">
       <span><span class="dot dot--indigo"></span>Aporte do mês</span>
       <span class="chart-tooltip__val">{{ formatCurrency(savTooltip()!.monthly) }}</span>

@@ -339,6 +339,7 @@
             <tr>
               <th scope="col">Descri&ccedil;&atilde;o</th>
               <th scope="col">Tipo</th>
+              <th scope="col">Fixo</th>
               <th scope="col">Categoria</th>
               <th scope="col">
                 <button
@@ -378,6 +379,7 @@
                     />
                   </td>
                   <td><span class="type-badge type-badge--shared">Compartilhado</span></td>
+                  <td></td>
                   <td>
                     <select
                       class="ind-table__edit-input"
@@ -434,6 +436,7 @@
                       <span class="type-badge type-badge--shared">Compartilhado</span>
                     }
                   </td>
+                  <td>@if (row.isRecurrent) { <span class="type-badge type-badge--individual">Sim</span> }</td>
                   <td>
                     @if (row.categoryName) {
                       <span class="cat-badge" [style.--c-color]="catColor(i)">{{ row.categoryName }}</span>
@@ -448,6 +451,7 @@
                       @if (row.kind === 'individual' && row.expense; as e) {
                         <a
                           [routerLink]="['/expenses', e.id, 'edit']"
+                          [state]="{ returnUrl: currentReturnUrl }"
                           class="icon-btn"
                           [attr.aria-label]="'Editar ' + e.description"
                           title="Editar"

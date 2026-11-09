@@ -75,6 +75,48 @@
   }
 }
 
+.section-card--individual .section-card__header {
+  border-left: 4px solid var(--color-primary);
+}
+
+.section-card--shared .section-card__header {
+  border-left: 4px solid var(--color-body);
+}
+
+.installment-heading {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  align-items: center;
+  gap: 4px 12px;
+  min-width: 0;
+
+  .section-card__title,
+  .section-card__subtitle { grid-column: 2; }
+  .section-card__subtitle { margin: 0; }
+}
+
+.installment-kind {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+  padding: 5px 9px;
+  border-radius: var(--rounded-pill);
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 700;
+  white-space: nowrap;
+
+  &--individual {
+    color: var(--color-primary-active);
+    background: var(--color-primary-soft);
+  }
+
+  &--shared {
+    color: var(--color-body-strong);
+    background: var(--color-surface-strong);
+  }
+}
+
 /* Ghost button */
 .btn-ghost {
   background: none;
@@ -87,6 +129,7 @@
   white-space: nowrap;
   transition: background 0.15s;
   &:hover { background: var(--color-surface-soft); }
+  &:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
   &--bottom {
     display: block;
@@ -156,14 +199,26 @@
   color: var(--color-body);
 }
 
-.badge-pessoal {
-  display: inline-block;
-  background: #f4b000;
-  color: #fff;
+.installment-type-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--rounded-pill);
   font-size: 10px;
   font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+
+  &--individual {
+    color: var(--color-primary-active);
+    background: var(--color-primary-soft);
+  }
+
+  &--shared {
+    color: var(--color-body-strong);
+    background: var(--color-surface-strong);
+  }
 }
 
 /* Progress cell */
@@ -282,3 +337,14 @@
   animation: spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 640px) {
+  .section-card__header { flex-direction: column; }
+  .installment-heading { grid-template-columns: 1fr; }
+  .installment-kind,
+  .installment-heading .section-card__title,
+  .installment-heading .section-card__subtitle { grid-column: 1; }
+  .installment-kind { grid-row: auto; justify-self: start; }
+  .shared-installments__header { flex-direction: column; }
+  .shared-installments__summary { text-align: left; }
+}

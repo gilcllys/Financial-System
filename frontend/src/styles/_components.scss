@@ -460,39 +460,6 @@
   }
 }
 
-// ── FAB ───────────────────────────────────────────────────────────────────────
-.fab {
-  position: fixed;
-  bottom: calc(var(--bottom-nav-h) + var(--space-base));
-  right: var(--space-base);
-  width: 56px;
-  height: 56px;
-  border-radius: var(--rounded-full);
-  background: var(--color-primary);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 16px rgba(0, 82, 255, 0.4);
-  border: none;
-  cursor: pointer;
-  z-index: 100;
-  font-size: 24px;
-  transition: background 0.15s ease, transform 0.1s ease;
-
-  &:hover {
-    background: var(--color-primary-active);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-
-  @media (min-width: 1024px) {
-    display: none;
-  }
-}
-
 // ── Filter bar ─────────────────────────────────────────────────────────────────
 .filter-bar {
   display: flex;

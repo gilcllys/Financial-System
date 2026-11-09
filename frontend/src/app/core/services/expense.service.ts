@@ -49,6 +49,7 @@ export interface HistoryEntry {
   total_installments: number | null;
   participant_count?: number;
   own_portion?: number;
+  is_recurrent?: boolean;
   is_recurring: boolean;
 }
 
@@ -129,12 +130,6 @@ export class ExpenseService {
           map(pages => [first, ...pages].flatMap(page => page.results))
         );
       })
-    );
-  }
-
-  listByCard(cardId: number): Observable<Expense[]> {
-    return this.http.get<any[]>(`${this.base}/per-credit-card/${cardId}/`).pipe(
-      map(list => list.map(normalize))
     );
   }
 

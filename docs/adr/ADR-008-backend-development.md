@@ -1,3 +1,14 @@
+# ADR-008: Desenvolvimento do backend
+
+- **Status:** Accepted
+- **Contexto:** Este documento registra a orientação atual do projeto para guia de desenvolvimento do backend.
+- **Decisão:** Manter estas regras e instruções como referência canônica para implementação e manutenção.
+- **Consequências:** Agentes devem consultar este ADR antes de alterar a área correspondente; mudanças de decisão devem atualizar este documento.
+
+## Conteúdo de referência
+
+O material abaixo foi preservado do documento original.
+
 # Backend — Financial System API
 
 API REST do sistema financeiro pessoal, construída com Django + Django REST Framework, com autenticação via Keycloak e isolamento de dados por `tenant_id`.

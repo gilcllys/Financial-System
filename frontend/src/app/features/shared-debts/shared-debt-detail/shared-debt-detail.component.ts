@@ -2,7 +2,6 @@ import * as d3 from 'd3';
 import { Component, OnInit, inject, signal, computed, ElementRef, ViewChild, effect } from '@angular/core';
 import { ToastService } from '../../../core/services/toast.service';
 import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
-import { SlicePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { ReactiveFormsModule, FormsModule, FormBuilder, Validators } from '@angular/forms';
@@ -19,7 +18,6 @@ import {
   BalancesResponse,
   MonthlyHistoryEntry,
   RecurringTemplate,
-  PaginatedResponse,
   ByPersonResponse,
   ByPersonBlock,
   ByPersonEntry,
@@ -43,7 +41,7 @@ interface DraftSharedEntry {
 @Component({
   selector: 'app-shared-debt-detail',
   standalone: true,
-  imports: [RouterLink, ReactiveFormsModule, FormsModule, SlicePipe],
+  imports: [RouterLink, ReactiveFormsModule, FormsModule],
   templateUrl: './shared-debt-detail.component.html',
   styleUrls: ['./shared-debt-detail.component.scss'],
 })
@@ -58,7 +56,7 @@ export class SharedDebtDetailComponent implements OnInit {
   private categorySvc = inject(CategoryService);
   private fb = inject(FormBuilder);
 
-  private myTenantId = this.auth.userProfile.sub ?? null;
+  readonly myTenantId = this.auth.userProfile.sub ?? null;
 
   groupId = 0;
   group = signal<SharedDebtGroup | null>(null);
@@ -70,6 +68,7 @@ export class SharedDebtDetailComponent implements OnInit {
   readonly PAGE_SIZE = 20;
   filterMonth = signal<number | null>(null);
   filterCategory = signal<number | null>(null);
+  filterSearch = signal('');
   currentPage = signal(1);
   totalCount = signal(0);
   private openedEntryFromQuery = false;
@@ -150,10 +149,10 @@ export class SharedDebtDetailComponent implements OnInit {
 
   deletingGroup = signal(false);
   monthlyHistory = signal<MonthlyHistoryEntry[]>([]);
+  groupEntryCount = computed(() =>
+    this.monthlyHistory().reduce((total, month) => total + month.entry_count, 0),
+  );
   recurringTemplates = signal<RecurringTemplate[]>([]);
-  showRecurringForm = signal(false);
-  savingRecurring = signal(false);
-  recurringError = signal('');
   generatingMonth = signal(false);
 
   // ── Batch de gastos compartilhados ───────────────────────────────────────
@@ -176,14 +175,6 @@ export class SharedDebtDetailComponent implements OnInit {
   get batchTotal(): number { return this.batchDrafts().reduce((s, d) => s + d.amount, 0); }
   generateResult = signal<{ created: string[]; skipped: string[] } | null>(null);
 
-  recurringForm = this.fb.group({
-    description: ['', [Validators.required, Validators.minLength(2)]],
-    amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
-    paid_by: [null as number | null, Validators.required],
-    day_of_month: [1, [Validators.required, Validators.min(1), Validators.max(28)]],
-    payment_method: ['dinheiro' as 'dinheiro' | 'cartao'],
-    category_id: [null as number | null],
-  });
 
   // participants: track selected member ids (default = all)
   participantIds = signal<Set<number>>(new Set());
@@ -233,43 +224,43 @@ export class SharedDebtDetailComponent implements OnInit {
   ngOnInit(): void {
     this.groupId = +this.route.snapshot.paramMap.get('id')!;
     this.loadAll();
-    this.cardSvc.list().subscribe({ next: c => this.cards.set(c) });
-    this.categorySvc.list().subscribe({ next: cats => this.categories.set(cats) });
   }
 
   private loadAll(): void {
     this.loading.set(true);
-    this.svc.getGroup(this.groupId).subscribe({ next: g => this.group.set(g) });
-    this.svc.members(this.groupId).subscribe({
-      next: m => {
-        this.members.set(m);
-        this.participantIds.set(new Set(m.map(x => x.id)));
-        this.batchParticipantIds.set(new Set(m.map(x => x.id)));
+    this.svc.screenSummary(this.groupId, this.filterMonth(), this.filterCategory(), this.currentPage(), this.filterSearch()).subscribe({
+      next: data => {
+        this.group.set(data.group);
+        this.members.set(data.members);
+        this.participantIds.set(new Set(data.members.map(member => member.id)));
+        this.batchParticipantIds.set(new Set(data.members.map(member => member.id)));
+        this.balances.set(data.balances);
+        this.entries.set(data.entries.results);
+        this.totalCount.set(data.entries.count);
+        this.monthlyHistory.set(data.monthly_history);
+        this.recurringTemplates.set(data.recurring_templates);
         this.openEntryFromQuery();
         this.loading.set(false);
+        this.loadByPerson();
       },
       error: () => this.loading.set(false),
     });
-    this.refreshEntriesAndBalances();
-    this.loadMonthlyHistory();
-    this.loadRecurringTemplates();
   }
 
   private refreshEntriesAndBalances(resetPage = false): void {
     if (resetPage) this.currentPage.set(1);
-    this.svc.listEntries({
-      shared_debt: this.groupId,
-      month: this.filterMonth() ?? undefined,
-      category: this.filterCategory() ?? undefined,
-      page: this.currentPage(),
-    }).subscribe({
-      next: (res: PaginatedResponse<SharedDebtEntry>) => {
-        this.entries.set(res.results);
-        this.totalCount.set(res.count);
+    this.svc.screenSummary(this.groupId, this.filterMonth(), this.filterCategory(), this.currentPage(), this.filterSearch()).subscribe({
+      next: data => {
+        this.group.set(data.group);
+        this.members.set(data.members);
+        this.entries.set(data.entries.results);
+        this.totalCount.set(data.entries.count);
+        this.balances.set(data.balances);
+        this.monthlyHistory.set(data.monthly_history);
+        this.recurringTemplates.set(data.recurring_templates);
         this.openEntryFromQuery();
       }
     });
-    this.svc.balances(this.groupId).subscribe({ next: b => this.balances.set(b) });
     if (this.bpData()) this.loadByPerson();
   }
 
@@ -293,6 +284,7 @@ export class SharedDebtDetailComponent implements OnInit {
   clearFilters(): void {
     this.filterMonth.set(null);
     this.filterCategory.set(null);
+    this.filterSearch.set('');
     this.refreshEntriesAndBalances(true);
   }
 
@@ -320,7 +312,10 @@ export class SharedDebtDetailComponent implements OnInit {
         this.inviteUrl.set(window.location.origin + res.join_path);
         this.inviting.set(false);
       },
-      error: () => this.inviting.set(false),
+      error: () => {
+        this.inviting.set(false);
+        this.toast.error('Não foi possível gerar o link de convite.');
+      },
     });
   }
 
@@ -338,12 +333,19 @@ export class SharedDebtDetailComponent implements OnInit {
     this.showEntryForm.set(!this.showEntryForm());
     this.editingEntryId.set(null);
     this.entryError.set('');
+    if (this.showEntryForm()) this.loadEntryLookups();
+  }
+
+  private loadEntryLookups(): void {
+    if (this.cards().length === 0) this.cardSvc.list().subscribe({ next: cards => this.cards.set(cards) });
+    if (this.categories().length === 0) this.categorySvc.list().subscribe({ next: categories => this.categories.set(categories) });
   }
 
   /** Open the form pre-filled for editing an existing entry.
    *  NOTE: The list endpoint does not return participant_ids, so we default
    *  to ALL members when editing. The user can uncheck before saving. */
   editEntry(entry: SharedDebtEntry): void {
+    this.loadEntryLookups();
     this.editingEntryId.set(entry.id);
     this.entryError.set('');
     this.form.reset({
@@ -355,8 +357,7 @@ export class SharedDebtDetailComponent implements OnInit {
       credit_card_id: entry.credit_card ?? null,
       category_id: entry.category ?? null,
     });
-    // Default all members as participants — editing re-sends all unless user unchecks.
-    this.participantIds.set(new Set(this.members().map(m => m.id)));
+    this.participantIds.set(new Set(entry.participant_ids));
     this.showEntryForm.set(true);
   }
 
@@ -374,6 +375,10 @@ export class SharedDebtDetailComponent implements OnInit {
 
   saveEntry(): void {
     if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+    if (this.isCartao && this.payerIsMe && !this.form.value.credit_card_id) {
+      this.entryError.set('Selecione o cartão de crédito usado.');
+      return;
+    }
     const participants = [...this.participantIds()];
     if (participants.length === 0) {
       this.entryError.set('Selecione ao menos um participante.');
@@ -391,7 +396,7 @@ export class SharedDebtDetailComponent implements OnInit {
       paid_by: v.paid_by!,
       participant_ids: allSelected ? undefined : participants,
       payment_method: v.payment_method!,
-      credit_card_id: v.payment_method === 'cartao' && this.payerIsMe ? v.credit_card_id : null,
+      credit_card_id: v.payment_method === 'cartao' ? v.credit_card_id : null,
       category_id: v.category_id ?? null,
       total_installments_input: this.isParcelado() ? (v.total_installments_input ?? 2) : 1,
     };
@@ -476,39 +481,6 @@ export class SharedDebtDetailComponent implements OnInit {
     });
   }
 
-  toggleRecurringForm(): void {
-    this.showRecurringForm.set(!this.showRecurringForm());
-    this.recurringError.set('');
-  }
-
-  saveRecurring(): void {
-    if (this.recurringForm.invalid) { this.recurringForm.markAllAsTouched(); return; }
-    this.savingRecurring.set(true);
-    this.recurringError.set('');
-    const v = this.recurringForm.getRawValue();
-    const allMembers = this.members().map(m => m.id);
-    this.svc.createRecurringTemplate(this.groupId, {
-      description: v.description!,
-      amount: v.amount!,
-      paid_by: v.paid_by!,
-      day_of_month: v.day_of_month ?? 1,
-      payment_method: v.payment_method as 'dinheiro' | 'cartao',
-      category_id: v.category_id,
-      participant_ids: allMembers,
-    }).subscribe({
-      next: () => {
-        this.savingRecurring.set(false);
-        this.showRecurringForm.set(false);
-        this.recurringForm.reset({ description: '', amount: null, paid_by: null, day_of_month: 1, payment_method: 'dinheiro', category_id: null });
-        this.loadRecurringTemplates();
-      },
-      error: err => {
-        this.savingRecurring.set(false);
-        this.recurringError.set(err?.error?.detail ?? 'Erro ao salvar.');
-      },
-    });
-  }
-
   async deleteRecurring(tplId: number): Promise<void> {
     if (!(await this.confirmDialog.confirm('Excluir este gasto recorrente?'))) return;
     this.svc.deleteRecurringTemplate(this.groupId, tplId).subscribe({
@@ -534,7 +506,10 @@ export class SharedDebtDetailComponent implements OnInit {
 
 
   // ── Batch methods ─────────────────────────────────────────────────────────
-  toggleBatchSection(): void { this.showBatchSection.set(!this.showBatchSection()); }
+  toggleBatchSection(): void {
+    this.showBatchSection.set(!this.showBatchSection());
+    if (this.showBatchSection()) this.loadEntryLookups();
+  }
 
   isBatchParticipant(id: number): boolean { return this.batchParticipantIds().has(id); }
 
@@ -641,7 +616,7 @@ export class SharedDebtDetailComponent implements OnInit {
       const first = entries[0];
       const last = entries[entries.length - 1];
       const total = first.total_installments;
-      const paid = entries.filter(e => new Date(e.date) <= now).length;
+      const paid = entries.filter(e => e.paid).length;
       const progressPct = Math.round((paid / total) * 100);
       const paidBy = first.paid_by_name;
       const participantCount = first.participant_count;
@@ -685,13 +660,19 @@ export class SharedDebtDetailComponent implements OnInit {
       };
     });
   });
-
   myPortion(e: SharedDebtEntry): number {
     return e.amount / (e.participant_count || 1);
   }
 
+  participantNames(entry: SharedDebtEntry): string {
+    return this.members()
+      .filter(member => entry.participant_ids.includes(member.id))
+      .map(member => member.tenant_id === this.myTenantId ? 'Você' : member.display_name)
+      .join(', ');
+  }
+
   isPaid(e: SharedDebtEntry): boolean {
-    return new Date(e.date) <= new Date();
+    return e.paid;
   }
 
   formatMonthYear(d: string): string {
@@ -717,7 +698,7 @@ export class SharedDebtDetailComponent implements OnInit {
   }
 
   // ── Per-person view (faturas fechadas / em aberto) ──────────────────────
-  bpMode = signal<'closed' | 'open'>('closed');
+  bpMode = signal<'closed' | 'open'>('open');
   bpMonth = signal(new Date().getMonth() + 1);
   bpYear = signal(new Date().getFullYear());
   bpData = signal<ByPersonResponse | null>(null);

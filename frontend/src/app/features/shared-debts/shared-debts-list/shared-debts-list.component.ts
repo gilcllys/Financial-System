@@ -1,18 +1,11 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ToastService } from '../../../core/services/toast.service';
-import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
 import { RouterLink } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { forkJoin, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
-import { AuthService } from '../../../core/auth/auth.service';
 import {
   SharedDebtService,
-  SharedDebtGroup,
-  BalancesResponse,
+  SharedDebtListSummary,
 } from '../../../core/services/shared-debt.service';
-
-interface Settlement { iOwe: boolean; name: string; amount: number; }
 
 @Component({
   selector: 'app-shared-debts-list',
@@ -23,16 +16,10 @@ interface Settlement { iOwe: boolean; name: string; amount: number; }
 })
 export class SharedDebtsListComponent implements OnInit {
   private toast = inject(ToastService);
-  private confirmDialog = inject(ConfirmDialogService);
   private svc  = inject(SharedDebtService);
-  private auth = inject(AuthService);
   private fb   = inject(FormBuilder);
 
-  private myTenantId = this.auth.userProfile.sub ?? null;
-
-  groups           = signal<SharedDebtGroup[]>([]);
-  balancesByGroup  = signal<Map<number, BalancesResponse>>(new Map());
-  entryCounts      = signal<Record<number, number>>({});
+  groups           = signal<SharedDebtListSummary[]>([]);
   loading          = signal(true);
   showForm         = signal(false);
   creating         = signal(false);
@@ -47,86 +34,12 @@ export class SharedDebtsListComponent implements OnInit {
 
   private load(): void {
     this.loading.set(true);
-    this.svc.listGroups().subscribe({
+    this.svc.listSummary().subscribe({
       next: groups => {
         this.groups.set(groups);
-        if (!groups.length) { this.loading.set(false); return; }
-        forkJoin(
-          groups.map(g =>
-            this.svc.balances(g.id).pipe(
-              map(b => [g.id, b] as const),
-              catchError(() => of([g.id, null] as const)),
-            )
-          )
-        ).subscribe({
-          next: results => {
-            const bmap = new Map<number, BalancesResponse>();
-            const counts: Record<number, number> = {};
-            for (const [id, b] of results) {
-              if (b) bmap.set(id, b);
-            }
-            this.balancesByGroup.set(bmap);
-            // Load entry counts per group
-            groups.forEach(g => {
-              this.svc.listEntries({ shared_debt: g.id, page_size: 200 }).subscribe({
-                next: res => this.entryCounts.update(c => ({ ...c, [g.id]: res.count })),
-                error: () => {},
-              });
-            });
-            this.loading.set(false);
-          },
-          error: () => this.loading.set(false),
-        });
+        this.loading.set(false);
       },
       error: () => this.loading.set(false),
-    });
-  }
-
-  groupBalances(groupId: number): BalancesResponse | null {
-    return this.balancesByGroup().get(groupId) ?? null;
-  }
-
-  myMemberIdFor(group: SharedDebtGroup): number | null {
-    const b = this.balancesByGroup().get(group.id);
-    if (!b) return null;
-    return this.myMemberId(group, b);
-  }
-
-  private myMemberId(group: SharedDebtGroup, b: BalancesResponse): number | null {
-    const byTenant = this.myTenantId
-      ? b.members.find(m => m.tenant_id === this.myTenantId)
-      : undefined;
-    if (byTenant) return byTenant.member_id;
-    return b.members.find(m => m.tenant_id === group.owner_tenant_id)?.member_id ?? null;
-  }
-
-  groupHint(group: SharedDebtGroup): number | null {
-    const b = this.balancesByGroup().get(group.id);
-    if (!b) return null;
-    const myId = this.myMemberId(group, b);
-    if (myId == null) return null;
-    return b.members.find(m => m.member_id === myId)?.balance ?? null;
-  }
-
-  /** Returns the most relevant settlement line involving me, or null. */
-  mySettlement(group: SharedDebtGroup, b: BalancesResponse): Settlement | null {
-    const myId = this.myMemberId(group, b);
-    if (myId == null) return null;
-    // I owe someone
-    const iOwe = b.settlement.find(s => s.from_member_id === myId);
-    if (iOwe) return { iOwe: true, name: iOwe.to_name, amount: iOwe.amount };
-    // Someone owes me
-    const owesMe = b.settlement.find(s => s.to_member_id === myId);
-    if (owesMe) return { iOwe: false, name: owesMe.from_name, amount: owesMe.amount };
-    return null;
-  }
-
-  copyInvite(groupId: number): void {
-    this.svc.createInvite(groupId).subscribe({
-      next: inv => {
-        const url = window.location.origin + inv.join_path;
-        navigator.clipboard.writeText(url).then(() => this.toast.success('Link copiado!'));
-      },
     });
   }
 
@@ -141,17 +54,13 @@ export class SharedDebtsListComponent implements OnInit {
       name: this.form.value.name!,
       member_names: names.length ? names : undefined,
     }).subscribe({
-      next: () => { this.creating.set(false); this.showForm.set(false); this.form.reset(); this.load(); },
+      next: () => { this.toast.success('Grupo criado.'); this.creating.set(false); this.showForm.set(false); this.form.reset(); this.load(); },
       error: err => { this.creating.set(false); this.errorMessage.set(err?.error?.detail ?? 'Erro ao criar grupo.'); },
     });
   }
 
   initials(name: string): string {
     return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
-  }
-
-  formatCurrency(v: number): string {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(v ?? 0));
   }
 
   hasError(field: string): boolean {

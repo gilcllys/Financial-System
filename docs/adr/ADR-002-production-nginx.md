@@ -1,3 +1,14 @@
+# ADR-002: Roteamento e implantação com Nginx
+
+- **Status:** Accepted
+- **Contexto:** Este documento registra a orientação atual do projeto para guia operacional do nginx.
+- **Decisão:** Manter estas regras e instruções como referência canônica para implementação e manutenção.
+- **Consequências:** Agentes devem consultar este ADR antes de alterar a área correspondente; mudanças de decisão devem atualizar este documento.
+
+## Conteúdo de referência
+
+O material abaixo foi preservado do documento original.
+
 # 📖 Guia de Referência — Nginx
 
 ## 1. O que é e como funciona

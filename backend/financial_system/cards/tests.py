@@ -7,6 +7,7 @@ from decimal import Decimal
 from django.test import SimpleTestCase, TestCase
 
 from cards.behaviors import (
+    CreditCardInvoiceViewBehavior,
     InvoiceExpensesBehavior,
     OpenInvoicesBehavior,
     compute_invoice_period,
@@ -14,7 +15,10 @@ from cards.behaviors import (
 )
 from cards.models import CreditCard
 from catalog.models import ExpenseCategory
-from debts.models import SharedDebt, SharedDebtMember, SharedEntry, SharedEntryParticipant
+from debts.models import (
+    SharedDebt, SharedDebtMember, SharedEntry, SharedEntryParticipant,
+    SharedRecurringTemplate,
+)
 from expenses.models import Expense
 
 
@@ -177,7 +181,9 @@ class OpenInvoicesSharedTests(TestCase):
 
     def _run(self, closing_month=None, closing_year=None):
         with patch('cards.behaviors.date', _FixedToday):
-            rows = OpenInvoicesBehavior(self.TENANT).run(closing_month, closing_year).data
+            rows = OpenInvoicesBehavior(
+                self.TENANT, closing_month, closing_year,
+            ).run().data
         self.assertEqual(len(rows), 1)
         return rows[0]
 
@@ -243,6 +249,71 @@ class OpenInvoicesSharedTests(TestCase):
         self.assertEqual(row['total'], 0.0)
 
 
+class AnnualInvoiceTotalsSharedTests(TestCase):
+    TENANT = 'tenant-annual-invoice'
+    OTHER_TENANT = 'tenant-annual-other'
+
+    def setUp(self):
+        self.card = CreditCard.objects.create(
+            tenant_id=self.TENANT, name='Cartao anual', due_day=1,
+            closing_day=21, last_four_digits='4321',
+        )
+        self.category = ExpenseCategory.objects.create(
+            tenant_id=self.TENANT, name='Casa anual'
+        )
+        self.group = SharedDebt.objects.create(
+            name='Grupo anual', owner_tenant_id=self.TENANT,
+        )
+        self.me = SharedDebtMember.objects.create(
+            shared_debt=self.group, tenant_id=self.TENANT, display_name='Eu'
+        )
+        self.other = SharedDebtMember.objects.create(
+            shared_debt=self.group, tenant_id=self.OTHER_TENANT, display_name='Outra pessoa'
+        )
+
+    def test_anual_soma_compartilhados_no_periodo_da_fatura(self):
+        period_start = real_date(2026, 1, 22)
+        period_end = real_date(2026, 2, 20)
+        Expense.objects.create(
+            tenant_id=self.TENANT, category=self.category, credit_card=self.card,
+            description='Individual', quantity=1, amount=Decimal('-100.00'),
+            date=real_date(2026, 2, 3), payment_method='cartao',
+        )
+        SharedEntry.objects.create(
+            shared_debt=self.group, paid_by=self.me, description='Dentro da fatura',
+            amount=Decimal('200.00'), date=real_date(2026, 2, 4),
+            payment_method='cartao', credit_card=self.card,
+            created_by_tenant_id=self.TENANT,
+        )
+        SharedEntry.objects.create(
+            shared_debt=self.group, paid_by=self.other, description='Pago por outra pessoa',
+            amount=Decimal('500.00'), date=real_date(2026, 2, 4),
+            payment_method='cartao', credit_card=self.card,
+            created_by_tenant_id=self.TENANT,
+        )
+        SharedEntry.objects.create(
+            shared_debt=self.group, paid_by=self.me, description='Fora da fatura',
+            amount=Decimal('700.00'), date=real_date(2026, 2, 21),
+            payment_method='cartao', credit_card=self.card,
+            created_by_tenant_id=self.TENANT,
+        )
+
+        totals = CreditCardInvoiceViewBehavior(
+            self.card, request=None, params={},
+        )._annual_totals(
+            [{
+                'invoice_month': 2,
+                'invoice_year': 2026,
+                'period_start': period_start.isoformat(),
+                'period_end': period_end.isoformat(),
+            }],
+            {'invoice_year': 2026},
+        )
+
+        self.assertEqual(totals[1], 300.00)
+        self.assertEqual(sum(totals), 300.00)
+
+
 class CreditCardDeleteEndpointTests(TestCase):
     """
     Trava do comportamento de delete antes de remover o perform_destroy.
@@ -280,6 +351,32 @@ class CreditCardDeleteEndpointTests(TestCase):
         resp = self.client.delete(f'{self.URL}{card.id}/')
         self.assertEqual(resp.status_code, 204)
         self.assertFalse(CreditCard.objects.filter(id=card.id).exists())
+
+    def test_delete_pausa_template_compartilhado_antes_de_remover_cartao(self):
+        card = self._card()
+        group = SharedDebt.objects.create(
+            name='Grupo recorrente', owner_tenant_id=self.TENANT,
+        )
+        payer = SharedDebtMember.objects.create(
+            shared_debt=group, tenant_id=self.TENANT, display_name='Eu'
+        )
+        template = SharedRecurringTemplate.objects.create(
+            shared_debt=group,
+            description='Aluguel',
+            amount=Decimal('1000.00'),
+            paid_by=payer,
+            participant_ids=[payer.id],
+            payment_method='cartao',
+            credit_card=card,
+            is_active=True,
+        )
+
+        resp = self.client.delete(f'{self.URL}{card.id}/')
+
+        self.assertEqual(resp.status_code, 204)
+        template.refresh_from_db()
+        self.assertFalse(template.is_active)
+        self.assertIsNone(template.credit_card_id)
 
     def test_delete_de_cartao_de_outro_tenant_retorna_404(self):
         alheio = self._card('Alheio', tenant=self.OTHER_TENANT)

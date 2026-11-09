@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { AnalyticsService, MonthlyAnalytics, CategoryAnalytics, CardAnalytics, DailyAnalytics } from '../../core/services/analytics.service';
 import { D3ChartService, DonutData, BarData, GroupedBarData, AreaData } from '../../core/services/d3-chart.service';
 
-const CAT_COLORS = ['#0052ff','#05b169','#cf202f','#f4b000','#7c828a','#16181c','#a8acb3','#30b0c7','#ff6b35','#af52de'];
+const CAT_COLORS = ['#2858d8','#16805b','#bd4552','#a96f16','#7c828a','#17202e','#a8acb3','#30b0c7','#ff6b35','#af52de'];
 
 @Component({
   selector: 'app-analytics',
@@ -57,6 +57,7 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
     return values.length % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
   };
   daysWithExpense = () => this.dailyData().filter(d => d.total > 0).length;
+  monthlyExpenseTotal = () => this.dailyData().reduce((total, day) => total + day.total, 0);
 
   private viewReady = false;
   private dataReady = false;

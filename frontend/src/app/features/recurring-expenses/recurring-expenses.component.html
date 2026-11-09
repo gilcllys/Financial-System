@@ -1,9 +1,9 @@
 <div class="page-header">
-  <div>
-    <h1 class="page-header__title">Gastos Fixos</h1>
+  <div class="page-header__left">
+    <p class="page-eyebrow">Planejamento</p>
+    <h1 class="page-header__title">Gastos fixos</h1>
     <p class="page-header__subtitle">
-      Cadastre o que se repete todo mês. Ao gerar os lançamentos, eles viram despesas reais
-      e aparecem no Histórico &mdash; e na fatura do cartão, quando houver um atribuído.
+      Cadastre compromissos mensais individuais e dos seus grupos compartilhados.
     </p>
   </div>
   <div class="page-header__actions">
@@ -12,24 +12,31 @@
 </div>
 
 <!-- Resumo -->
-<div class="kpi-grid kpi-grid--3">
+<div class="kpi-grid kpi-grid--4">
   <div class="kpi-clean-card">
     <div class="kpi-clean-card__top">
-      <span class="kpi-clean-card__label">CUSTO FIXO MENSAL</span>
+      <span class="kpi-clean-card__label">FIXOS INDIVIDUAIS</span>
     </div>
     <span class="kpi-clean-card__value mono">{{ fmtCur(monthlyTotal()) }}</span>
-    <span class="kpi-clean-card__hint">{{ activeTemplates().length }} ativo(s)</span>
+    <span class="kpi-clean-card__hint">{{ activeTemplates().length }} modelo(s) ativo(s)</span>
   </div>
   <div class="kpi-clean-card">
     <div class="kpi-clean-card__top">
-      <span class="kpi-clean-card__label">NO CARTÃO</span>
+      <span class="kpi-clean-card__label">MINHA PARTE NOS GRUPOS</span>
+    </div>
+    <span class="kpi-clean-card__value mono">{{ fmtCur(sharedMyMonthlyTotal()) }}</span>
+    <span class="kpi-clean-card__hint">somente os grupos que incluem você</span>
+  </div>
+  <div class="kpi-clean-card">
+    <div class="kpi-clean-card__top">
+      <span class="kpi-clean-card__label">INDIVIDUAIS NO CARTÃO</span>
     </div>
     <span class="kpi-clean-card__value mono">{{ fmtCur(cardTotal()) }}</span>
     <span class="kpi-clean-card__hint">entra na fatura</span>
   </div>
   <div class="kpi-clean-card">
     <div class="kpi-clean-card__top">
-      <span class="kpi-clean-card__label">EM DINHEIRO</span>
+      <span class="kpi-clean-card__label">INDIVIDUAIS EM DINHEIRO</span>
     </div>
     <span class="kpi-clean-card__value mono">{{ fmtCur(cashTotal()) }}</span>
     <span class="kpi-clean-card__hint">só no histórico</span>
@@ -39,12 +46,11 @@
 <!-- Gerar lancamentos do mes -->
 <div class="card generate-card">
   <div class="card__header">
-    <span class="card__title">Gerar lançamentos do mês</span>
+    <span class="card__title">Gerar lançamentos individuais do mês</span>
   </div>
   <div class="card__body">
     <p class="generate-card__help">
-      Cria uma despesa real para cada gasto fixo ativo. Rodar duas vezes no mesmo mês
-      não duplica: o que já existe é ignorado.
+      Gere os modelos individuais para outro mês quando precisar. Os gastos compartilhados são gerados automaticamente ao cadastrar e pelo agendador diário.
     </p>
     <div class="generate-card__controls">
       <button class="btn btn--ghost btn--sm" type="button" (click)="shiftMonth(-1)" aria-label="Mês anterior">&lsaquo;</button>
@@ -96,10 +102,17 @@
 @if (showForm()) {
   <div class="card form-card">
     <div class="card__header">
-      <span class="card__title">{{ editingId() === null ? 'Cadastrar Gasto Fixo' : 'Editar Gasto Fixo' }}</span>
+      <span class="card__title">{{ editingId() === null ? 'Novo gasto fixo' : 'Editar gasto fixo individual' }}</span>
       <button class="btn btn--ghost btn--sm" type="button" (click)="closeForm()">Fechar</button>
     </div>
     <div class="card__body">
+      @if (editingId() === null) {
+        <div class="recurring-type-switch" role="group" aria-label="Tipo do gasto fixo">
+          <button type="button" [class.recurring-type-switch__button--active]="expenseType() === 'individual'" [attr.aria-pressed]="expenseType() === 'individual'" (click)="selectType('individual')">Individual</button>
+          <button type="button" [class.recurring-type-switch__button--active]="expenseType() === 'shared'" [attr.aria-pressed]="expenseType() === 'shared'" (click)="selectType('shared')">Compartilhado</button>
+        </div>
+      }
+      @if (expenseType() === 'individual') {
       <form [formGroup]="form" (ngSubmit)="save()" novalidate class="form-body">
         <div class="form-row">
           <div class="form-group" style="flex:2">
@@ -156,6 +169,112 @@
           </button>
         </div>
       </form>
+      } @else {
+        <form [formGroup]="sharedForm" (ngSubmit)="save()" novalidate class="form-body">
+          <div class="form-row">
+            <div class="form-group" style="flex:1">
+              <label class="form-label" for="shared-rec-group">Grupo compartilhado *</label>
+              <select id="shared-rec-group" class="form-select" formControlName="shared_debt" (change)="onSharedGroupChange($any($event.target).value)">
+                <option [ngValue]="null">Selecione um grupo</option>
+                @for (group of sharedGroups(); track group.id) {
+                  <option [ngValue]="group.id">{{ group.name }}</option>
+                }
+              </select>
+              @if (sharedForm.get('shared_debt')?.invalid && sharedForm.get('shared_debt')?.touched) {
+                <span class="form-error">Selecione o grupo que terá esse gasto fixo.</span>
+              }
+              @if (sharedGroups().length === 0) {
+                <span class="form-hint">Crie ou entre em um grupo antes de cadastrar um gasto compartilhado.</span>
+              }
+            </div>
+            <div class="form-group" style="flex:2">
+              <label class="form-label" for="shared-rec-desc">Descrição *</label>
+              <input id="shared-rec-desc" class="form-input" type="text" formControlName="description" placeholder="Ex.: Aluguel" />
+              @if (sharedForm.get('description')?.invalid && sharedForm.get('description')?.touched) {
+                <span class="form-error">Informe uma descrição.</span>
+              }
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="shared-rec-amount">Valor total mensal (R$) *</label>
+              <input id="shared-rec-amount" class="form-input" type="number" min="0.01" step="0.01" formControlName="amount" />
+              @if (sharedForm.get('amount')?.invalid && sharedForm.get('amount')?.touched) {
+                <span class="form-error">Informe um valor maior que zero.</span>
+              }
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="shared-rec-day">Dia do mês *</label>
+              <input id="shared-rec-day" class="form-input" type="number" min="1" max="28" formControlName="day_of_month" />
+              @if (sharedForm.get('day_of_month')?.invalid && sharedForm.get('day_of_month')?.touched) {
+                <span class="form-error">Escolha um dia entre 1 e 28.</span>
+              }
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="shared-rec-payer">Quem paga *</label>
+              <select id="shared-rec-payer" class="form-select" formControlName="paid_by">
+                <option [ngValue]="null" disabled>Selecione quem paga</option>
+                @for (member of sharedMembers(); track member.id) {
+                  <option [ngValue]="member.id">{{ member.tenant_id && member.tenant_id === currentTenantId ? 'Você' : member.display_name }}</option>
+                }
+              </select>
+              @if (sharedForm.get('paid_by')?.invalid && sharedForm.get('paid_by')?.touched) {
+                <span class="form-error">Selecione quem paga.</span>
+              }
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="shared-rec-category">Categoria</label>
+              <select id="shared-rec-category" class="form-select" formControlName="category_id">
+                <option [ngValue]="null">Sem categoria</option>
+                @for (category of categories(); track category.id) {
+                  <option [ngValue]="category.id">{{ category.name }}</option>
+                }
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <fieldset class="form-group">
+              <legend class="form-label">Forma de pagamento</legend>
+              <div class="radio-group">
+                <label class="radio-option"><input type="radio" formControlName="payment_method" value="dinheiro" /> Dinheiro</label>
+                <label class="radio-option"><input type="radio" formControlName="payment_method" value="cartao" /> Cartão de crédito</label>
+              </div>
+            </fieldset>
+            @if (sharedIsCartao && sharedPayerIsMe) {
+              <div class="form-group">
+                <label class="form-label" for="shared-rec-card">Cartão usado por você *</label>
+                <select id="shared-rec-card" class="form-select" formControlName="credit_card_id">
+                  <option [ngValue]="null">Selecione o cartão</option>
+                  @for (card of creditCards(); track card.id) {
+                    <option [ngValue]="card.id">{{ card.name }}</option>
+                  }
+                </select>
+              </div>
+            } @else if (sharedIsCartao) {
+              <p class="form-hint">O cartão do outro participante não será vinculado à sua conta.</p>
+            }
+          </div>
+          <fieldset class="form-group recurring-participants">
+            <legend class="form-label">Dividir com *</legend>
+            @if (selectedSharedGroupId() && sharedMembers().length) {
+              <div class="recurring-participants__list">
+                @for (member of sharedMembers(); track member.id) {
+                  <label><input type="checkbox" [checked]="isSharedParticipant(member.id)" (change)="toggleSharedParticipant(member.id)" /> {{ member.tenant_id && member.tenant_id === currentTenantId ? 'Você' : member.display_name }}</label>
+                }
+              </div>
+            } @else {
+              <span class="form-hint">Selecione um grupo para escolher quem participa.</span>
+            }
+          </fieldset>
+          @if (error()) { <div class="form-error-box" role="alert">{{ error() }}</div> }
+          <div class="form-actions">
+            <button class="btn btn--primary btn--sm" type="submit" [disabled]="savingShared() || !sharedGroups().length">
+              @if (savingShared()) { <span class="spinner"></span> }
+              Criar gasto fixo compartilhado
+            </button>
+          </div>
+        </form>
+      }
     </div>
   </div>
 }
@@ -163,13 +282,13 @@
 <!-- Lista -->
 <div class="card">
   <div class="card__header">
-    <span class="card__title">Cadastrados</span>
+    <span class="card__title">Gastos fixos individuais</span>
   </div>
   <div class="card__body">
     @if (loading()) {
       <p class="empty-msg">Carregando...</p>
     } @else if (templates().length === 0) {
-      <p class="empty-msg">Nenhum gasto fixo cadastrado. Clique em &ldquo;Novo Gasto Fixo&rdquo; para começar.</p>
+      <p class="empty-msg">Nenhum gasto fixo individual cadastrado.</p>
     } @else {
       <div class="data-table-wrapper">
         <table class="data-table">
@@ -219,6 +338,80 @@
                     {{ t.is_active ? 'Pausar' : 'Ativar' }}
                   </button>
                   <button class="btn btn--danger btn--sm" type="button" (click)="remove(t)">Excluir</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>
+
+<div class="card shared-recurring-list">
+  <div class="card__header">
+    <div>
+      <span class="card__title">Gastos fixos compartilhados</span>
+      <p class="shared-recurring-list__hint">Modelos dos seus grupos, com a sua parte mensal identificada.</p>
+    </div>
+    <button class="btn btn--secondary btn--sm" type="button" (click)="openCreate('shared')" [disabled]="sharedGroups().length === 0">
+      + Novo gasto compartilhado
+    </button>
+  </div>
+  <div class="card__body">
+    @if (loadingShared()) {
+      <p class="empty-msg">Carregando gastos compartilhados...</p>
+    } @else if (sharedLoadError()) {
+      <div class="shared-recurring-list__error" role="alert">
+        <span>{{ sharedLoadError() }}</span>
+        <button class="btn btn--secondary btn--sm" type="button" (click)="loadShared()">Tentar novamente</button>
+      </div>
+    } @else if (sharedGroups().length === 0) {
+      <p class="empty-msg">Você ainda não participa de grupos. <a routerLink="/shared-debts">Ver grupos compartilhados</a>.</p>
+    } @else if (sharedTemplates().length === 0) {
+      <p class="empty-msg">Nenhum grupo tem gastos fixos cadastrados. Use “Novo gasto compartilhado” para criar o primeiro.</p>
+    } @else {
+      <div class="data-table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Grupo</th>
+              <th>Descrição</th>
+              <th>Pago por</th>
+              <th>Pagamento</th>
+              <th>Dia</th>
+              <th class="text-right">Valor total</th>
+              <th class="text-right">Sua parte</th>
+              <th>Status</th>
+              <th><span class="sr-only">Ações</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (template of sharedTemplates(); track template.id) {
+              <tr [class.row--paused]="!template.is_active">
+                <td><span class="badge badge--primary">{{ template.shared_debt_name }}</span></td>
+                <td class="cell--strong">{{ template.description }}</td>
+                <td>{{ template.paid_by_tenant_id && template.paid_by_tenant_id === currentTenantId ? 'Você' : template.paid_by_name }}</td>
+                <td>{{ sharedCardName(template) }}</td>
+                <td class="mono text-muted">dia {{ template.day_of_month }}</td>
+                <td class="text-right mono">{{ fmtCur(template.amount) }}</td>
+                <td class="text-right mono">
+                  @if (sharedMyPortion(template); as portion) {
+                    {{ fmtCur(portion) }}
+                  } @else {
+                    <span class="text-muted">Fora da divisão</span>
+                  }
+                </td>
+                <td>
+                  <span [class]="template.is_active ? 'badge badge--success' : 'badge badge--muted'">
+                    {{ template.is_active ? 'Ativo' : 'Pausado' }}
+                  </span>
+                </td>
+                <td class="cell--actions">
+                  <button class="btn btn--secondary btn--sm" type="button" (click)="toggleShared(template)">
+                    {{ template.is_active ? 'Pausar' : 'Ativar' }}
+                  </button>
+                  <button class="btn btn--danger btn--sm" type="button" (click)="removeShared(template)">Excluir</button>
                 </td>
               </tr>
             }

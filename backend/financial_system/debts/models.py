@@ -2,6 +2,7 @@ import uuid
 from decimal import Decimal
 from django.db import models
 from django.db.models import Q
+from django.db.models.functions import ExtractMonth, ExtractYear
 from financial_system.base_model import BaseModel
 
 
@@ -164,6 +165,20 @@ class SharedEntry(BaseModel):
         default=False,
         help_text='Indica se esta despesa compartilhada ja foi paga/quitada.',
     )
+    recurring_template = models.ForeignKey(
+        to='debts.SharedRecurringTemplate',
+        db_column='recurring_template_id',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='generated_entries',
+        help_text='Template de gasto fixo que gerou esta entrada, quando recorrente.',
+    )
+    is_recurrent = models.BooleanField(
+        db_column='is_recurrent',
+        default=False,
+        help_text='Indica se esta entrada compartilhada foi gerada por um gasto fixo.',
+    )
 
     # ── Rateio ─────────────────────────────────────────────────────────────
     # Regra unica do produto: a despesa e dividida igualmente entre os
@@ -186,6 +201,14 @@ class SharedEntry(BaseModel):
         db_table = 'shared_entries'
         verbose_name = 'Shared Entry'
         verbose_name_plural = 'Shared Entries'
+        constraints = [
+            models.UniqueConstraint(
+                'recurring_template',
+                ExtractYear('date'),
+                ExtractMonth('date'),
+                name='uniq_shr_entry_tpl_month',
+            ),
+        ]
 
 
 class SharedEntryParticipant(BaseModel):
@@ -294,6 +317,14 @@ class SharedRecurringTemplate(BaseModel):
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='recurring_templates',
+    )
+    credit_card = models.ForeignKey(
+        to='cards.CreditCard',
+        db_column='credit_card_id',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='shared_recurring_templates',
     )
     day_of_month = models.PositiveSmallIntegerField(
         db_column='day_of_month',

@@ -1,3 +1,14 @@
+# ADR-001: Arquitetura e visão geral do projeto
+
+- **Status:** Accepted
+- **Contexto:** Este documento registra a orientação atual do projeto para readme do projeto.
+- **Decisão:** Manter estas regras e instruções como referência canônica para implementação e manutenção.
+- **Consequências:** Agentes devem consultar este ADR antes de alterar a área correspondente; mudanças de decisão devem atualizar este documento.
+
+## Conteúdo de referência
+
+O material abaixo foi preservado do documento original.
+
 # 💸 Financial System
 
 Sistema financeiro pessoal com frontend Angular, backend Django REST e autenticação centralizada no Keycloak.
@@ -467,7 +478,7 @@ Resumo das proteções implementadas hoje:
 
 ## 📚 READMEs específicos
 
-- [`backend/README.md`](./backend/README.md)
-- [`frontend/README.md`](./frontend/README.md)
+- [`backend/README.md`](docs/adr/ADR-008-backend-development.md)
+- [`frontend/README.md`](docs/adr/ADR-009-frontend-development.md)
 
 Esses dois arquivos detalham cada camada separadamente.

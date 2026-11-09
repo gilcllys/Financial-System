@@ -30,7 +30,7 @@ from debts.models import SharedDebt, SharedEntry
 class ByPersonBehavior:
     """GET /api/debts/shared-debts/{id}/by-person/?mode=closed|open&month=&year="""
 
-    def __init__(self, shared_debt: SharedDebt, mode: str, month: int | None, year: int | None,
+    def __init__(self, shared_debt: SharedDebt, mode: str = 'closed', month: int | None = None, year: int | None = None,
                  today: date | None = None):
         self.shared_debt = shared_debt
         self.mode = 'open' if mode == 'open' else 'closed'
@@ -88,6 +88,12 @@ class ByPersonBehavior:
 
     # ── run ────────────────────────────────────────────────────────────────
     def run(self) -> Response:
+        context = self._load_context()
+        self._add_card_blocks(context)
+        self._add_cash_block(context)
+        return self._build_response(context)
+
+    def _load_context(self):
         members = list(self.shared_debt.members.all().order_by('id'))
         members_by_id = {m.id: m for m in members}
         member_ids = [m.id for m in members]
@@ -107,14 +113,26 @@ class ByPersonBehavior:
             .filter(id__in=used_card_ids, tenant_id__in=member_by_tenant.keys())
             .order_by('tenant_id', 'id')
         )
+        return {
+            'members': members,
+            'members_by_id': members_by_id,
+            'member_ids': member_ids,
+            'member_by_tenant': member_by_tenant,
+            'base_queryset': base_qs,
+            'cards': cards,
+            'blocks': [],
+            'share': {mid: Decimal('0') for mid in member_ids},
+            'paid': {mid: Decimal('0') for mid in member_ids},
+            'outside_count': 0,
+            'outside_total': Decimal('0'),
+            'next_closing': None,
+        }
 
-        blocks = []
-        share = {mid: Decimal('0') for mid in member_ids}
-        paid = {mid: Decimal('0') for mid in member_ids}
-        outside_count, outside_total = 0, Decimal('0')
-        next_closing = None
-
-        for card in cards:
+    def _add_card_blocks(self, context):
+        for card in context['cards']:
+            base_qs = context['base_queryset']
+            member_ids = context['member_ids']
+            member_by_tenant = context['member_by_tenant']
             owner = member_by_tenant[card.tenant_id]
             inv_month, inv_year, start, end, due, is_closed = self._invoice_for(card)
             if self.mode == 'closed' and not is_closed:
@@ -132,12 +150,14 @@ class ByPersonBehavior:
                 status='closed' if is_closed else 'open',
                 days_to_close=(end - self.today).days,
             )
-            blocks.append(block)
-            paid[owner.id] += total
+            context['blocks'].append(block)
+            context['paid'][owner.id] += total
             for mid, v in shares_total.items():
-                share[mid] += v
-            if self.mode == 'open' and (next_closing is None or end < next_closing[1]):
-                next_closing = (card, end)
+                context['share'][mid] += v
+            if self.mode == 'open' and (
+                context['next_closing'] is None or end < context['next_closing'][1]
+            ):
+                context['next_closing'] = (card, end)
 
             if self.mode == 'closed':
                 # O que já está na fatura ABERTA deste cartão fica fora desta conta.
@@ -145,27 +165,43 @@ class ByPersonBehavior:
                 o_start, o_end, _ = compute_invoice_period(card, o_month, o_year)
                 if o_start > end:
                     open_qs = base_qs.filter(credit_card=card, date__gte=o_start, date__lte=o_end)
-                    outside_count += open_qs.count()
-                    outside_total += sum((Decimal(e.amount) for e in open_qs), Decimal('0'))
+                    context['outside_count'] += open_qs.count()
+                    context['outside_total'] += sum(
+                        (Decimal(e.amount) for e in open_qs), Decimal('0'),
+                    )
 
+    def _add_cash_block(self, context):
         if self.mode == 'closed':
             # Dinheiro / sem cartão cadastrado: conta no mês em que foi pago.
             _, last_day = calendar.monthrange(self.year, self.month)
             cash_entries = list(
-                base_qs.filter(credit_card=None, date__gte=date(self.year, self.month, 1),
-                               date__lte=date(self.year, self.month, last_day))
+                context['base_queryset'].filter(
+                    credit_card=None,
+                    date__gte=date(self.year, self.month, 1),
+                    date__lte=date(self.year, self.month, last_day),
+                )
                 .order_by('date', 'id')
             )
             if cash_entries:
-                block, total, shares_total = self._block(cash_entries, member_ids, None, kind='cash', status='closed')
-                blocks.append(block)
+                block, total, shares_total = self._block(
+                    cash_entries, context['member_ids'], None,
+                    kind='cash', status='closed',
+                )
+                context['blocks'].append(block)
                 for e in cash_entries:
-                    paid[e.paid_by_id] = paid.get(e.paid_by_id, Decimal('0')) + Decimal(e.amount)
+                    context['paid'][e.paid_by_id] = (
+                        context['paid'].get(e.paid_by_id, Decimal('0')) + Decimal(e.amount)
+                    )
                 for mid, v in shares_total.items():
-                    share[mid] += v
+                    context['share'][mid] += v
 
+    def _build_response(self, context):
+        members = context['members']
+        member_ids = context['member_ids']
+        share = context['share']
+        paid = context['paid']
         balance = {mid: _round2(paid[mid] - share[mid]) for mid in member_ids}
-        settlement = BalancesBehavior._settlement(dict(balance), members_by_id)
+        settlement = BalancesBehavior._settlement(dict(balance), context['members_by_id'])
 
         payload = {
             'mode': self.mode,
@@ -177,7 +213,7 @@ class ByPersonBehavior:
                 {'id': m.id, 'display_name': m.display_name, 'tenant_id': m.tenant_id}
                 for m in members
             ],
-            'blocks': blocks,
+            'blocks': context['blocks'],
             'totals': {
                 'grand_total': _f(sum(share.values(), Decimal('0'))),
                 'share': {mid: _f(v) for mid, v in share.items()},
@@ -187,11 +223,17 @@ class ByPersonBehavior:
             'settlement': settlement,
         }
         if self.mode == 'closed':
-            payload['outside'] = {'count': outside_count, 'total': _f(outside_total)}
+            payload['outside'] = {
+                'count': context['outside_count'],
+                'total': _f(context['outside_total']),
+            }
         else:
             payload['next_closing'] = (
-                {'card_name': next_closing[0].name, 'last_four_digits': next_closing[0].last_four_digits,
-                 'date': next_closing[1].isoformat()}
-                if next_closing else None
+                {
+                    'card_name': context['next_closing'][0].name,
+                    'last_four_digits': context['next_closing'][0].last_four_digits,
+                    'date': context['next_closing'][1].isoformat(),
+                }
+                if context['next_closing'] else None
             )
         return Response(payload, status=status.HTTP_200_OK)

@@ -3,7 +3,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
 import { RouterLink } from '@angular/router';
 import { ExpenseService } from '../../core/services/expense.service';
-import { CardService } from '../../core/services/card.service';
+import { InstallmentsService } from '../../core/services/installments.service';
 import { SharedDebtService, SharedDebtEntry } from '../../core/services/shared-debt.service';
 import { CreditCard, Expense } from '../../core/models';
 import { invoiceForDate, isInvoiceClosed, InvoiceMonthRef } from '../../core/utils/invoice-cycle';
@@ -56,7 +56,7 @@ export class InstallmentsComponent implements OnInit {
   private confirmDialog = inject(ConfirmDialogService);
   private expenseService = inject(ExpenseService);
   private sharedDebtService = inject(SharedDebtService);
-  private cardService = inject(CardService);
+  private installmentsService = inject(InstallmentsService);
 
   expenses = signal<Expense[]>([]);
   sharedEntries = signal<SharedDebtEntry[]>([]);
@@ -248,34 +248,32 @@ export class InstallmentsComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.fetchCards();
-    this.fetchExpenses();
-    this.fetchSharedEntries();
+    this.loadOverview();
   }
 
-  private fetchCards(): void {
-    this.loadingCards.set(true);
-    this.cardService.list().subscribe({
-      next: cards => { this.cards.set(cards); this.loadingCards.set(false); },
-      error: () => this.loadingCards.set(false),
-    });
-  }
-
-  private fetchExpenses(): void {
+  private loadOverview(): void {
     this.loading.set(true);
-    this.expenseService.listAll().subscribe({
-      next: expenses => { this.expenses.set(expenses); this.loading.set(false); },
-      error: () => this.loading.set(false),
+    this.loadingShared.set(true);
+    this.loadingCards.set(true);
+    this.installmentsService.load().subscribe({
+      next: overview => {
+        this.expenses.set(overview.expenses);
+        this.sharedEntries.set(overview.shared_entries);
+        this.cards.set(overview.cards);
+        this.loading.set(false);
+        this.loadingShared.set(false);
+        this.loadingCards.set(false);
+      },
+      error: () => {
+        this.loading.set(false);
+        this.loadingShared.set(false);
+        this.loadingCards.set(false);
+      },
     });
   }
 
-  private fetchSharedEntries(): void {
-    this.loadingShared.set(true);
-    this.sharedDebtService.listEntries({ page_size: 500 }).subscribe({
-      next: res => { this.sharedEntries.set(res.results); this.loadingShared.set(false); },
-      error: () => this.loadingShared.set(false),
-    });
-  }
+  private fetchExpenses(): void { this.loadOverview(); }
+  private fetchSharedEntries(): void { this.loadOverview(); }
 
   installmentKey(group: InstallmentGroup): string { return `${group.name}:${group.cardId ?? 'none'}`; }
 

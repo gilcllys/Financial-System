@@ -33,8 +33,10 @@ RUN apk add --no-cache libpq
 
 COPY --from=builder /opt/venv /opt/venv
 COPY . .
+COPY recurring-expenses.cron /etc/crontabs/root
 
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh \
+    && chmod 0600 /etc/crontabs/root
 
 EXPOSE 8000
 

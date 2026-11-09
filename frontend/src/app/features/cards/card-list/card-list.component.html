@@ -1,10 +1,11 @@
 <!-- ─— Page Header ─— -->
 <div class="page-header">
   <div class="page-header__left">
-    <h1 class="page-header__title">Meus Cartões</h1>
-    <p class="page-header__subtitle">Gerencie limites, vencimentos e veja extratos consolidados.</p>
+    <p class="page-eyebrow">Crédito</p>
+    <h1 class="page-header__title">Cartões</h1>
+    <p class="page-header__subtitle">Fechamentos, vencimentos e compras por ciclo.</p>
   </div>
-  <a routerLink="/cards/new" class="btn btn--primary btn--pill">+ Novo Cartão</a>
+  <a routerLink="/cards/new" class="btn btn--primary">+ Novo cartão</a>
 </div>
 
 @if (loading()) {
@@ -19,13 +20,18 @@
   </div>
 } @else {
 
-  <!-- ─— Cards Grid (4 columns) ─— -->
+  <section class="cards-overview" aria-label="Resumo dos cartões">
+    <article><span>Total das faturas</span><strong>{{ formatAmount(totalInvoices()) }}</strong><small>Valor bruto cobrado pelos cartões</small></article>
+    <article><span>Cartões cadastrados</span><strong>{{ cards().length }}</strong><small>Faturas organizadas por ciclo</small></article>
+    <article><span>Período consultado</span><strong>{{ currentMonthLabel() }}</strong><small>Fechamento de cada cartão</small></article>
+  </section>
+
+  <!-- Cartões e ciclos -->
   <div class="cc-grid" role="list" aria-label="Lista de cartões">
-    @for (card of cards(); track card.id; let i = $index) {
+    @for (card of cards(); track card.id) {
       <div
         class="cc-card"
         [class.cc-card--selected]="selectedCardId() === card.id"
-        [style]="getCardGradient(card, i)"
         role="listitem"
         (click)="selectCard(card, true)"
         tabindex="0"
@@ -36,7 +42,7 @@
           <h3 class="cc-card__name">{{ card.name }}</h3>
           <div class="cc-card__top-right">
             @if (selectedCardId() === card.id) {
-              <span class="cc-card__selected-badge">SELECIONADO</span>
+            <span class="cc-card__selected-badge">Selecionado</span>
             }
             <button
               class="cc-card__menu"
@@ -55,10 +61,10 @@
         <!-- Bottom Row: Dates + Total -->
         <div class="cc-card__footer">
           <span class="cc-card__dates">
-            Fecha dia {{ card.closing_day }} | Vence dia {{ card.due_day }}
+            Fecha dia {{ card.closing_day }} · vence dia {{ card.due_day }}
           </span>
           <span class="cc-card__total">
-            {{ formatAmount(invoiceTotals()[card.id] ?? 0) }}
+            <span>{{ formatAmount(invoiceTotals()[card.id]) }}</span>
           </span>
         </div>
       </div>
@@ -109,6 +115,7 @@
                 <th scope="col">DESCRIÇÃO</th>
                 <th scope="col" class="text-center">DATA</th>
                 <th scope="col" class="text-center">PARCELA</th>
+                <th scope="col" class="text-center">FIXO</th>
                 <th scope="col" class="text-right">VALOR</th>
               </tr>
             </thead>
@@ -125,6 +132,7 @@
                       <span class="text-dash">-</span>
                     }
                   </td>
+                  <td class="text-center">@if (e.is_recurrent) { <span class="badge--blue-pill">Sim</span> }</td>
                   <td class="col-value text-right mono red-amount">{{ formatAmount(e.amount) }}</td>
                 </tr>
               }
@@ -146,7 +154,7 @@
 @if (menuCard()) {
   <div class="cc-menu-backdrop" (click)="closeMenu()" aria-hidden="true"></div>
   <div class="cc-menu" role="menu" [style.top.px]="menuY()" [style.left.px]="menuX()">
-    <a [routerLink]="['/cards', menuCard()!.id, 'edit']" class="cc-menu__item" role="menuitem" (click)="closeMenu()">✏️ Editar</a>
-    <button class="cc-menu__item cc-menu__item--danger" role="menuitem" type="button" (click)="deleteFromMenu()">Ὕ1️ Excluir</button>
+    <a [routerLink]="['/cards', menuCard()!.id, 'edit']" class="cc-menu__item" role="menuitem" (click)="closeMenu()">Editar cartão</a>
+    <button class="cc-menu__item cc-menu__item--danger" role="menuitem" type="button" (click)="deleteFromMenu()">Excluir cartão</button>
   </div>
 }

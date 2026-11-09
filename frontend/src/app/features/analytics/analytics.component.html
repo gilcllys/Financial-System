@@ -1,9 +1,18 @@
 ﻿<div class="page-header">
   <div class="page-header__left">
+    <p class="page-eyebrow">Padrões do mês</p>
     <h1 class="page-header__title">Análises</h1>
-    <p class="page-header__subtitle">Visualize seus gastos em gráficos</p>
+    <p class="page-header__subtitle">Veja onde seu dinheiro está indo.</p>
   </div>
 </div>
+
+@if (!loading()) {
+  <section class="analytics-kpis" aria-label="Resumo de despesas do mês">
+    <article class="analytics-kpi"><span>Despesas no período</span><strong>{{ formatCurrency(monthlyExpenseTotal()) }}</strong><small>Lançamentos e compras do mês</small></article>
+    <article class="analytics-kpi"><span>Média por dia com gastos</span><strong>{{ formatCurrency(avgDaily()) }}</strong><small>{{ daysWithExpense() }} dias com movimentação</small></article>
+    <article class="analytics-kpi"><span>Mediana diária</span><strong>{{ formatCurrency(medianDaily()) }}</strong><small>Reduz o peso de gastos atípicos</small></article>
+  </section>
+}
 
 <div class="filter-bar">
   <select class="form-select" [ngModel]="selectedMonth()" (ngModelChange)="selectedMonth.set(+$event); onFilterChange()" aria-label="Mês">

@@ -1,7 +1,8 @@
 <div class="page-header">
   <div class="page-header__left">
+    <p class="page-eyebrow">Organização</p>
     <h1 class="page-header__title">Categorias</h1>
-    <p class="page-header__subtitle">Organize seus gastos por categoria</p>
+    <p class="page-header__subtitle">Classifique despesas e receitas com nomes que façam sentido para você.</p>
   </div>
   <a routerLink="/categories/new" class="btn btn--primary">+ Nova Categoria</a>
 </div>
@@ -22,14 +23,14 @@
             <div class="category-card__header">
               <span class="badge badge--custom">Personalizada</span>
               <div class="category-card__actions">
-                <a [routerLink]="['/categories', cat.id, 'edit']" class="btn btn--ghost btn--sm" [attr.aria-label]="'Editar ' + cat.name">✏️</a>
+                <a [routerLink]="['/categories', cat.id, 'edit']" class="btn btn--ghost btn--sm" [attr.aria-label]="'Editar ' + cat.name">Editar</a>
                 <button
                   class="btn btn--ghost btn--sm"
                   (click)="delete(cat)"
                   [disabled]="deletingId() === cat.id"
                   [attr.aria-label]="'Excluir ' + cat.name"
                 >
-                  @if (deletingId() === cat.id) { <span class="spinner"></span> } @else { 🗑️ }
+                  @if (deletingId() === cat.id) { <span class="spinner"></span> } @else { Excluir }
                 </button>
               </div>
             </div>

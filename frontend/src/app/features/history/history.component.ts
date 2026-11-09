@@ -162,7 +162,7 @@ export class HistoryComponent implements OnInit {
     });
   }
   edit(entry: HistoryEntry): void {
-    if (entry.type === 'individual') this.router.navigate(['/expenses', entry.id, 'edit']);
+    if (entry.type === 'individual') this.router.navigate(['/expenses', entry.id, 'edit'], { state: { returnUrl: this.router.url } });
     else if (entry.group_id) this.router.navigate(['/shared-debts', entry.group_id], { queryParams: { edit_entry: entry.id } });
   }
   async delete(entry: HistoryEntry): Promise<void> {
