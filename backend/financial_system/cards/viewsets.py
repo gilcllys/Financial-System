@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework import viewsets
 from rest_framework.decorators import action
 
@@ -23,6 +24,17 @@ class CreditCardViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         """[SEC-A01] Defense-in-depth: garante que tenant_id não muda em updates."""
         serializer.save(tenant_id=self.request.user.tenant_id)
+
+    def perform_destroy(self, instance):
+        from debts.models import SharedRecurringTemplate
+
+        with transaction.atomic():
+            SharedRecurringTemplate.objects.filter(
+                credit_card=instance,
+                payment_method='cartao',
+                is_active=True,
+            ).update(is_active=False)
+            instance.delete()
 
     @action(detail=True, methods=['get'], url_path='invoices')
     def invoices(self, request, pk=None):

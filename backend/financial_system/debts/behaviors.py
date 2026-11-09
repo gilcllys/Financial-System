@@ -683,6 +683,14 @@ class RecurringTemplateBehavior:
         if not tpl.is_active:
             return False
 
+        # CreditCard is SET_NULL on deletion. Pause legacy templates that still
+        # say "cartao" but lost their card, rather than creating an entry that
+        # cannot be associated with any invoice.
+        if tpl.payment_method == 'cartao' and not tpl.credit_card_id:
+            tpl.is_active = False
+            tpl.save(update_fields=['is_active', 'updated_at'])
+            return False
+
         entries = self.shared_debt.entries.filter(
             date__year=year,
             date__month=month,

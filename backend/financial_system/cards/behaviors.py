@@ -454,6 +454,7 @@ class CreditCardInvoiceViewBehavior:
     def _annual_totals(self, invoices, selected):
         from django.db.models import Sum
         from django.db.models.functions import Abs
+        from debts.models import SharedEntry
         from expenses.models import Expense
 
         totals = [0.0] * 12
@@ -463,5 +464,12 @@ class CreditCardInvoiceViewBehavior:
                 tenant_id=self.card.tenant_id, credit_card_id=self.card.id,
                 date__gte=invoice['period_start'], date__lte=invoice['period_end'], amount__lt=0,
             ).aggregate(total=Sum(Abs('amount')))['total'] or 0
-            totals[invoice['invoice_month'] - 1] = round(float(total), 2)
+            shared_total = SharedEntry.objects.filter(
+                credit_card_id=self.card.id,
+                paid_by__tenant_id=self.card.tenant_id,
+                date__gte=invoice['period_start'], date__lte=invoice['period_end'],
+            ).aggregate(total=Sum(Abs('amount')))['total'] or 0
+            totals[invoice['invoice_month'] - 1] = round(
+                float(total) + float(shared_total), 2,
+            )
         return totals

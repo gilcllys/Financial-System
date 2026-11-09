@@ -1021,6 +1021,7 @@ class ByPersonBehaviorTests(TestCase):
     def _block(self, data, kind, card=None):
         return next(b for b in data['blocks'] if b['kind'] == kind and (card is None or b['card_id'] == card.id))
 
+
     # ── closed ──────────────────────────────────────────────────────────────
     def test_closed_blocks_only_include_entries_inside_invoice_period(self):
         self._entry('Mercado', '200.00', 12, self.gil, self.nubank)          # dentro (22/08–21/09)
@@ -1166,3 +1167,69 @@ class DeleteSharedInstallmentsTests(TestCase):
         resp = self._client('gil').post(URL, {'installment_group_id': 'nope'}, format='json')
 
         self.assertEqual(resp.status_code, 400)
+
+
+class SharedRecurringTemplateCardDeletionTests(TestCase):
+    def test_deleted_card_pauses_template_without_generating_orphan_entry(self):
+        from debts.behaviors import RecurringTemplateBehavior
+        from debts.models import SharedRecurringTemplate
+
+        group = SharedDebt.objects.create(name='Casa', owner_tenant_id=GIL)
+        payer = SharedDebtMember.objects.create(
+            shared_debt=group, tenant_id=GIL, display_name='Gil',
+        )
+        card = CreditCard.objects.create(
+            tenant_id=GIL, name='Cartão removido', closing_day=10, due_day=15,
+        )
+        template = SharedRecurringTemplate.objects.create(
+            shared_debt=group,
+            description='Aluguel',
+            amount=Decimal('1500.00'),
+            paid_by=payer,
+            participant_ids=[payer.id],
+            payment_method='cartao',
+            credit_card=card,
+        )
+
+        # The production FK behavior is SET_NULL when a card is deleted.
+        card.delete()
+        template.refresh_from_db()
+        self.assertTrue(template.is_active)
+        self.assertIsNone(template.credit_card_id)
+
+        response = RecurringTemplateBehavior(
+            group, _make_user(tenant_id=GIL), 'generate_month',
+            month=12, year=2026,
+        ).run()
+
+        template.refresh_from_db()
+        self.assertEqual(response.data, {'created': [], 'skipped': ['Aluguel']})
+        self.assertFalse(template.is_active)
+        self.assertFalse(group.entries.filter(recurring_template=template).exists())
+
+    def test_cash_template_without_card_is_still_generated(self):
+        from debts.behaviors import RecurringTemplateBehavior
+        from debts.models import SharedRecurringTemplate
+
+        group = SharedDebt.objects.create(name='Casa', owner_tenant_id=GIL)
+        payer = SharedDebtMember.objects.create(
+            shared_debt=group, tenant_id=GIL, display_name='Gil',
+        )
+        template = SharedRecurringTemplate.objects.create(
+            shared_debt=group,
+            description='Conta de luz',
+            amount=Decimal('150.00'),
+            paid_by=payer,
+            participant_ids=[payer.id],
+            payment_method='dinheiro',
+        )
+
+        response = RecurringTemplateBehavior(
+            group, _make_user(tenant_id=GIL), 'generate_month',
+            month=12, year=2026,
+        ).run()
+
+        self.assertEqual(response.data, {'created': ['Conta de luz'], 'skipped': []})
+        entry = group.entries.get(recurring_template=template)
+        self.assertEqual(entry.payment_method, 'dinheiro')
+        self.assertIsNone(entry.credit_card_id)
