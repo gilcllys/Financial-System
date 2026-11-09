@@ -1,3 +1,14 @@
+# ADR-005: Convenções de tema do frontend
+
+- **Status:** Accepted
+- **Contexto:** Este documento registra a orientação atual do projeto para guia de tema.
+- **Decisão:** Manter estas regras e instruções como referência canônica para implementação e manutenção.
+- **Consequências:** Agentes devem consultar este ADR antes de alterar a área correspondente; mudanças de decisão devem atualizar este documento.
+
+## Conteúdo de referência
+
+O material abaixo foi preservado do documento original.
+
 ## Overview
 
 Coinbase reads like an institutional financial brand that happens to trade crypto — the marketing surfaces are quiet, white-canvas, editorially-spaced, and almost monochromatic. The single brand voltage is **Coinbase Blue** (`{colors.primary}` — #0052ff), used scarcely: every primary CTA pill, the brand wordmark, and inline emphasis links. Beyond that one blue, the system is white canvas + ink + soft gray elevation bands + a deep near-black editorial canvas (`{colors.surface-dark}` — #0a0b0d) for full-bleed product-mockup heroes.

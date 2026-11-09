@@ -49,6 +49,7 @@ export interface HistoryEntry {
   total_installments: number | null;
   participant_count?: number;
   own_portion?: number;
+  is_recurrent?: boolean;
   is_recurring: boolean;
 }
 

@@ -30,6 +30,7 @@ import { Expense, ExpenseCategory } from '../../core/models';
           <thead>
             <tr>
               <th>Descrição</th>
+              <th>Fixo</th>
               <th>Data</th>
               <th class="text-right">Valor</th>
               <th>Categorizar</th>
@@ -39,6 +40,7 @@ import { Expense, ExpenseCategory } from '../../core/models';
             @for (e of items(); track e.id) {
               <tr>
                 <td>{{ e.description }}</td>
+                <td>@if (e.is_recurrent) { <span class="badge badge--success">Sim</span> }</td>
                 <td class="mono text-muted">{{ e.date | slice:8:10 }}/{{ e.date | slice:5:7 }}</td>
                 <td class="text-right mono" [class.value-up]="e.amount >= 0" [class.value-down]="e.amount < 0">
                   {{ e.amount >= 0 ? '+' : '-' }}{{ fmt(e.amount) }}

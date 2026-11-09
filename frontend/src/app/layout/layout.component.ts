@@ -4,6 +4,7 @@ import { AuthService } from '../core/auth/auth.service';
 import { ExpenseService } from '../core/services/expense.service';
 import { SupermarketService } from '../core/services/supermarket.service';
 import { SavingsService } from '../core/services/savings.service';
+import { RouteLoadingService } from '../core/services/route-loading.service';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
@@ -20,6 +21,7 @@ export class LayoutComponent implements OnInit {
   private expenseService = inject(ExpenseService);
   private supermarketService = inject(SupermarketService);
   private savingsService = inject(SavingsService);
+  readonly routeLoading = inject(RouteLoadingService);
 
   /** Controls the mobile drawer (sidebar slide-in) */
   drawerOpen = signal(false);

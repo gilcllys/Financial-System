@@ -53,6 +53,7 @@ export interface CombinedExpenseRow {
   date: string;
   amount: number;
   installmentBadge: string | null;
+  isRecurrent: boolean;
   groupName: string | null;
   expense: Expense | null;
   sharedEntry: SharedDebtEntry | null;
@@ -251,6 +252,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
       date: e.date,
       amount: Math.abs(e.amount),
       installmentBadge: this.installmentBadge(e),
+      isRecurrent: e.is_recurrent ?? false,
       groupName: null,
       expense: e,
       sharedEntry: null,
@@ -264,6 +266,7 @@ export class CardExpensesComponent implements OnInit, OnDestroy {
       date: e.date,
       amount: Math.abs(e.amount),
       installmentBadge: e.total_installments > 1 ? `${e.installment_number}/${e.total_installments}` : null,
+      isRecurrent: false,
       groupName: e.shared_debt_name,
       expense: null,
       sharedEntry: e,

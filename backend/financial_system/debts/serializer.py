@@ -25,6 +25,8 @@ class SharedEntrySerializer(serializers.ModelSerializer):
     participant_count = serializers.SerializerMethodField()
     participant_ids = serializers.SerializerMethodField()
     credit_card_name = serializers.SerializerMethodField()
+    recurring_template_id = serializers.IntegerField(read_only=True, allow_null=True)
+    is_recurrent = serializers.BooleanField(read_only=True)
 
     def get_participant_count(self, obj):
         return len(obj.participant_ids()) or 1
@@ -65,6 +67,8 @@ class SharedEntrySerializer(serializers.ModelSerializer):
             'total_installments',
             'installment_number',
             'paid',
+            'recurring_template_id',
+            'is_recurrent',
             'created_by_tenant_id',
             'created_at',
         ]
@@ -78,6 +82,8 @@ class SharedRecurringTemplateSerializer(serializers.ModelSerializer):
     paid_by_name = serializers.CharField(source='paid_by.display_name', read_only=True)
     paid_by_tenant_id = serializers.CharField(source='paid_by.tenant_id', read_only=True, default=None)
     category_name = serializers.CharField(source='category.name', read_only=True, default=None)
+    credit_card_id = serializers.IntegerField(read_only=True, allow_null=True)
+    credit_card_name = serializers.CharField(source='credit_card.name', read_only=True, allow_null=True)
 
     class Meta:
         model = SharedRecurringTemplate
@@ -85,7 +91,7 @@ class SharedRecurringTemplateSerializer(serializers.ModelSerializer):
             'id', 'shared_debt', 'description', 'amount',
             'paid_by', 'paid_by_name',
             'paid_by_tenant_id', 'participant_ids',
-            'payment_method', 'category', 'category_name',
+            'payment_method', 'credit_card_id', 'credit_card_name', 'category', 'category_name',
             'day_of_month', 'is_active', 'created_at',
         ]
         read_only_fields = ['id', 'created_at']

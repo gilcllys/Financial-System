@@ -27,8 +27,20 @@
   margin-bottom: var(--space-base);
 }
 
+.kpi-grid--4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-base);
+  margin-bottom: var(--space-base);
+}
+
 @media (max-width: 768px) {
   .kpi-grid--3 { grid-template-columns: 1fr; }
+  .kpi-grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 520px) {
+  .kpi-grid--4 { grid-template-columns: 1fr; }
 }
 
 .kpi-clean-card__hint {
@@ -80,6 +92,54 @@
 .generate-result__block--warn { border-left: 3px solid var(--warning, #ed6c02); }
 
 .form-card { margin-bottom: var(--space-base); }
+
+.recurring-type-switch {
+  display: inline-flex;
+  gap: 4px;
+  margin: 0 0 var(--space-base);
+  padding: 4px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-sm);
+  background: var(--color-surface-soft);
+
+  button {
+    min-height: 36px;
+    padding: 7px 14px;
+    border: 1px solid transparent;
+    border-radius: var(--rounded-xs);
+    background: transparent;
+    color: var(--color-body);
+    font: inherit;
+    cursor: pointer;
+
+    &:hover { color: var(--color-ink); }
+    &:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+    &.recurring-type-switch__button--active {
+      border-color: var(--color-hairline);
+      background: var(--color-canvas);
+      color: var(--color-primary-active);
+      font-weight: 600;
+      box-shadow: var(--shadow-sm);
+    }
+  }
+}
+
+.recurring-participants {
+  margin: 0;
+  padding: 0;
+  border: 0;
+
+  &__list { display: flex; flex-wrap: wrap; gap: 12px 20px; }
+  label { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+}
+
+.shared-recurring-list { margin-top: var(--space-base); }
+.shared-recurring-list__hint { margin: 4px 0 0; color: var(--color-muted); font-size: 0.8125rem; }
+.shared-recurring-list__error { display: flex; align-items: center; justify-content: space-between; gap: var(--space-base); }
+
+@media (max-width: 520px) {
+  .shared-recurring-list__error { align-items: flex-start; flex-direction: column; }
+}
 
 .radio-option {
   display: flex;

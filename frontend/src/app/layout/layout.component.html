@@ -187,8 +187,14 @@
 </header>
 
 <!-- —— Main content —— -->
-<main class="page-content" id="main-content">
+<main class="page-content" id="main-content" [attr.aria-busy]="routeLoading.isLoading()">
   <div class="container">
     <router-outlet />
   </div>
+  @if (routeLoading.isLoading()) {
+    <div class="route-loading" role="status" aria-live="polite">
+      <span class="route-loading__spinner" aria-hidden="true"></span>
+      <span>Carregando tela...</span>
+    </div>
+  }
 </main>

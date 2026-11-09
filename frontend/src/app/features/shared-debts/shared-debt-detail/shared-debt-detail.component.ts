@@ -153,9 +153,6 @@ export class SharedDebtDetailComponent implements OnInit {
     this.monthlyHistory().reduce((total, month) => total + month.entry_count, 0),
   );
   recurringTemplates = signal<RecurringTemplate[]>([]);
-  showRecurringForm = signal(false);
-  savingRecurring = signal(false);
-  recurringError = signal('');
   generatingMonth = signal(false);
 
   // ── Batch de gastos compartilhados ───────────────────────────────────────
@@ -178,14 +175,6 @@ export class SharedDebtDetailComponent implements OnInit {
   get batchTotal(): number { return this.batchDrafts().reduce((s, d) => s + d.amount, 0); }
   generateResult = signal<{ created: string[]; skipped: string[] } | null>(null);
 
-  recurringForm = this.fb.group({
-    description: ['', [Validators.required, Validators.minLength(2)]],
-    amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
-    paid_by: [null as number | null, Validators.required],
-    day_of_month: [1, [Validators.required, Validators.min(1), Validators.max(28)]],
-    payment_method: ['dinheiro' as 'dinheiro' | 'cartao'],
-    category_id: [null as number | null],
-  });
 
   // participants: track selected member ids (default = all)
   participantIds = signal<Set<number>>(new Set());
@@ -323,7 +312,10 @@ export class SharedDebtDetailComponent implements OnInit {
         this.inviteUrl.set(window.location.origin + res.join_path);
         this.inviting.set(false);
       },
-      error: () => this.inviting.set(false),
+      error: () => {
+        this.inviting.set(false);
+        this.toast.error('Não foi possível gerar o link de convite.');
+      },
     });
   }
 
@@ -486,40 +478,6 @@ export class SharedDebtDetailComponent implements OnInit {
     this.svc.listRecurringTemplates(this.groupId).subscribe({
       next: t => this.recurringTemplates.set(t),
       error: () => {},
-    });
-  }
-
-  toggleRecurringForm(): void {
-    this.showRecurringForm.set(!this.showRecurringForm());
-    this.recurringError.set('');
-    if (this.showRecurringForm()) this.loadEntryLookups();
-  }
-
-  saveRecurring(): void {
-    if (this.recurringForm.invalid) { this.recurringForm.markAllAsTouched(); return; }
-    this.savingRecurring.set(true);
-    this.recurringError.set('');
-    const v = this.recurringForm.getRawValue();
-    const allMembers = this.members().map(m => m.id);
-    this.svc.createRecurringTemplate(this.groupId, {
-      description: v.description!,
-      amount: v.amount!,
-      paid_by: v.paid_by!,
-      day_of_month: v.day_of_month ?? 1,
-      payment_method: v.payment_method as 'dinheiro' | 'cartao',
-      category_id: v.category_id,
-      participant_ids: allMembers,
-    }).subscribe({
-      next: () => {
-        this.savingRecurring.set(false);
-        this.showRecurringForm.set(false);
-        this.recurringForm.reset({ description: '', amount: null, paid_by: null, day_of_month: 1, payment_method: 'dinheiro', category_id: null });
-        this.loadRecurringTemplates();
-      },
-      error: err => {
-        this.savingRecurring.set(false);
-        this.recurringError.set(err?.error?.detail ?? 'Erro ao salvar.');
-      },
     });
   }
 

@@ -104,14 +104,15 @@
       <table class="history-table" aria-label="Histórico de lançamentos">
         <thead><tr>
           <th><input type="checkbox" aria-label="Selecionar todos os lançamentos individuais desta página" (change)="selectVisible()"></th>
-          <th>Descrição</th><th>Tipo</th><th>Categoria</th><th>Data</th><th>Pagamento</th><th class="text-right">Valor</th><th>Ações</th>
+          <th>Descrição</th><th>Tipo</th><th>Fixo</th><th>Categoria</th><th>Data</th><th>Pagamento</th><th class="text-right">Valor</th><th>Ações</th>
         </tr></thead>
         <tbody>
           @for (entry of entries(); track entry.type + ':' + entry.id) {
             <tr>
               <td>@if (entry.type === 'individual') { <input type="checkbox" [checked]="isSelected(entry)" (change)="toggleSelected(entry)" [attr.aria-label]="'Selecionar ' + entry.description"> }</td>
-              <td class="description-cell"><strong>{{ entry.description }}</strong><small>@if (entry.total_installments && entry.total_installments > 1) { Parcela {{ entry.installment_number }}/{{ entry.total_installments }} · }@if (entry.is_recurring) { Gasto fixo · }{{ entry.group_name ? entry.group_name + ' · ' + entry.paid_by_name : cardName(entry) }}</small></td>
+              <td class="description-cell"><strong>{{ entry.description }}</strong><small>@if (entry.total_installments && entry.total_installments > 1) { Parcela {{ entry.installment_number }}/{{ entry.total_installments }} · }{{ entry.group_name ? entry.group_name + ' · ' + entry.paid_by_name : cardName(entry) }}</small></td>
               <td><span class="origin-pill" [class.origin-pill--shared]="entry.type === 'shared'">{{ entry.type === 'shared' ? 'Compartilhado' : 'Individual' }}</span></td>
+              <td>@if (entry.is_recurrent) { <span class="recurring-badge">Sim</span> }</td>
               <td>{{ entry.category_name }}</td>
               <td class="mono text-muted">{{ formatDate(entry.date) }}</td>
               <td><span class="chip" [class.chip--card]="entry.payment_method === 'cartao'" [class.chip--cash]="entry.payment_method === 'dinheiro'">{{ entry.payment_method === 'cartao' ? cardName(entry) : 'Dinheiro' }}</span></td>

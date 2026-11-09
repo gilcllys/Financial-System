@@ -78,6 +78,11 @@ class Expense(BaseModel):
             'real e deve sobreviver a exclusao do template.'
         ),
     )
+    is_recurrent = models.BooleanField(
+        db_column='is_recurrent',
+        default=False,
+        help_text='Indica se a despesa foi gerada por um gasto fixo recorrente.',
+    )
 
     class Meta:
         db_table = 'expenses'

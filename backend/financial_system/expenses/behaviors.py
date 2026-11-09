@@ -12,6 +12,7 @@ from django.db.models import Count, Q, Sum
 from django.db.models.functions import Abs, ExtractDay, ExtractMonth
 from rest_framework.pagination import PageNumberPagination
 from django.db import transaction
+from django.utils import timezone
 from django.http import HttpResponse
 from rest_framework.response import Response
 from rest_framework import status
@@ -194,6 +195,7 @@ class RecurringExpenseBehavior:
         ).select_related('category', 'credit_card').order_by('id')
         return Response(RecurringExpenseTemplateSerializer(qs, many=True).data)
 
+    @transaction.atomic
     def _create_template(self, data: dict) -> Response:
         day = int(data.get('day_of_month', 1))
         if not (1 <= day <= 28):
@@ -207,7 +209,45 @@ class RecurringExpenseBehavior:
             credit_card_id=data.get('credit_card_id'),
             category_id=data.get('category_id'),
         )
+        today = timezone.localdate()
+        self._materialize_template(tpl, today.month, today.year)
         return Response(RecurringExpenseTemplateSerializer(tpl).data, status=status.HTTP_201_CREATED)
+
+    def _materialize_template(self, tpl, month: int, year: int) -> bool:
+        """Create the template's real ledger entry once for the requested month."""
+        import calendar as cal_mod
+        from datetime import date as date_cls
+
+        if tpl.payment_method == 'cartao' and tpl.credit_card_id is None:
+            return False
+        if Expense.objects.filter(
+            recurring_template=tpl, date__year=year, date__month=month,
+        ).exists():
+            return False
+
+        category_id = tpl.category_id
+        if category_id is None:
+            category_id = ExpenseCategory.objects.filter(
+                Q(tenant_id='system') | Q(tenant_id=self.tenant_id),
+                name='Sem categoria',
+            ).order_by('tenant_id').values_list('id', flat=True).first()
+            if category_id is None:
+                raise ValueError('Não foi encontrada a categoria “Sem categoria”.')
+
+        day = min(tpl.day_of_month, cal_mod.monthrange(year, month)[1])
+        Expense.objects.create(
+            tenant_id=self.tenant_id,
+            category_id=category_id,
+            description=tpl.description,
+            quantity=1,
+            amount=-abs(tpl.amount),
+            date=date_cls(year, month, day),
+            payment_method=tpl.payment_method,
+            credit_card_id=tpl.credit_card_id,
+            recurring_template=tpl,
+            is_recurrent=True,
+        )
+        return True
 
     def _update_template(self, template_id: int, data: dict) -> Response:
         tpl, err = self._get(template_id)
@@ -244,10 +284,7 @@ class RecurringExpenseBehavior:
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def _generate_month(self, month: int, year: int) -> Response:
-        import calendar as cal_mod
-        from datetime import date as date_cls
         from django.db import IntegrityError, transaction
-        from expenses.models import RecurringExpenseTemplate, Expense
         templates = RecurringExpenseTemplate.objects.filter(tenant_id=self.tenant_id, is_active=True)
         created, skipped, skipped_invalid = [], [], []
         for tpl in templates:
@@ -255,9 +292,6 @@ class RecurringExpenseBehavior:
             if tpl.payment_method == 'cartao' and tpl.credit_card_id is None:
                 skipped_invalid.append(tpl.description)
                 continue
-            last_day = cal_mod.monthrange(year, month)[1]
-            day = min(tpl.day_of_month, last_day)
-            entry_date = date_cls(year, month, day)
             # A trava e pela FK, nao pela descricao: renomear o template ou a
             # despesa nao duplica mais, e um gasto manual homonimo nao impede
             # mais o gasto fixo de ser gerado.
@@ -273,20 +307,13 @@ class RecurringExpenseBehavior:
                 # savepoint proprio: sem ele um IntegrityError aborta a
                 # transacao inteira e os templates seguintes nao seriam gerados.
                 with transaction.atomic():
-                    Expense.objects.create(
-                        tenant_id=self.tenant_id,
-                        category_id=tpl.category_id,
-                        description=tpl.description,
-                        quantity=1,
-                        amount=-abs(tpl.amount),  # gasto fixo e sempre despesa
-                        date=entry_date,
-                        payment_method=tpl.payment_method,
-                        credit_card_id=tpl.credit_card_id,
-                        recurring_template=tpl,
-                    )
+                    materialized = self._materialize_template(tpl, month, year)
             except IntegrityError:
                 # Corrida entre dois cliques simultaneos: a constraint do banco
                 # e a autoridade final. Perder a corrida e sucesso, nao erro.
+                skipped.append(tpl.description)
+                continue
+            if not materialized:
                 skipped.append(tpl.description)
                 continue
             created.append(tpl.description)
@@ -1152,7 +1179,8 @@ class ExpenseHistoryBehavior:
             'paid_by_name': None,
             'installment_number': None,
             'total_installments': None,
-            'is_recurring': expense.recurring_template_id is not None,
+            'is_recurrent': expense.is_recurrent,
+            'is_recurring': expense.is_recurrent,
         } for expense in expenses]
 
     def _shared_rows(self, entries, member_ids):
@@ -1188,7 +1216,8 @@ class ExpenseHistoryBehavior:
                 'installment_number': entry.installment_number,
                 'total_installments': entry.total_installments,
                 'participant_count': len(participant_ids) or 1,
-                'is_recurring': False,
+                'is_recurrent': entry.is_recurrent,
+                'is_recurring': entry.is_recurrent,
                 'own_portion': own_portion,
             })
         return rows
@@ -1211,12 +1240,13 @@ class ExpenseHistoryBehavior:
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow([
-            'Tipo', 'Data', 'Descrição', 'Categoria', 'Pagamento', 'Cartão',
+            'Tipo', 'Fixo', 'Data', 'Descrição', 'Categoria', 'Pagamento', 'Cartão',
             'Grupo', 'Pago por', 'Valor total', 'Minha parte',
         ])
         for row in rows:
             writer.writerow([
                 'Compartilhado' if row['type'] == 'shared' else 'Individual',
+                'Sim' if row.get('is_recurrent', False) else '',
                 row['date'],
                 _safe_csv_cell(row['description']),
                 _safe_csv_cell(row['category_name']),

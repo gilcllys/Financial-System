@@ -1,10 +1,48 @@
 /* Shared presentation layer for the approved minimal finance prototype.
    Keep feature pages on the same visual system through existing app primitives. */
 .page-content {
+  position: relative;
   background: var(--color-page);
   color: var(--color-ink);
   font-size: 14px;
   line-height: 1.45;
+}
+
+.route-loading {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: clamp(110px, 20vh, 190px) 24px 32px;
+  color: var(--color-body);
+  background: var(--color-page);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.route-loading__spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--color-hairline);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: route-loading-spin 0.75s linear infinite;
+}
+
+@keyframes route-loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-loading__spinner {
+    animation: none;
+    border-top-color: var(--color-hairline);
+    border-right-color: var(--color-primary);
+  }
 }
 
 .page-content .container {

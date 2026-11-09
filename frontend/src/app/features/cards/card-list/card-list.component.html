@@ -115,6 +115,7 @@
                 <th scope="col">DESCRIÇÃO</th>
                 <th scope="col" class="text-center">DATA</th>
                 <th scope="col" class="text-center">PARCELA</th>
+                <th scope="col" class="text-center">FIXO</th>
                 <th scope="col" class="text-right">VALOR</th>
               </tr>
             </thead>
@@ -131,6 +132,7 @@
                       <span class="text-dash">-</span>
                     }
                   </td>
+                  <td class="text-center">@if (e.is_recurrent) { <span class="badge--blue-pill">Sim</span> }</td>
                   <td class="col-value text-right mono red-amount">{{ formatAmount(e.amount) }}</td>
                 </tr>
               }

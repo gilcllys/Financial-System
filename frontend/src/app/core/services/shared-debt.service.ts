@@ -40,6 +40,8 @@ export interface SharedDebtEntry {
   installment_group_id: string | null;
   total_installments: number;
   installment_number: number;
+  is_recurrent?: boolean;
+  recurring_template_id?: number | null;
   paid: boolean;
   created_by_tenant_id: string;
   created_at: string;
@@ -132,6 +134,8 @@ export interface RecurringTemplate {
   paid_by_tenant_id: string | null;
   participant_ids: number[];
   payment_method: 'dinheiro' | 'cartao';
+  credit_card_id?: number | null;
+  credit_card_name?: string | null;
   category: number | null;
   category_name: string | null;
   day_of_month: number;
@@ -145,6 +149,7 @@ export interface CreateRecurringTemplatePayload {
   paid_by: number;
   participant_ids?: number[];
   payment_method?: 'dinheiro' | 'cartao';
+  credit_card_id?: number | null;
   category_id?: number | null;
   day_of_month?: number;
 }

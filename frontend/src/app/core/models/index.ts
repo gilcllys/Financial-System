@@ -31,6 +31,8 @@ export interface Expense {
 
   /** Template que gerou a despesa; null quando foi lancada manualmente. */
   recurring_template_id?: number | null;
+  /** Campo persistido na tabela Expense; true para despesas de gasto fixo. */
+  is_recurrent?: boolean;
   /** Atalho para recurring_template_id !== null, calculado no backend. */
   is_recurring?: boolean;
 }

@@ -1,0 +1,4 @@
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+5 0 * * * cd /app/financial_system && python manage.py generate_recurring_expenses >> /proc/1/fd/1 2>&1
+10 0 * * * cd /app/financial_system && python manage.py generate_shared_recurring_expenses >> /proc/1/fd/1 2>&1

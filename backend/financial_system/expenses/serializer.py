@@ -83,6 +83,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
     # Origem da despesa: permite ao front distinguir gasto fixo de lancamento
     # manual sem inferir pela descricao (que o usuario pode editar).
     recurring_template_id = serializers.IntegerField(read_only=True)
+    is_recurrent = serializers.BooleanField(read_only=True)
     is_recurring = serializers.SerializerMethodField()
 
     class Meta:
@@ -91,7 +92,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
         read_only_fields = ['tenant_id', 'recurring_template']
 
     def get_is_recurring(self, obj) -> bool:
-        return obj.recurring_template_id is not None
+        return obj.is_recurrent
 
     def to_internal_value(self, data):
         # Aceita category_id no payload (PUT/PATCH) mapeando para o campo category

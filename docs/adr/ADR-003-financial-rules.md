@@ -1,3 +1,14 @@
+# ADR-003: Regras do domínio financeiro
+
+- **Status:** Accepted
+- **Contexto:** Este documento registra a orientação atual do projeto para regras financeiras.
+- **Decisão:** Manter estas regras e instruções como referência canônica para implementação e manutenção.
+- **Consequências:** Agentes devem consultar este ADR antes de alterar a área correspondente; mudanças de decisão devem atualizar este documento.
+
+## Conteúdo de referência
+
+O material abaixo foi preservado do documento original.
+
 # Regras financeiras usadas pela interface
 
 Este documento registra decisões de produto adotadas durante a correção do relatório Melhorias_Controle_Financeiro.pdf (fornecido pelo usuário em 2026-11-02). O PDF continua sendo a fonte dos relatos originais; decisões sobre valores e períodos foram confirmadas pelo usuário no chat.

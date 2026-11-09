@@ -17,6 +17,20 @@
         Excluir grupo
       </button>
     }
+    @if (!inviteUrl()) {
+      <button class="btn-ghost detail-invite-button" type="button" (click)="invite()"
+        [disabled]="inviting()" [attr.aria-busy]="inviting()">
+        @if (inviting()) { <span class="spinner" aria-hidden="true"></span> }
+        {{ inviting() ? 'Gerando link…' : 'Convidar uma pessoa' }}
+      </button>
+    } @else {
+      <div class="detail-invite-link" aria-live="polite">
+        <span class="detail-invite-link__url">Link de convite pronto</span>
+        <button class="btn-ghost" type="button" (click)="copyInvite()">
+          {{ copied() ? 'Link copiado' : 'Copiar link' }}
+        </button>
+      </div>
+    }
     <button class="btn-primary" type="button" (click)="toggleEntryForm()">+ Novo gasto</button>
   </div>
 </div>
@@ -83,6 +97,47 @@
       }
       <span class="shared-detail-kpi__note">Estimativa: pode mudar até as faturas fecharem</span>
     </article>
+  </section>
+
+  <section class="section-card shared-recurring" aria-labelledby="shared-recurring-title">
+    <div class="shared-recurring__heading">
+      <div>
+        <h2 id="shared-recurring-title">Gastos fixos do grupo</h2>
+        <p>Aluguel, internet e outros gastos que se repetem todo mês.</p>
+      </div>
+      <a class="btn-ghost" routerLink="/recurring-expenses" [queryParams]="{ type: 'shared', group: groupId }">Cadastrar gasto fixo</a>
+    </div>
+
+
+    @if (recurringTemplates().length === 0) {
+      <p class="shared-recurring__empty">Ainda não há gastos fixos neste grupo.</p>
+    } @else {
+      <div class="shared-recurring__list" aria-label="Gastos fixos cadastrados no grupo">
+        @for (template of recurringTemplates(); track template.id) {
+          <article class="shared-recurring__item">
+            <div class="shared-recurring__item-info">
+              <div class="shared-recurring__item-title">
+                <strong>{{ template.description }}</strong>
+                <span class="shared-recurring__status" [class.shared-recurring__status--paused]="!template.is_active">
+                  {{ template.is_active ? 'Ativo' : 'Pausado' }}
+                </span>
+              </div>
+              <span class="shared-recurring__meta">
+                {{ formatCurrency(template.amount) }} / mês · Dia {{ template.day_of_month }} · Pago por {{ template.paid_by_name }} · {{ template.participant_ids.length }} participante(s)
+                @if (template.category_name) { · {{ template.category_name }} }
+                @if (template.payment_method === 'cartao') { · {{ template.credit_card_name ?? 'Cartão de outro participante' }} }
+              </span>
+            </div>
+            <div class="shared-recurring__actions">
+              <button class="btn-ghost" type="button" (click)="toggleRecurring(template.id)">
+                {{ template.is_active ? 'Pausar' : 'Retomar' }}
+              </button>
+              <button class="btn-ghost shared-recurring__delete" type="button" (click)="deleteRecurring(template.id)">Excluir</button>
+            </div>
+          </article>
+        }
+      </div>
+    }
   </section>
 
   <!-- Tabs -->
@@ -161,7 +216,7 @@
             <article class="shared-ledger-row">
               <div class="shared-ledger-row__main">
                 <div>
-                  <h3>{{ e.description }}</h3>
+                  <h3>{{ e.description }} @if (e.is_recurrent) { <span class="badge badge--primary">Fixo</span> }</h3>
                   <span class="shared-ledger-row__sub">{{ formatDate(e.date) }}
                     @if (e.total_installments > 1) { <span> · {{ e.installment_number }}ª de {{ e.total_installments }} parcelas</span> }
                   </span>
@@ -530,12 +585,17 @@
         </div>
         <div class="form-group">
           <label class="form-label" for="eg-paidby">Quem pagou *</label>
-          <select id="eg-paidby" class="form-select" formControlName="paid_by">
+          <select id="eg-paidby" class="form-select" formControlName="paid_by"
+            [attr.aria-invalid]="form.get('paid_by')?.invalid && form.get('paid_by')?.touched"
+            [attr.aria-describedby]="form.get('paid_by')?.invalid && form.get('paid_by')?.touched ? 'eg-paidby-error' : null">
             <option [ngValue]="null">Selecione...</option>
             @for (m of members(); track m.id) {
               <option [value]="m.id">{{ isMe(m.tenant_id) ? "Voce" : m.display_name }}</option>
             }
           </select>
+          @if (form.get('paid_by')?.invalid && form.get('paid_by')?.touched) {
+            <span id="eg-paidby-error" class="form-error">Selecione quem pagou.</span>
+          }
         </div>
         <div class="form-group">
           <label class="form-label">Forma de pagamento</label>

@@ -13,6 +13,9 @@
 }
 
 .detail-header__left { min-width: 240px; }
+.detail-invite-link { display: inline-flex; align-items: center; gap: 8px; }
+.detail-invite-link__url { color: var(--color-muted); font-size: 12px; }
+.detail-invite-button { border-radius: 8px; }
 .detail-members { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .detail-member { display: inline-flex; align-items: center; gap: 6px; color: var(--color-body); font-size: 12px; }
 .detail-member__avatar { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: var(--color-primary); background: #edf2ff; font-size: 10px; font-weight: 700; }
@@ -69,6 +72,7 @@
   background: none; border: 1px solid var(--color-hairline); border-radius: 20px;
   padding: 5px 12px; font-size: 13px; color: var(--color-body); cursor: pointer;
   &:hover { background: var(--color-surface-soft); }
+  &:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 }
 
 /* ── Settlement Banner ── */
@@ -126,6 +130,30 @@
   margin-bottom: 20px;
 }
 
+.shared-recurring__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--color-hairline);
+
+  h2 { margin: 0; color: var(--color-ink); font-size: 15px; font-weight: 650; }
+  p { margin: 4px 0 0; color: var(--color-muted); font-size: 11px; }
+}
+.shared-recurring__heading a { display: inline-flex; align-items: center; text-decoration: none; }
+.shared-recurring__empty { margin: 0; padding: 16px 18px; color: var(--color-muted); font-size: 12px; }
+.shared-recurring__list { display: grid; }
+.shared-recurring__item { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; border-bottom: 1px solid var(--color-hairline-soft); }
+.shared-recurring__item:last-child { border-bottom: 0; }
+.shared-recurring__item-info { display: grid; gap: 5px; min-width: 0; }
+.shared-recurring__item-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--color-ink); font-size: 13px; }
+.shared-recurring__meta { color: var(--color-muted); font-size: 11px; }
+.shared-recurring__status { padding: 3px 8px; border-radius: var(--rounded-pill); background: #e8f5ef; color: #16805b; font-size: 10px; font-weight: 650; }
+.shared-recurring__status--paused { background: var(--color-surface-soft); color: var(--color-muted); }
+.shared-recurring__actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.shared-recurring__delete { color: var(--color-semantic-down); }
+
 .shared-ledger-heading {
   display: flex;
   align-items: center;
@@ -166,6 +194,8 @@
 @media (max-width: 700px) {
   .shared-detail-kpis { grid-template-columns: 1fr; }
   .shared-ledger-heading { align-items: flex-start; }
+  .shared-recurring__heading, .shared-recurring__item { align-items: flex-start; flex-direction: column; }
+  .shared-recurring__actions { flex-wrap: wrap; }
   .shared-ledger-row { grid-template-columns: 1fr; gap: 8px; padding: 13px 14px; }
   .shared-ledger-row__main, .shared-ledger-row__amounts { justify-content: flex-start; }
   .shared-ledger-row__actions { flex-wrap: wrap; }

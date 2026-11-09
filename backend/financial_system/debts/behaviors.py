@@ -628,12 +628,13 @@ class RecurringTemplateBehavior:
     def _list(self) -> Response:
         qs = SharedRecurringTemplate.objects.filter(
             shared_debt=self.shared_debt
-        ).select_related('paid_by', 'category').order_by('id')
+        ).select_related('paid_by', 'category', 'credit_card').order_by('id')
         return Response(
             SharedRecurringTemplateSerializer(qs, many=True).data,
             status=status.HTTP_200_OK,
         )
 
+    @transaction.atomic
     def _create(self, data: dict) -> Response:
         """`data` ja validado por SharedRecurringTemplateInputSerializer."""
         try:
@@ -647,10 +648,13 @@ class RecurringTemplateBehavior:
             paid_by_id=rules['paid_by_id'],
             participant_ids=rules['participant_ids'],
             payment_method=rules['payment_method'],
+            credit_card_id=rules['credit_card_id'],
             category_id=rules['category_id'],
             day_of_month=data.get('day_of_month', 1),
             is_active=data.get('is_active', True),
         )
+        today = timezone.localdate()
+        self._materialize_template(tpl, today.month, today.year)
         return Response(SharedRecurringTemplateSerializer(tpl).data, status=status.HTTP_201_CREATED)
 
     def _get(self, template_id: int):
@@ -671,49 +675,79 @@ class RecurringTemplateBehavior:
         tpl.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def _materialize_template(self, tpl, month: int, year: int) -> bool:
+        """Create one real shared entry for this template and calendar month."""
+        import calendar as cal_mod
+        from datetime import date as date_cls
+
+        if not tpl.is_active:
+            return False
+
+        entries = self.shared_debt.entries.filter(
+            date__year=year,
+            date__month=month,
+        )
+        if entries.filter(recurring_template=tpl).exists():
+            return False
+
+        current_member_ids = set(self.shared_debt.members.values_list('id', flat=True))
+        participant_ids = [
+            int(member_id) for member_id in tpl.participant_ids
+            if int(member_id) in current_member_ids
+        ]
+        if not participant_ids:
+            return False
+
+        day = min(tpl.day_of_month, cal_mod.monthrange(year, month)[1])
+        entry_date = date_cls(year, month, day)
+        created_by = (
+            getattr(self.user, 'tenant_id', None)
+            or tpl.paid_by.tenant_id
+            or self.shared_debt.owner_tenant_id
+        )
+        with transaction.atomic():
+            entry = SharedEntry.objects.create(
+                shared_debt=self.shared_debt,
+                paid_by_id=tpl.paid_by_id,
+                description=tpl.description,
+                amount=tpl.amount,
+                date=entry_date,
+                payment_method=tpl.payment_method,
+                credit_card_id=tpl.credit_card_id,
+                category_id=tpl.category_id,
+                created_by_tenant_id=created_by,
+                recurring_template=tpl,
+                is_recurrent=True,
+            )
+            SharedEntryParticipant.objects.bulk_create([
+                SharedEntryParticipant(entry=entry, member_id=member_id)
+                for member_id in participant_ids
+            ])
+        return True
+
     def _generate_month(self, month: int, year: int) -> Response:
         """
         Materializa todos os templates ativos para o mês/ano informado.
-        Cria um SharedEntry apenas se ainda não existir um com a mesma
-        descrição e data naquele mês (idempotente).
+        Cada template gera no máximo uma SharedEntry por mês, com a constraint
+        única do banco como garantia final contra execuções concorrentes.
         """
-        import calendar as cal_mod
-        from datetime import date as date_cls
+        from django.db import IntegrityError
         templates = SharedRecurringTemplate.objects.filter(
-            shared_debt=self.shared_debt, is_active=True
+            shared_debt=self.shared_debt, is_active=True,
         )
         created = []
         skipped = []
         for tpl in templates:
-            # Usar day_of_month, respeitando o último dia do mês
-            last_day = cal_mod.monthrange(year, month)[1]
-            day = min(tpl.day_of_month, last_day)
-            entry_date = date_cls(year, month, day)
-            # Idempotência: não duplica se já existir mesma descrição + mês
-            already = self.shared_debt.entries.filter(
-                description=tpl.description,
-                date__year=year,
-                date__month=month,
-            ).exists()
-            if already:
+            try:
+                with transaction.atomic():
+                    materialized = self._materialize_template(tpl, month, year)
+            except IntegrityError:
+                # Concurrent scheduler/API calls converge on the database key.
+                materialized = False
+            if materialized:
+                created.append(tpl.description)
+            else:
                 skipped.append(tpl.description)
-                continue
-            with transaction.atomic():
-                entry = SharedEntry.objects.create(
-                    shared_debt=self.shared_debt,
-                    paid_by_id=tpl.paid_by_id,
-                    description=tpl.description,
-                    amount=tpl.amount,
-                    date=entry_date,
-                    payment_method=tpl.payment_method,
-                    category_id=tpl.category_id,
-                    created_by_tenant_id=self.user.tenant_id,
-                )
-                SharedEntryParticipant.objects.bulk_create([
-                    SharedEntryParticipant(entry=entry, member_id=mid)
-                    for mid in tpl.participant_ids
-                ])
-            created.append(tpl.description)
         return Response(
             {'created': created, 'skipped': skipped},
             status=status.HTTP_200_OK,
