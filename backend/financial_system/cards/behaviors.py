@@ -223,6 +223,8 @@ class InvoiceExpensesBehavior:
         base_filter = self._period_filter(period)
         expense_page = self._get_expense_page(Expense, base_filter)
         breakdown = self._get_category_breakdown(Expense, base_filter)
+        shared_breakdown = self._get_shared_category_breakdown(period)
+        breakdown = self._merge_category_breakdowns(breakdown, shared_breakdown)
         shared = _shared_invoice_breakdown(self.card, period[0], period[1])
         return self._build_response(period, expense_page, breakdown, shared, ExpenseSerializer)
 
@@ -260,9 +262,6 @@ class InvoiceExpensesBehavior:
     @staticmethod
     def _get_category_breakdown(expense_model, base_filter):
         debit_queryset = expense_model.objects.filter(**base_filter, amount__lt=0)
-        period_total = round(
-            float(debit_queryset.aggregate(total=Sum(Abs('amount')))['total'] or 0), 2,
-        )
         category_rows = debit_queryset.values(
             'category_id', 'category__name',
         ).annotate(
@@ -274,10 +273,56 @@ class InvoiceExpensesBehavior:
                 'category_name': row['category__name'],
                 'total': to_float(row['cat_total']),
                 'count': row['cat_count'],
-                'percentage': round(float(row['cat_total'] or 0) / period_total * 100, 2)
-                if period_total else 0,
             }
             for row in category_rows
+        ]
+
+    def _get_shared_category_breakdown(self, period):
+        from debts.models import SharedEntry
+
+        rows = SharedEntry.objects.filter(
+            credit_card_id=self.card.id,
+            paid_by__tenant_id=self.card.tenant_id,
+            date__gte=period[0],
+            date__lte=period[1],
+        ).values(
+            'category_id', 'category__name',
+        ).annotate(
+            cat_total=Sum(Abs('amount')), cat_count=Count('id'),
+        ).order_by('-cat_total')
+        return [
+            {
+                'category_id': row['category_id'],
+                'category_name': row['category__name'] or 'Sem categoria',
+                'total': to_float(row['cat_total']),
+                'count': row['cat_count'],
+            }
+            for row in rows
+        ]
+
+    @staticmethod
+    def _merge_category_breakdowns(*breakdowns):
+        categories = {}
+        for rows in breakdowns:
+            for row in rows:
+                category_id = row['category_id']
+                current = categories.setdefault(category_id, {
+                    'category_id': category_id,
+                    'category_name': row['category_name'] or 'Sem categoria',
+                    'total': 0.0,
+                    'count': 0,
+                })
+                current['total'] += row['total']
+                current['count'] += row['count']
+
+        total = sum(row['total'] for row in categories.values())
+        return [
+            {
+                **row,
+                'total': round(row['total'], 2),
+                'percentage': round(row['total'] / total * 100, 2) if total else 0,
+            }
+            for row in sorted(categories.values(), key=lambda item: item['total'], reverse=True)
         ]
 
     def _build_response(self, period, expense_page, by_category, shared, expense_serializer):
