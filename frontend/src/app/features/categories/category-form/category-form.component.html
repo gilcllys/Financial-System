@@ -1,16 +1,15 @@
 <div class="page-header">
   <div class="page-header__left">
+    <p class="page-eyebrow">Organização</p>
     <h1 class="page-header__title">{{ isEdit() ? 'Editar Categoria' : 'Nova Categoria' }}</h1>
   </div>
   <a routerLink="/categories" class="btn btn--secondary btn--sm">← Voltar</a>
 </div>
-
 @if (loading()) {
   <div class="loading-wrapper"><span class="spinner"></span> Carregando...</div>
 } @else {
   <div class="card" style="max-width: 480px">
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate aria-label="Formulário de categoria">
-
       <div class="form-row">
         <div class="form-group">
           <label class="form-label" for="cat-name">Nome *</label>
@@ -21,28 +20,25 @@
           }
         </div>
       </div>
-
       <div class="form-row">
         <div class="form-group">
           <label class="form-label" for="cat-desc">Descrição</label>
-          <textarea id="cat-desc" class="form-textarea form-input resize-none"
+          <textarea id="cat-desc" class="form-textarea form-input resize-none"
             formControlName="description"
             placeholder="Descreva esta categoria..."></textarea>
         </div>
       </div>
-
       @if (errorMessage()) {
         <div class="form-error-box" role="alert">{{ errorMessage() }}</div>
       }
-
       <div class="form-actions">
-        <a routerLink="/categories" class="btn btn--secondary">{{ isSystem() ? 'Voltar' : 'Cancelar' }}</a>
-        @if (!isSystem()) {
-          <button type="submit" class="btn btn--primary" [disabled]="saving()">
-            @if (saving()) { <span class="spinner"></span> } Salvar
-          </button>
-        }
-      </div>
+        <a routerLink="/categories" class="btn btn--secondary">{{ isSystem() ? 'Voltar' : 'Cancelar' }}</a>
+        @if (!isSystem()) {
+          <button type="submit" class="btn btn--primary" [disabled]="saving()">
+            @if (saving()) { <span class="spinner"></span> } Salvar
+          </button>
+        }
+      </div>
     </form>
   </div>
 }

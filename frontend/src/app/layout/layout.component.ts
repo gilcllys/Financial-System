@@ -4,6 +4,7 @@ import { AuthService } from '../core/auth/auth.service';
 import { ExpenseService } from '../core/services/expense.service';
 import { SupermarketService } from '../core/services/supermarket.service';
 import { SavingsService } from '../core/services/savings.service';
+import { RouteLoadingService } from '../core/services/route-loading.service';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
@@ -20,6 +21,7 @@ export class LayoutComponent implements OnInit {
   private expenseService = inject(ExpenseService);
   private supermarketService = inject(SupermarketService);
   private savingsService = inject(SavingsService);
+  readonly routeLoading = inject(RouteLoadingService);
 
   /** Controls the mobile drawer (sidebar slide-in) */
   drawerOpen = signal(false);
@@ -63,6 +65,28 @@ export class LayoutComponent implements OnInit {
       .toUpperCase();
   }
 
+  currentPageLabel(): string {
+    const routeLabels: Record<string, string> = {
+      '/home': 'Início',
+      '/history': 'Histórico',
+      '/cards': 'Cartões',
+      '/installments': 'Parcelamentos',
+      '/recurring-expenses': 'Gastos fixos',
+      '/analytics': 'Análises',
+      '/shared-debts': 'Grupos compartilhados',
+      '/categories': 'Categorias',
+      '/uncategorized': 'Sem categoria',
+      '/supermarket': 'Supermercado',
+      '/savings': 'Investimentos',
+      '/expenses/new': 'Novo lançamento',
+    };
+    const path = this.router.url.split('?')[0].replace(/\/$/, '') || '/home';
+    const matchedRoute = Object.keys(routeLabels)
+      .sort((first, second) => second.length - first.length)
+      .find(route => path === route || path.startsWith(`${route}/`));
+    return matchedRoute ? routeLabels[matchedRoute] : 'Financeiro';
+  }
+
   toggleDrawer(): void {
     this.drawerOpen.update(v => !v);
   }
@@ -75,9 +99,6 @@ export class LayoutComponent implements OnInit {
     this.auth.logout();
   }
 
-  goToNewExpense(): void {
-    this.router.navigate(['/expenses/new']);
-  }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {

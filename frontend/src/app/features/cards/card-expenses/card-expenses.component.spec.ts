@@ -23,7 +23,7 @@ import { ConfirmDialogService } from '../../../core/services/confirm-dialog.serv
 
 function invoice(over: Partial<any> = {}): any {
   return {
-    month: 9, year: 2026, label: 'Setembro/2026',
+    invoice_month: 9, invoice_year: 2026, invoice_name: 'Setembro/2026',
     period_start: '2026-07-23', period_end: '2026-08-21',
     due_date: '2026-09-05', is_current: true, is_future: false, ...over,
   };
@@ -72,19 +72,14 @@ describe('CardExpensesComponent [caracterizacao]', () => {
   } = {}) {
     confirmDialog = { confirm: jasmine.createSpy('confirm').and.resolveTo(true) };
     cardSvc = {
-      get: jasmine.createSpy('get').and.returnValue(of({ id: 1, name: 'Bradesco' })),
-      getAllCardExpenses: jasmine.createSpy('getAllCardExpenses').and.returnValue(of([])),
-      getInvoices: jasmine.createSpy('getInvoices').and.returnValue(of([invoice()])),
-      getInvoiceExpenses: jasmine.createSpy('getInvoiceExpenses')
-        .and.returnValue(of(opts.invoiceData ?? invoiceData())),
-      getInvoiceChart: jasmine.createSpy('getInvoiceChart').and.returnValue(
-        of({
-          expenses: opts.chartExpenses ?? [],
-          by_category: [],
-          period_start: '2026-07-23',
-          period_end: '2026-08-21',
-        }),
-      ),
+      getInvoiceView: jasmine.createSpy('getInvoiceView').and.returnValue(of({
+        card: { id: 1, name: 'Bradesco', last_four_digits: '1234', due_day: 5, closing_day: 21 },
+        invoices: [invoice()], selected_invoice: invoice(),
+        invoice_data: opts.invoiceData ?? invoiceData(),
+        chart_data: invoiceData({ expenses: opts.chartExpenses ?? [] }),
+        shared_entries: opts.sharedEntries ?? [], categories: [],
+        annual_invoice_totals: Array(12).fill(0),
+      })),
     };
     sharedSvc = {
       listEntries: jasmine.createSpy('listEntries').and.callFake((params: any) =>
@@ -218,10 +213,10 @@ describe('CardExpensesComponent [caracterizacao]', () => {
 
     it('NAO refaz a chamada ao servidor ao buscar (o card de total nao pode mudar)', () => {
       const f = setup({ chartExpenses: [expense()] });
-      const chamadasAntes = cardSvc.getInvoiceExpenses.calls.count();
+      const chamadasAntes = cardSvc.getInvoiceView.calls.count();
       f.componentInstance.searchControl.setValue('padaria');
       f.detectChanges();
-      expect(cardSvc.getInvoiceExpenses.calls.count()).toBe(chamadasAntes);
+      expect(cardSvc.getInvoiceView.calls.count()).toBe(chamadasAntes);
     });
   });
 

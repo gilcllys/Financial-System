@@ -1,43 +1,45 @@
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 :root {
   // Colors – Brand & Accent
-  --color-primary: #0052ff;
-  --color-primary-active: #003ecc;
+  --color-primary: #2858d8;
+  --color-primary-active: #1d49c2;
   --color-primary-disabled: #a8b8cc;
+  --color-primary-soft: #edf2ff;
 
   // Colors – Surface
   --color-canvas: #ffffff;
+  --color-page: #f6f7f9;
   --color-surface-soft: #f7f7f7;
   --color-surface-strong: #eef0f3;
-  --color-surface-dark: #0a0b0d;
+  --color-surface-dark: #17202e;
   --color-surface-dark-elevated: #16181c;
 
   // Colors – Hairlines
-  --color-hairline: #dee1e6;
+  --color-hairline: #e7eaf0;
   --color-hairline-soft: #eef0f3;
 
   // Colors – Text
-  --color-ink: #0a0b0d;
-  --color-body: #5b616e;
-  --color-body-strong: #0a0b0d;
-  --color-muted: #7c828a;
+  --color-ink: #17202e;
+  --color-body: #687283;
+  --color-body-strong: #17202e;
+  --color-muted: #707989;
   --color-muted-soft: #a8acb3;
   --color-on-primary: #ffffff;
   --color-on-dark: #ffffff;
   --color-on-dark-soft: #a8acb3;
 
   // Colors – Semantics
-  --color-semantic-up: #05b169;
-  --color-semantic-down: #cf202f;
+  --color-semantic-up: #16805b;
+  --color-semantic-down: #bd4552;
   --color-accent-yellow: #f4b000;
 
   // Border Radius
   --rounded-none: 0px;
   --rounded-xs: 4px;
   --rounded-sm: 8px;
-  --rounded-md: 12px;
+  --rounded-md: 14px;
   --rounded-lg: 16px;
-  --rounded-xl: 24px;
+  --rounded-xl: 14px;
   --rounded-pill: 100px;
   --rounded-full: 9999px;
 
@@ -58,13 +60,11 @@
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;
 
   // Shadows
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-sm: 0 1px 3px rgba(21, 39, 68, 0.03);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.04);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
 
   // Layout dimensions
   --navbar-h: 64px;          // kept for backward compat
-  --mobile-header-h: 56px;   // top bar visible only on mobile
-  --sidebar-w: 240px;        // fixed sidebar width (desktop)
-  --bottom-nav-h: 64px;
+  --sidebar-w: 244px;        // fixed sidebar width (desktop)
 }

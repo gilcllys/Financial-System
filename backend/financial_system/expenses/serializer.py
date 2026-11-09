@@ -1,5 +1,77 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 from expenses.models import Expense
+
+
+class HistoryQuerySerializer(serializers.Serializer):
+    month = serializers.IntegerField(required=False, min_value=1, max_value=12)
+    year = serializers.IntegerField(required=False, min_value=1)
+    category_id = serializers.IntegerField(required=False, min_value=1)
+    category_key = serializers.CharField(required=False, max_length=40)
+    payment_method = serializers.ChoiceField(
+        required=False, choices=['dinheiro', 'cartao'],
+    )
+    credit_card_id = serializers.IntegerField(required=False, min_value=1)
+    start_date = serializers.DateField(required=False)
+    end_date = serializers.DateField(required=False)
+    search = serializers.CharField(required=False, allow_blank=True, max_length=200)
+    type = serializers.ChoiceField(required=False, choices=['individual', 'shared'])
+    include_future = serializers.BooleanField(required=False, default=False)
+    min_amount = serializers.DecimalField(
+        required=False, max_digits=12, decimal_places=2, min_value=Decimal('0.00'),
+    )
+    max_amount = serializers.DecimalField(
+        required=False, max_digits=12, decimal_places=2, min_value=Decimal('0.00'),
+    )
+    amount = serializers.DecimalField(
+        required=False, max_digits=12, decimal_places=2, min_value=Decimal('0.00'),
+    )
+    export = serializers.ChoiceField(required=False, choices=['csv'])
+    page = serializers.IntegerField(required=False, min_value=1)
+    page_size = serializers.IntegerField(required=False, min_value=1, max_value=100)
+
+    def validate(self, attrs):
+        minimum = attrs.get('min_amount')
+        maximum = attrs.get('max_amount')
+        if minimum is not None and maximum is not None and minimum > maximum:
+            raise serializers.ValidationError({'max_amount': 'Deve ser maior ou igual a min_amount.'})
+        return attrs
+
+
+class HistoryBulkCategoryInputSerializer(serializers.Serializer):
+    expense_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), allow_empty=False, max_length=100,
+    )
+    category_id = serializers.IntegerField(min_value=1)
+
+    def validate_expense_ids(self, value):
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError('IDs de lançamentos duplicados.')
+        return value
+
+
+class ExpenseAnalyticsQuerySerializer(serializers.Serializer):
+    month = serializers.IntegerField(required=False, min_value=1, max_value=12)
+    year = serializers.IntegerField(required=False, min_value=1)
+    closing_month = serializers.IntegerField(required=False, min_value=1, max_value=12)
+    closing_year = serializers.IntegerField(required=False, min_value=1)
+    payment_method = serializers.ChoiceField(required=False, choices=['dinheiro', 'cartao'])
+    period = serializers.ChoiceField(
+        required=False, choices=['purchase_month', 'cycle'], default='purchase_month',
+    )
+    include_obligations = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):
+        if ('closing_month' in attrs) != ('closing_year' in attrs):
+            raise serializers.ValidationError(
+                'closing_month e closing_year devem ser enviados juntos.'
+            )
+        return attrs
+
+
+class ImportExcelInputSerializer(serializers.Serializer):
+    file = serializers.FileField(required=True)
 
 
 class ExpenseSerializer(serializers.ModelSerializer):
@@ -11,6 +83,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
     # Origem da despesa: permite ao front distinguir gasto fixo de lancamento
     # manual sem inferir pela descricao (que o usuario pode editar).
     recurring_template_id = serializers.IntegerField(read_only=True)
+    is_recurrent = serializers.BooleanField(read_only=True)
     is_recurring = serializers.SerializerMethodField()
 
     class Meta:
@@ -19,7 +92,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
         read_only_fields = ['tenant_id', 'recurring_template']
 
     def get_is_recurring(self, obj) -> bool:
-        return obj.recurring_template_id is not None
+        return obj.is_recurrent
 
     def to_internal_value(self, data):
         # Aceita category_id no payload (PUT/PATCH) mapeando para o campo category

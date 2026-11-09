@@ -233,6 +233,8 @@ export class ExpenseFormComponent implements OnInit {
 
   editId = signal<number | null>(null);
 
+  private returnUrl: string | null = null;
+
   // true = receita (entrada), false = despesa (saída)
 
   isIncome = signal(false);
@@ -275,6 +277,11 @@ export class ExpenseFormComponent implements OnInit {
     this.loadSelects();
 
     this.setupConditionals();
+
+    const stateReturnUrl = window.history.state?.returnUrl;
+    if (typeof stateReturnUrl === 'string' && stateReturnUrl.startsWith('/') && !stateReturnUrl.startsWith('//')) {
+      this.returnUrl = stateReturnUrl;
+    }
 
     this.sharedDebtSvc
       .listGroups()
@@ -465,6 +472,47 @@ export class ExpenseFormComponent implements OnInit {
     });
   }
 
+  private resetExpenseForm(preservePaymentDetails = false): void {
+    const paymentMethod = preservePaymentDetails
+      ? this.form.value.payment_method ?? 'dinheiro'
+      : 'dinheiro';
+    const creditCardId = preservePaymentDetails
+      ? this.form.value.credit_card_id ?? null
+      : null;
+
+    this.isIncome.set(false);
+    this.form.reset({
+      description: '',
+      amount: null,
+      date: this.todayStr(),
+      category_id: null,
+      payment_method: paymentMethod,
+      credit_card_id: creditCardId,
+      is_installment: false,
+      installments: 1,
+      quantity: 1,
+    });
+    this.form.markAsPristine();
+    this.form.markAsUntouched();
+    this.errorMessage.set('');
+  }
+
+  private resetSharedExpenseForm(): void {
+    this.sharedForm.reset({
+      description: '',
+      amount: null,
+      date: this.todayStr(),
+      paid_by: null,
+      payment_method: 'dinheiro',
+      credit_card_id: null,
+      category_id: null,
+    });
+    this.sharedForm.markAsPristine();
+    this.sharedForm.markAsUntouched();
+    this.participantIds.set(new Set(this.sharedMembers().map((member) => member.id)));
+    this.errorMessage.set('');
+  }
+
   isSharedParticipant(id: number): boolean {
     return this.participantIds().has(id);
   }
@@ -538,9 +586,9 @@ export class ExpenseFormComponent implements OnInit {
       })
       .subscribe({
         next: () => {
+          this.savingShared.set(false);
           this.toast.success('Gasto compartilhado criado.');
-
-          this.router.navigate(['/home']);
+          this.resetSharedExpenseForm();
         },
 
         error: (err) => {
@@ -608,7 +656,7 @@ export class ExpenseFormComponent implements OnInit {
       this.expenseService.delete(this.editId()!).subscribe({
         next: () => {
           this.expenseService.create(payload).subscribe({
-            next: () => this.saving.set(false),
+            next: () => this.handleSaveSuccess(addAnother),
 
             error: (err) => {
               this.saving.set(false);
@@ -643,25 +691,7 @@ export class ExpenseFormComponent implements OnInit {
       : this.expenseService.create(payload);
 
     req$.subscribe({
-      next: () => {
-        this.toast.success(
-          this.isEdit() ? 'Gasto atualizado.' : 'Gasto criado.',
-        );
-
-        this.saving.set(false);
-        if (addAnother && !this.isEdit()) {
-          const paymentMethod = this.form.value.payment_method;
-          const cardId = this.form.value.credit_card_id;
-          this.form.reset({
-            description: '', amount: null, date: this.todayStr(), category_id: null,
-            payment_method: paymentMethod, credit_card_id: cardId,
-            is_installment: false, installments: 1, quantity: 1,
-          });
-          this.form.markAsPristine();
-          this.form.markAsUntouched();
-        }
-        this.saveAndAddAnother.set(false);
-      },
+      next: () => this.handleSaveSuccess(addAnother),
 
       error: (err) => {
         this.saving.set(false);
@@ -672,6 +702,28 @@ export class ExpenseFormComponent implements OnInit {
         );
       },
     });
+  }
+
+  returnToPreviousPage(): void {
+    if (this.returnUrl) {
+      void this.router.navigateByUrl(this.returnUrl);
+      return;
+    }
+
+    void this.router.navigate(['/history']);
+  }
+
+  private handleSaveSuccess(addAnother: boolean): void {
+    this.toast.success(this.isEdit() ? 'Gasto atualizado.' : 'Gasto criado.');
+    this.saving.set(false);
+
+    if (this.isEdit()) {
+      this.returnToPreviousPage();
+      return;
+    }
+
+    this.resetExpenseForm(addAnother);
+    this.saveAndAddAnother.set(false);
   }
   installmentPreview = computed(() => {
     const v = this.form.getRawValue();

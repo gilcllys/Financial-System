@@ -1,18 +1,8 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
 import { RouterLink } from '@angular/router';
-import { DecimalPipe } from '@angular/common';
 import { CardService } from '../../../core/services/card.service';
 import { CreditCard, Expense, Invoice, InvoiceExpensesResponse } from '../../../core/models';
-
-const CARD_GRADIENTS = [
-  'background: linear-gradient(135deg, #1a2a4a 0%, #2d4a7a 100%)',  // dark blue - Itau
-  'background: linear-gradient(135deg, #6b21a8 0%, #9333ea 100%)',  // purple - Nubank
-  'background: linear-gradient(135deg, #7f1d1d 0%, #b91c1c 100%)',  // dark red - Bradesco
-  'background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',  // orange - Inter
-  'background: linear-gradient(135deg, #065f46 0%, #059669 100%)',  // green
-  'background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%)',  // blue
-];
 
 const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                      'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -20,7 +10,7 @@ const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
 @Component({
   selector: 'app-card-list',
   standalone: true,
-  imports: [RouterLink, DecimalPipe],
+  imports: [RouterLink],
   templateUrl: './card-list.component.html',
   styleUrls: ['./card-list.component.scss'],
 })
@@ -53,6 +43,7 @@ export class CardListComponent implements OnInit {
   invoiceTotal = computed(() =>
     this.invoiceExpenses().reduce((s, e) => s + Number(e.amount), 0)
   );
+  totalInvoices = computed(() => Object.values(this.invoiceTotals()).reduce((total, amount) => total + amount, 0));
 
   private readonly installmentRe = /parcela\s+(\d+)\/(\d+)/i;
 
@@ -142,23 +133,6 @@ export class CardListComponent implements OnInit {
   }
 
   
-  getCardGradient(card: CreditCard, index: number): string {
-    const name = card.name.toLowerCase();
-    if (name.includes('ita?') || name.includes('itau')) {
-      return 'background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%)';
-    }
-    if (name.includes('nubank') || name.includes('nu ')) {
-      return 'background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)';
-    }
-    if (name.includes('bradesco')) {
-      return 'background: linear-gradient(135deg, #450A0A 0%, #18181B 100%)';
-    }
-    if (name.includes('inter')) {
-      return 'background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%)';
-    }
-    return CARD_GRADIENTS[index % CARD_GRADIENTS.length];
-  }
-
   getInstallmentBadge(e: Expense): { text: string; isBadge: boolean } {
     const m = /\b(\d+)\/(\d+)\b/i.exec(e.description) || /parcela\s+(\d+)\/(\d+)/i.exec(e.description);
     if (m) {

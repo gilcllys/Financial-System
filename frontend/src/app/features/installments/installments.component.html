@@ -1,4 +1,4 @@
-﻿<div class="page-header">
+<div class="page-header">
   <div class="page-header__left">
     <h1 class="page-header__title">Parcelamentos</h1>
     <p class="page-header__subtitle">Compras parceladas ativas</p>
@@ -12,30 +12,34 @@
   <!-- KPI Cards -->
   <div class="kpi-row">
     <div class="kpi-card">
-      <span class="kpi-card__label">PARCELAS INDIVIDUAIS</span>
+      <span class="kpi-card__label">Total mensal individual</span>
       <span class="kpi-card__value kpi-card__value--red">{{ formatAmount(totalParcelasIndividuais()) }}</span>
-      <span class="kpi-card__sub">{{ activeGroups().length }} ativas</span>
+      <span class="kpi-card__sub">{{ activeGroups().length }} {{ activeGroups().length === 1 ? 'parcelamento ativo' : 'parcelamentos ativos' }}</span>
     </div>
     <div class="kpi-card">
-      <span class="kpi-card__label">PARCELAS COMPARTILHADAS</span>
+      <span class="kpi-card__label">Sua parte mensal compartilhada</span>
       <span class="kpi-card__value kpi-card__value--blue">{{ formatAmount(totalParcelasCompartilhadas()) }}</span>
-      <span class="kpi-card__sub">{{ activeSharedGroups().length }} ativas</span>
+      <span class="kpi-card__sub">{{ activeSharedGroups().length }} {{ activeSharedGroups().length === 1 ? 'parcelamento ativo' : 'parcelamentos ativos' }}</span>
     </div>
     <div class="kpi-card">
-      <span class="kpi-card__label">MAIOR INDIVIDUAL</span>
+      <span class="kpi-card__label">Maior parcela individual</span>
       <span class="kpi-card__value">{{ formatAmount(maiorParcelaIndividual()) }}</span>
     </div>
     <div class="kpi-card">
-      <span class="kpi-card__label">MAIOR COMPARTILHADA</span>
+      <span class="kpi-card__label">Maior parte mensal compartilhada</span>
       <span class="kpi-card__value">{{ formatAmount(maiorParcelaCompartilhada()) }}</span>
     </div>
   </div>
 
   <!-- Parcelamentos Pessoais -->
   @if (activeGroups().length > 0 || finalizadasGroups().length > 0) {
-    <div class="section-card">
+    <div class="section-card section-card--individual">
       <div class="section-card__header">
-        <h2 class="section-card__title">Progresso dos Parcelamentos</h2>
+        <div class="installment-heading">
+          <span class="installment-kind installment-kind--individual">Individual</span>
+          <h2 class="section-card__title">Parcelamentos individuais</h2>
+          <p class="section-card__subtitle">Compras parceladas da sua conta. O valor mensal é a parcela integral.</p>
+        </div>
         @if (finalizadasGroups().length > 0) {
           <button class="btn-ghost" (click)="toggleFinalizadas()" type="button">
             Ver finalizadas ({{ finalizadasGroups().length }})
@@ -43,14 +47,14 @@
         }
       </div>
 
-      <table class="installments-table" aria-label="Parcelamentos pessoais">
+      <table class="installments-table" aria-label="Parcelamentos individuais">
         <thead>
           <tr>
-            <th>DESCRICAO</th>
-            <th>CARTAO</th>
+            <th>DESCRIÇÃO</th>
+            <th>CARTÃO</th>
             <th>PROGRESSO</th>
-            <th>PROXIMA PARCELA</th>
-            <th class="text-right">VALOR/MES</th>
+            <th>PRÓXIMA PARCELA</th>
+            <th class="text-right">VALOR MENSAL</th>
             <th class="col-actions"><span class="sr-only">Acoes</span></th>
           </tr>
         </thead>
@@ -63,7 +67,7 @@
               <td class="col-card">
                 <span class="card-chip">
                   @if (group.cardName) { {{ group.cardName }} }
-                  <span class="badge-pessoal">Pessoal</span>
+                  <span class="installment-type-pill installment-type-pill--individual">Individual</span>
                 </span>
               </td>
               <td class="col-progress">
@@ -96,7 +100,7 @@
                 <td class="col-card">
                   <span class="card-chip">
                     @if (group.cardName) { {{ group.cardName }} }
-                    <span class="badge-pessoal">Pessoal</span>
+                    <span class="installment-type-pill installment-type-pill--individual">Individual</span>
                   </span>
                 </td>
                 <td class="col-progress">
@@ -125,11 +129,12 @@
 
   <!-- Parcelamentos Compartilhados -->
   @if (activeSharedGroups().length > 0 || finalizadasSharedGroups().length > 0) {
-    <div class="section-card">
+    <div class="section-card section-card--shared">
       <div class="section-card__header">
-        <div>
-          <h2 class="section-card__title">Parcelamentos de Dívidas Compartilhadas</h2>
-          <p class="section-card__subtitle">Parcelas organizadas por grupo compartilhado.</p>
+        <div class="installment-heading">
+          <span class="installment-kind installment-kind--shared">Compartilhado</span>
+          <h2 class="section-card__title">Parcelamentos compartilhados</h2>
+          <p class="section-card__subtitle">Compras divididas em grupo. Os valores mostram somente a sua parte.</p>
         </div>
         @if (finalizadasSharedGroups().length > 0) {
           <button class="btn-ghost" (click)="toggleFinalizadasShared()" type="button">
@@ -144,22 +149,22 @@
             <div class="shared-installments__header">
               <div>
                 <h3 class="shared-installments__title">{{ section.shared_debt_name }}</h3>
-                <p class="shared-installments__meta">{{ section.groups.length }} parcelamento(s) ativo(s)</p>
+                <p class="shared-installments__meta">{{ section.groups.length }} {{ section.groups.length === 1 ? 'parcelamento ativo' : 'parcelamentos ativos' }}</p>
               </div>
               <div class="shared-installments__summary">
-                <span>Total: <strong>{{ formatAmount(section.totalMyPortion) }}</strong></span>
-                <span>Maior: <strong>{{ formatAmount(section.largestMyPortion) }}</strong></span>
+                <span>Sua parte mensal: <strong>{{ formatAmount(section.totalMyPortion) }}</strong></span>
+                <span>Maior parcela: <strong>{{ formatAmount(section.largestMyPortion) }}</strong></span>
               </div>
             </div>
 
             <table class="installments-table" aria-label="Parcelamentos compartilhados de {{ section.shared_debt_name }}">
               <thead>
                 <tr>
-                  <th>DESCRICAO</th>
-                  <th>CARTAO</th>
+                  <th>DESCRIÇÃO</th>
+                  <th>CARTÃO</th>
                   <th>PROGRESSO</th>
-                  <th>PROXIMA PARCELA</th>
-                  <th class="text-right">SUA PARTE</th>
+                  <th>PRÓXIMA PARCELA</th>
+                  <th class="text-right">SUA PARTE MENSAL</th>
                   <th class="col-actions"><span class="sr-only">Acoes</span></th>
                 </tr>
               </thead>
@@ -170,7 +175,7 @@
                     <td class="col-card">
                       <span class="card-chip">
                         @if (group.cardName) { {{ group.cardName }} }
-                        <span class="badge-pessoal">Pessoal</span>
+                        <span class="installment-type-pill installment-type-pill--shared">Compartilhado</span>
                       </span>
                     </td>
                     <td class="col-progress">
@@ -209,11 +214,11 @@
               <table class="installments-table" aria-label="Parcelamentos finalizados de {{ section.shared_debt_name }}">
                 <thead>
                   <tr>
-                    <th>DESCRICAO</th>
-                    <th>CARTAO</th>
+                    <th>DESCRIÇÃO</th>
+                    <th>CARTÃO</th>
                     <th>PROGRESSO</th>
-                    <th>PROXIMA PARCELA</th>
-                    <th class="text-right">SUA PARTE</th>
+                    <th>PRÓXIMA PARCELA</th>
+                    <th class="text-right">SUA PARTE MENSAL</th>
                     <th class="col-actions"><span class="sr-only">Acoes</span></th>
                   </tr>
                 </thead>
@@ -224,7 +229,7 @@
                       <td class="col-card">
                         <span class="card-chip">
                           @if (group.cardName) { {{ group.cardName }} }
-                          <span class="badge-pessoal">Pessoal</span>
+                          <span class="installment-type-pill installment-type-pill--shared">Compartilhado</span>
                         </span>
                       </td>
                       <td class="col-progress">
@@ -255,7 +260,7 @@
 
   @if (activeGroups().length === 0 && activeSharedGroups().length === 0 && finalizadasGroups().length === 0 && finalizadasSharedGroups().length === 0) {
     <div class="empty-state">
-      <div class="empty-state__icon">📅</div>
+      <div class="empty-state__icon"></div>
       <p class="empty-state__title">Nenhum parcelamento encontrado</p>
       <p class="empty-state__text">Gastos parcelados aparecem aqui quando criados com a opcao de parcelamento.</p>
       <a routerLink="/expenses/new" class="btn btn--primary" style="margin-top: 16px">+ Novo Gasto Parcelado</a>

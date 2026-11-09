@@ -1,16 +1,16 @@
 import {
-  Component, OnInit, OnDestroy, AfterViewInit,
+  Component, OnInit, OnDestroy,
   ElementRef, ViewChild, inject, signal, computed, effect
 } from '@angular/core';
 import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { CurrencyPipe, DatePipe, SlicePipe } from '@angular/common';
+import { SlicePipe } from '@angular/common';
 import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
 
 import { HomeService, InstallmentGroup } from '../../core/services/home.service';
-import { CategoryService } from '../../core/services/category.service';
-import { AnalyticsService, MonthlyAnalytics, CategoryAnalytics, ConsolidatedSummary } from '../../core/services/analytics.service';
+
+import { MonthlyAnalytics, CategoryAnalytics, ConsolidatedSummary } from '../../core/services/analytics.service';
 import { OpenInvoice, Expense, ExpenseCategory } from '../../core/models';
 import { ExpenseService, RecurringExpenseTemplate } from '../../core/services/expense.service';
 import * as d3 from 'd3';
@@ -32,18 +32,18 @@ const EMPTY_CONSOLIDATED: ConsolidatedSummary = {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CurrencyPipe, RouterLink, FormsModule, SlicePipe, DatePipe],
+  imports: [RouterLink, FormsModule, SlicePipe],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss'],
 })
-export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
+export class HomeComponent implements OnInit, OnDestroy {
   private confirmDialog = inject(ConfirmDialogService);
   private homeService      = inject(HomeService);
   private expenseService   = inject(ExpenseService);
-  private categoryService  = inject(CategoryService);
-  private analyticsService = inject(AnalyticsService);
+
+
   private sharedDebtService = inject(SharedDebtService);
-  private expSvc = inject(ExpenseService);
+
 
   recurringTemplates = signal<RecurringExpenseTemplate[]>([]);
   private destroy$         = new Subject<void>();
@@ -87,43 +87,39 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
 
   totalPages    = computed(() => Math.ceil(this.totalCount() / this.pageSize));
   pageNumbers   = computed(() => Array.from({ length: this.totalPages() }, (_, i) => i + 1));
-  /** Soma BRUTA das faturas abertas (individual + valor cheio do compartilhado) — o que o banco cobra. */
-  totalInvoices = computed(() => this.openInvoices().reduce((s, i) => s + i.total, 0));
-  maxCategory   = computed(() => Math.max(...this.byCategory().map(c => c.total), 1));
-
-  // ── Home v2: KPIs centrados no cartão ─────────────────────────────────────
+  /** Soma BRUTA das faturas abertas (individual + valor cheio do compartilhado) — o que o banco cobra. */
+  totalInvoices = computed(() => this.openInvoices().reduce((s, i) => s + i.total, 0));
+  maxCategory   = computed(() => Math.max(...this.byCategory().map(c => c.total), 1));
+  // ── Home v2: KPIs centrados no cartão ─────────────────────────────────────
   /** Usa o saldo pessoal calculado no backend, incluindo obrigações ainda não lançadas. */
   balance = computed(() => this.consolidated().free_to_spend ?? this.consolidated().balance);
-  nextDueDate = computed<string | null>(() => {
-    const dates = this.openInvoices().map(i => i.due_date).filter(Boolean).sort();
-    return dates[0] ?? null;
-  });
-
-  invoicesKpiSub = computed(() => {
-    const n = this.openInvoices().length;
-    if (n === 0) return 'Nenhum cartão cadastrado';
-    const cards = `${n} ${n === 1 ? 'cartão' : 'cartões'}`;
-    const due = this.nextDueDate();
-    return due ? `${cards} · próx. vencimento ${this.ddmm(due)}` : cards;
-  });
-
-  /** Para cada grupo compartilhado, em quais faturas abertas (cartões) ele caiu. */
-  groupCards = computed(() => {
-    const map = new Map<number, { label: string; total: number; my_portion: number }[]>();
-    for (const inv of this.openInvoices()) {
-      for (const g of inv.shared_groups ?? []) {
-        const list = map.get(g.group_id) ?? [];
-        list.push({ label: `${inv.card_name} •••• ${inv.last_four_digits}`, total: g.total, my_portion: g.my_portion });
-        map.set(g.group_id, list);
-      }
-    }
-    return map;
-  });
-
-  activeRecurring = computed(() => this.recurringTemplates().filter(t => t.is_active));
-  totalRecurringMonthly = computed(() =>
-    this.activeRecurring().reduce((s, t) => s + Number(t.amount), 0)
-  );
+  nextDueDate = computed<string | null>(() => {
+    const dates = this.openInvoices().map(i => i.due_date).filter(Boolean).sort();
+    return dates[0] ?? null;
+  });
+  invoicesKpiSub = computed(() => {
+    const n = this.openInvoices().length;
+    if (n === 0) return 'Nenhum cartão cadastrado';
+    const cards = `${n} ${n === 1 ? 'cartão' : 'cartões'}`;
+    const due = this.nextDueDate();
+    return due ? `${cards} · próx. vencimento ${this.ddmm(due)}` : cards;
+  });
+  /** Para cada grupo compartilhado, em quais faturas abertas (cartões) ele caiu. */
+  groupCards = computed(() => {
+    const map = new Map<number, { label: string; total: number; my_portion: number }[]>();
+    for (const inv of this.openInvoices()) {
+      for (const g of inv.shared_groups ?? []) {
+        const list = map.get(g.group_id) ?? [];
+        list.push({ label: `${inv.card_name} •••• ${inv.last_four_digits}`, total: g.total, my_portion: g.my_portion });
+        map.set(g.group_id, list);
+      }
+    }
+    return map;
+  });
+  activeRecurring = computed(() => this.recurringTemplates().filter(t => t.is_active));
+  totalRecurringMonthly = computed(() =>
+    this.activeRecurring().reduce((s, t) => s + Number(t.amount), 0)
+  );
 
   /** Parcelas ativas (ainda não quitadas) — máximo 4 no preview */
   activeInstallments = computed(() =>
@@ -132,16 +128,16 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
 
   totalRemainingInstallments = computed(() =>
     this.installmentGroups().reduce((s, g) => s + g.remainingAmount, 0)
-  );
-  // ponytail: this exists — soma my_portion de todos os grupos para o chip de resumo
-  groupsNetBalance = computed(() =>
-    this.sharedDebts().reduce((s, g) => s - g.my_portion, 0)
-  );
+  );
+  // ponytail: this exists — soma my_portion de todos os grupos para o chip de resumo
+  groupsNetBalance = computed(() =>
+    this.sharedDebts().reduce((s, g) => s - g.my_portion, 0)
+  );
 
 
   // ────────────────────────────────────────────────────────────────────────
   ngOnInit(): void {
-    this.categoryService.list().subscribe({ next: cats => this.categories.set(cats) });
+
 
     this.searchSubject.pipe(
       debounceTime(400),
@@ -150,11 +146,11 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     ).subscribe(() => { this.currentPage.set(1); this.loadTable(); });
 
     this.loadDashboard();
-    this.loadTable();
-    this.loadRecurringTemplates();
-  }
+
+
+  }
 
-  ngAfterViewInit(): void { }
+
 
   ngOnDestroy(): void {
     this.destroy$.next();
@@ -174,6 +170,11 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
           this.byCategory.set(data.byCategory);
           this.installmentGroups.set(data.installmentGroups);
           this.evolution.set(data.evolution);
+          this.categories.set(data.categories);
+          this.recurringTemplates.set(data.recurringTemplates);
+          this.expenses.set(data.expensePage.results);
+          this.totalCount.set(data.expensePage.count);
+          this.tableLoading.set(false);
           this.dashLoading.set(false);
         },
         error: () => this.dashLoading.set(false),
@@ -199,27 +200,16 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
         },
         error: () => this.tableLoading.set(false),
       });
+  }
 
-    // KPIs consolidados: recarrega ao trocar mês/ano
-    this.analyticsService.consolidatedSummary(
-      this.filterMonth(), this.filterYear(), this.filterMonth(), this.filterYear()
-    )
-    .pipe(takeUntil(this.destroy$))
-      .subscribe({ next: data => this.consolidated.set(data) });
-
-    // Categorias: recarrega ao trocar mês/ano
-    this.analyticsService.homeCharts(this.filterMonth(), this.filterYear())
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({ next: data => this.byCategory.set(data.by_category) });
-  }
 
   onFilterChange(): void {
     this.currentPage.set(1);
+    this.loadDashboard();
     this.loadTable();
+
     if (this.activeTab() === 'compartilhada') this.loadSharedEntries();
-    this.loadRecurringTemplates();
   }
-
   switchTab(tab: 'individual' | 'compartilhada'): void {
     this.activeTab.set(tab);
     if (tab === 'compartilhada' && this.sharedEntries().length === 0) {
@@ -250,6 +240,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     if (page < 1 || page > this.totalPages()) return;
     this.currentPage.set(page);
     this.loadTable();
+
   }
 
   async delete(id: number): Promise<void> {
@@ -306,26 +297,43 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     if (days <= 7) return 'badge--yellow';
     return 'badge--green';
   }
-
-  /** 'YYYY-MM-DD' → 'dd/MM' sem depender de timezone. */
-  ddmm(iso: string): string {
-    return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+  /** 'YYYY-MM-DD' → 'dd/MM' sem depender de timezone. */
+  ddmm(iso: string): string {
+    return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+  }
+  cycleRange(invoice: OpenInvoice): string {
+    return `${this.shortDate(invoice.period_start)} – ${this.shortDate(invoice.period_end)}`;
   }
 
-  /** % da fatura que é gasto individual (restante = compartilhado) — largura da barra dividida. */
-  individualPct(inv: OpenInvoice): number {
-    if (inv.total <= 0) return 100;
-    return Math.round((inv.expenses_total / inv.total) * 100);
+  private shortDate(iso: string): string {
+    const monthNames = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    const month = Number(iso.slice(5, 7)) - 1;
+    return `${iso.slice(8, 10)} ${monthNames[month] ?? ''}`.trim();
   }
 
-  cardsForGroup(groupId: number): { label: string; total: number; my_portion: number }[] {
-    return this.groupCards().get(groupId) ?? [];
+  recentYearMonths(): MonthlyAnalytics[] {
+    return this.evolution()
+      .filter(month => month.month <= this.filterMonth())
+      .slice(-6);
   }
 
-  recurringMeta(t: RecurringExpenseTemplate): string {
-    const pay = t.payment_method === 'cartao' ? (t.credit_card_name ?? 'Cartão não definido') : 'Dinheiro';
-    return `${t.category_name ?? 'Sem categoria'} · ${pay} · dia ${t.day_of_month}`;
+  monthlyExpensePct(value: number): number {
+    const maxExpense = Math.max(...this.recentYearMonths().map(month => Number(month.expenses)), 1);
+    return Math.max((Number(value) / maxExpense) * 100, 3);
   }
+
+  /** % da fatura que é gasto individual (restante = compartilhado) — largura da barra dividida. */
+  individualPct(inv: OpenInvoice): number {
+    if (inv.total <= 0) return 100;
+    return Math.round((inv.expenses_total / inv.total) * 100);
+  }
+  cardsForGroup(groupId: number): { label: string; total: number; my_portion: number }[] {
+    return this.groupCards().get(groupId) ?? [];
+  }
+  recurringMeta(t: RecurringExpenseTemplate): string {
+    const pay = t.payment_method === 'cartao' ? (t.credit_card_name ?? 'Cartão não definido') : 'Dinheiro';
+    return `${t.category_name ?? 'Sem categoria'} · ${pay} · dia ${t.day_of_month}`;
+  }
 
   @ViewChild('lineChartEl') lineChartEl!: ElementRef<HTMLDivElement>;
   @ViewChild('compChartEl') compChartEl!: ElementRef<HTMLDivElement>;
@@ -344,7 +352,6 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     });
   }
-
   // ?? SVG Chart rendering (D3) ??
   renderCharts(data: MonthlyAnalytics[]): void {
     if (!this.lineChartEl || !this.compChartEl) return;
@@ -505,12 +512,6 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
   }
 
-  loadRecurringTemplates(): void {
-    this.expSvc.listRecurringTemplates().subscribe({
-      next: tpls => this.recurringTemplates.set(tpls),
-    });
-  }
-
-}
+}
 
 

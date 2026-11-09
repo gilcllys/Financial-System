@@ -6,6 +6,9 @@ import { ExpenseService } from '../../core/services/expense.service';
 import { CardService } from '../../core/services/card.service';
 import { CategoryService } from '../../core/services/category.service';
 import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
+import { SharedDebtService } from '../../core/services/shared-debt.service';
+import { AuthService } from '../../core/auth/auth.service';
+import { ActivatedRoute } from '@angular/router';
 
 /**
  * Testes de CARACTERIZACAO da tela de Gastos Fixos.
@@ -58,6 +61,13 @@ describe('RecurringExpensesComponent [caracterizacao]', () => {
         { provide: CardService, useValue: { list: () => of([{ id: 1, name: 'Itau Azul' }]) } },
         { provide: CategoryService, useValue: { list: () => of([{ id: 8, name: 'Assinaturas' }]) } },
         { provide: ConfirmDialogService, useValue: confirmDialog },
+        { provide: SharedDebtService, useValue: {
+          listGroups: () => of([]),
+          listRecurringTemplates: () => of([]),
+          members: () => of([]),
+        } },
+        { provide: AuthService, useValue: { userProfile: { sub: 'test-tenant' } } },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } } } },
       ],
     });
 

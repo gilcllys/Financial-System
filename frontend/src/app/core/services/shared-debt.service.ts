@@ -36,9 +36,12 @@ export interface SharedDebtEntry {
   category: number | null;
   category_name: string | null;
   participant_count: number;
+  participant_ids: number[];
   installment_group_id: string | null;
   total_installments: number;
   installment_number: number;
+  is_recurrent?: boolean;
+  recurring_template_id?: number | null;
   paid: boolean;
   created_by_tenant_id: string;
   created_at: string;
@@ -90,12 +93,6 @@ export interface CreateEntryPayload {
   paid?: boolean;
 }
 
-export interface PersonalSummary {
-  installments_remaining: { total: number; count: number };
-  card_current_month: { total: number; count: number };
-}
-
-
 export interface SharedDebtHomeSummary {
   id: number;
   name: string;
@@ -103,6 +100,19 @@ export interface SharedDebtHomeSummary {
   total_amount: number;
   my_portion: number;
   entry_count: number;
+}
+
+export interface SharedDebtListSummary extends SharedDebtHomeSummary {
+  member_details: Array<{ member_id: number; display_name: string }>;
+}
+
+export interface SharedDebtScreenSummary {
+  group: SharedDebtGroup;
+  members: SharedDebtMember[];
+  balances: BalancesResponse;
+  entries: PaginatedResponse<SharedDebtEntry>;
+  monthly_history: MonthlyHistoryEntry[];
+  recurring_templates: RecurringTemplate[];
 }
 
 export interface MonthlyHistoryEntry {
@@ -124,6 +134,8 @@ export interface RecurringTemplate {
   paid_by_tenant_id: string | null;
   participant_ids: number[];
   payment_method: 'dinheiro' | 'cartao';
+  credit_card_id?: number | null;
+  credit_card_name?: string | null;
   category: number | null;
   category_name: string | null;
   day_of_month: number;
@@ -137,6 +149,7 @@ export interface CreateRecurringTemplatePayload {
   paid_by: number;
   participant_ids?: number[];
   payment_method?: 'dinheiro' | 'cartao';
+  credit_card_id?: number | null;
   category_id?: number | null;
   day_of_month?: number;
 }
@@ -217,10 +230,6 @@ export class SharedDebtService {
   // --- Groups ---
   listGroups(): Observable<SharedDebtGroup[]> {
     return this.http.get<SharedDebtGroup[]>(`${this.base}/shared-debts/`);
-  }
-
-  getGroup(id: number): Observable<SharedDebtGroup> {
-    return this.http.get<SharedDebtGroup>(`${this.base}/shared-debts/${id}/`);
   }
 
   createGroup(payload: CreateGroupPayload): Observable<SharedDebtGroup> {
@@ -305,12 +314,16 @@ export class SharedDebtService {
   }
 
   // --- Personal debts summary ---
-  personalSummary(): Observable<PersonalSummary> {
-    return this.http.get<PersonalSummary>(`${this.base}/personal-summary/`);
+  listSummary(): Observable<SharedDebtListSummary[]> {
+    return this.http.get<SharedDebtListSummary[]>(`${this.base}/shared-debts/home-summary/`);
   }
 
-  homeSummary(): Observable<SharedDebtHomeSummary[]> {
-    return this.http.get<SharedDebtHomeSummary[]>(`${this.base}/shared-debts/home-summary/`);
+  screenSummary(id: number, month?: number | null, category?: number | null, page = 1, search = ''): Observable<SharedDebtScreenSummary> {
+    let params = new HttpParams().set('page', page);
+    if (month != null) params = params.set('month', month);
+    if (category != null) params = params.set('category', category);
+    if (search.trim()) params = params.set('search', search.trim());
+    return this.http.get<SharedDebtScreenSummary>(`${this.base}/shared-debts/${id}/screen-summary/`, { params });
   }
 
   monthlyHistory(id: number): Observable<MonthlyHistoryEntry[]> {

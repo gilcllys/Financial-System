@@ -1,10 +1,13 @@
 from django.contrib import admin
 from django.urls import path, include
 from .api_root import api_root
+from .screen_queries import HomeDashboardView, InstallmentsOverviewView
 
 
 urlpatterns = [
     path('', api_root),
+    path('api/dashboard/home/', HomeDashboardView.as_view(), name='home-dashboard'),
+    path('api/dashboard/installments/', InstallmentsOverviewView.as_view(), name='installments-overview'),
     path('admin/', admin.site.urls),
     path('api/catalog/', include('catalog.urls')),
     path('api/cards/', include('cards.urls')),

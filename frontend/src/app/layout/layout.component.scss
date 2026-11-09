@@ -1,75 +1,4 @@
-﻿// ─── Mobile Header ────────────────────────────────────────────────────────────
-// Visible only on mobile (<768px). Desktop users see the persistent sidebar.
-.mobile-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 300;
-  height: var(--mobile-header-h);
-  background: rgba(255, 255, 255, 0.95);
-  border-bottom: 1px solid var(--color-hairline);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  padding: 0 var(--space-base);
-  gap: var(--space-sm);
-
-  @media (min-width: 768px) {
-    display: none;
-  }
-
-  &__hamburger {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 5px;
-    width: 44px;
-    height: 44px;
-    padding: var(--space-sm);
-    border-radius: var(--rounded-md);
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: background 0.15s;
-
-    &:hover {
-      background: var(--color-surface-soft);
-    }
-  }
-
-  &__brand {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    text-decoration: none;
-
-    &:hover { text-decoration: none; }
-  }
-
-  &__logo {
-    font-size: 20px;
-    line-height: 1;
-  }
-
-  &__name {
-    font-size: 17px;
-    font-weight: 700;
-    color: #ffffff;
-    letter-spacing: -0.3px;
-  }
-}
-
-.hamburger-bar {
-  display: block;
-  width: 18px;
-  height: 2px;
-  background: var(--color-ink);
-  border-radius: 1px;
-}
-
-// ─── Sidebar Overlay (mobile backdrop) ────────────────────────────────────────
+﻿// ─── Sidebar Overlay (mobile backdrop) ────────────────────────────────────────
 .sidebar-overlay {
   position: fixed;
   inset: 0;
@@ -78,7 +7,7 @@
   backdrop-filter: blur(2px);
   animation: fadeIn 0.2s ease;
 
-  @media (min-width: 768px) {
+  @media (min-width: 721px) {
     display: none;
   }
 }
@@ -103,7 +32,7 @@
   overflow: hidden;
 
   // ── Mobile: hidden off-screen, slides in as a drawer
-  @media (max-width: 767px) {
+  @media (max-width: 720px) {
     transform: translateX(-100%);
     transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: var(--shadow-lg);
@@ -114,7 +43,7 @@
   }
 
   // ── Desktop: always visible, no transition needed
-  @media (min-width: 768px) {
+  @media (min-width: 721px) {
     transform: none !important;
     transition: none !important;
   }
@@ -126,10 +55,10 @@
     justify-content: space-between;
     padding: var(--space-lg) var(--space-base);
     border-bottom: 1px solid #232323;
-    flex-shrink: 0;
-    font-weight: 700;
-    color: #ffffff;
-    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 0.5px;
     user-select: none;
   }
 
@@ -189,7 +118,7 @@
       color: #ffffff;
     }
 
-    @media (min-width: 768px) {
+    @media (min-width: 721px) {
       display: none;
     }
   }
@@ -367,69 +296,6 @@
   }
 }
 
-// ─── Bottom Nav (mobile only) ──────────────────────────────────────────────────
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: var(--bottom-nav-h);
-  background: rgba(255, 255, 255, 0.94);
-  border-top: 1px solid var(--color-hairline);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: stretch;
-  z-index: 200;
-
-  // Hide on desktop (sidebar handles navigation)
-  @media (min-width: 768px) {
-    display: none;
-  }
-
-  &__item {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    text-decoration: none;
-    color: var(--color-muted);
-    font-size: 10px;
-    font-weight: 500;
-    transition: color 0.12s ease;
-    min-height: 44px;
-
-    &:hover {
-      text-decoration: none;
-      color: var(--color-primary);
-    }
-
-    &--active {
-      color: var(--color-primary) !important;
-
-      .bottom-nav__icon {
-        transform: scale(1.15);
-      }
-    }
-  }
-
-  &__icon {
-    font-size: 20px;
-    line-height: 1;
-    transition: transform 0.15s ease;
-  }
-
-  &__label {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.2px;
-  }
-}
-
-
-
-
 .sidebar__section-label {
   margin: var(--space-xs) var(--space-base) 0;
   color: var(--color-muted);
@@ -437,4 +303,134 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+// The application shell follows the light, restrained prototype treatment.
+.sidebar {
+  background: var(--color-canvas);
+  border-right-color: var(--color-hairline);
+
+  &__header {
+    border-bottom-color: var(--color-hairline);
+    color: var(--color-ink);
+  }
+
+  &__logo-box {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  &__logo-name,
+  &__user-name {
+    color: var(--color-ink);
+  }
+
+  &__close:hover {
+    color: var(--color-ink);
+  }
+
+  &__divider {
+    background: var(--color-hairline);
+  }
+
+  &__link {
+    min-height: 38px;
+    padding: 0 12px;
+    border-left-width: 0;
+    color: var(--color-body);
+    font-size: 13px;
+    &:hover {
+      background: var(--color-surface-soft);
+      color: var(--color-ink);
+    }
+
+    &--active {
+      background: var(--color-primary-soft) !important;
+      color: var(--color-primary) !important;
+      border-left-color: transparent !important;
+    }
+  }
+
+  &__link-icon {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    font-size: 16px;
+
+    svg {
+      display: block;
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  &__badge {
+    background: #fff3e5;
+    color: #a85b00;
+  }
+
+  &__footer {
+    border-top-color: var(--color-hairline);
+    background: var(--color-canvas);
+  }
+}
+
+.sidebar__avatar {
+  background: #e9edf5;
+  color: #526076;
+}
+
+
+// Shared top bar follows the prototype at desktop and mobile widths.
+.app-topbar__breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-muted);
+  font-size: 12px;
+
+  strong { color: var(--color-ink); font-weight: 600; }
+}
+
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  height: 68px;
+  margin-left: var(--sidebar-w);
+  padding-inline: 36px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: rgb(255 255 255 / 94%);
+  backdrop-filter: blur(12px);
+}
+
+.app-topbar__menu {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-right: 10px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-sm);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+
+  svg { width: 17px; height: 17px; }
+}
+
+@media (max-width: 720px) {
+  .app-topbar {
+    height: 58px;
+    margin-left: 0;
+    padding-inline: 16px;
+  }
+
+  .app-topbar__menu { display: inline-flex; flex: 0 0 auto; }
 }

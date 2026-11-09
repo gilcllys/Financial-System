@@ -54,6 +54,20 @@
       retries: 3
       start_period: 45s
 
+  # Gera uma despesa para cada gasto fixo ativo no mês atual (idempotente).
+  recurring-expenses-scheduler:
+    build: ./backend
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["cd /app/financial_system || exit; python manage.py generate_recurring_expenses; python manage.py generate_shared_recurring_expenses; exec crond -f -l 2"]
+    env_file:
+      - ./backend/.env.local
+    environment:
+      DB_HOST: db
+      DB_SSL_MODE: disable
+    depends_on:
+      backend:
+        condition: service_healthy
+
   # --- Frontend (Angular dev build + nginx local) ---
   frontend:
     build:

@@ -1,13 +1,12 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { forkJoin, Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { OpenInvoice, Expense, CreditCard } from '../models';
+import { OpenInvoice, Expense, CreditCard, ExpenseCategory } from '../models';
 import { invoiceForDate, isInvoiceClosed } from '../utils/invoice-cycle';
-import { AnalyticsService, MonthlyAnalytics, CategoryAnalytics, ConsolidatedSummary } from './analytics.service';
-import { SharedDebtService, SharedDebtHomeSummary } from './shared-debt.service';
-import { ExpenseService } from './expense.service';
+import { MonthlyAnalytics, CategoryAnalytics, ConsolidatedSummary } from './analytics.service';
+import { PaginatedResponse, SharedDebtHomeSummary } from './shared-debt.service';
+import { RecurringExpenseTemplate } from './expense.service';
 
 export interface InstallmentGroup {
   name: string;
@@ -26,48 +25,52 @@ export interface HomeSummary {
   sharedDebts: SharedDebtHomeSummary[];
   byCategory: CategoryAnalytics[];
   recentExpenses: Expense[];
+  expensePage: PaginatedResponse<Expense>;
   installmentGroups: InstallmentGroup[];
+  categories: ExpenseCategory[];
+  recurringTemplates: RecurringExpenseTemplate[];
+}
+
+interface HomeDashboardPayload {
+  consolidated: ConsolidatedSummary;
+  home_charts: { by_category: CategoryAnalytics[] };
+  evolution: MonthlyAnalytics[];
+  open_invoices: OpenInvoice[];
+  shared_debts: SharedDebtHomeSummary[];
+  expenses: PaginatedResponse<Expense>;
+  installment_expenses: Expense[];
+  cards: CreditCard[];
+  categories: ExpenseCategory[];
+  recurring_templates: RecurringExpenseTemplate[];
 }
 
 @Injectable({ providedIn: 'root' })
 export class HomeService {
-  private http           = inject(HttpClient);
-  private analytics      = inject(AnalyticsService);
-  private sharedDebt     = inject(SharedDebtService);
-  private expenseService = inject(ExpenseService);
-
-  private cardsBase = `${environment.apiBaseUrl}/api/cards/credit-cards`;
+  private http = inject(HttpClient);
 
   load(month: number, year: number): Observable<HomeSummary> {
-    return forkJoin({
-      consolidated:        this.analytics.consolidatedSummary(month, year, month, year),
-      homeCharts:          this.analytics.homeCharts(month, year),
-      evolution:           this.analytics.monthly(year),
-      openInvoices:        this.http.get<OpenInvoice[]>(`${this.cardsBase}/open-invoices/?closing_month=${month}&closing_year=${year}`),
-      sharedDebts:         this.sharedDebt.homeSummary(),
-      recentExpenses:      this.expenseService.list({ month, year, page: 1, page_size: 5 }),
-      allInstallmentExp:   this.expenseService.listAll(),
-      cards:               this.http.get<CreditCard[]>(`${this.cardsBase}/`),
-    }).pipe(
-      map(({ consolidated, homeCharts, evolution, openInvoices,
-             sharedDebts, recentExpenses, allInstallmentExp, cards }) => ({
-        consolidated,
-        evolution,
-        openInvoices,
-        sharedDebts,
-        byCategory:        homeCharts.by_category,
-        recentExpenses:    recentExpenses.results,
-        installmentGroups: this._groupInstallments(allInstallmentExp, cards),
+    const params = new HttpParams().set('month', month).set('year', year);
+    return this.http.get<HomeDashboardPayload>(`${environment.apiBaseUrl}/api/dashboard/home/`, { params }).pipe(
+      map(data => ({
+        consolidated: data.consolidated,
+        evolution: data.evolution,
+        openInvoices: data.open_invoices,
+        sharedDebts: data.shared_debts,
+        byCategory: data.home_charts.by_category,
+        recentExpenses: data.expenses.results.slice(0, 5),
+        expensePage: data.expenses,
+        installmentGroups: this.groupInstallments(data.installment_expenses, data.cards),
+        categories: data.categories,
+        recurringTemplates: data.recurring_templates,
       }))
     );
   }
 
-  private _groupInstallments(expenses: Expense[], cards: CreditCard[]): InstallmentGroup[] {
+  private groupInstallments(expenses: Expense[], cards: CreditCard[]): InstallmentGroup[] {
     const cardById = new Map(cards.map(card => [card.id, card]));
-    const installmentExpenses = expenses.filter(e => /parcela\s+\d+\/\d+/i.test(e.description));
-    const groups = new Map<string, { name: string; totalInstallments: number; paidInstallments: number; amountPerInstallment: number; totalAmount: number; remainingAmount: number; nextDate: string | null }>();
+    const groups = new Map<string, InstallmentGroup>();
 
-    for (const expense of installmentExpenses) {
+    for (const expense of expenses) {
       const match = expense.description.match(/^(.*?)[\s-]*parcela\s+(\d+)\/(\d+)/i);
       if (!match) continue;
       const name = match[1].trim() || expense.description;
@@ -78,16 +81,16 @@ export class HomeService {
       const key = `${name}-${totalParts}-${cardId ?? 'none'}`;
       const invoice = card ? invoiceForDate(expense.date, card.closing_day) : null;
       const closed = card ? isInvoiceClosed(expense.date, card.closing_day) : expense.date < new Date().toISOString().slice(0, 10);
-      const displayDate = invoice?.displayDate ?? expense.date;
+      const amount = Math.abs(Number(expense.amount));
       const group = groups.get(key) ?? {
         name, totalInstallments: totalParts, paidInstallments: 0,
-        amountPerInstallment: Math.abs(Number(expense.amount)), totalAmount: 0,
-        remainingAmount: 0, nextDate: null,
+        amountPerInstallment: amount, totalAmount: 0, remainingAmount: 0, nextDate: null,
       };
-      group.totalAmount = Math.round((group.totalAmount + Math.abs(Number(expense.amount))) * 100) / 100;
+      group.totalAmount = Math.round((group.totalAmount + amount) * 100) / 100;
       if (closed) group.paidInstallments = Math.max(group.paidInstallments, part);
       else {
-        group.remainingAmount = Math.round((group.remainingAmount + Math.abs(Number(expense.amount))) * 100) / 100;
+        group.remainingAmount = Math.round((group.remainingAmount + amount) * 100) / 100;
+        const displayDate = invoice?.displayDate ?? expense.date;
         if (!group.nextDate || displayDate < group.nextDate) group.nextDate = displayDate;
       }
       groups.set(key, group);

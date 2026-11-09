@@ -23,15 +23,6 @@ export interface CardAnalytics {
 export interface DailyAnalytics {
   day: number; date: string; total: number; count: number;
 }
-export interface HomeCharts {
-  month: number;
-  year: number;
-  summary: { income: number; expenses: number; balance: number; count: number };
-  by_category: CategoryAnalytics[];
-  daily: { day: number; total: number; count: number }[];
-  weekly: { week: number; label: string; total: number }[];
-}
-
 export interface CardInvoiceDetail {
   card_id: number;
   card_name: string;
@@ -96,27 +87,4 @@ export class AnalyticsService {
     return this.http.get<DailyAnalytics[]>(`${this.base}/daily/`, { params });
   }
 
-
-  consolidatedSummary(month?: number, year?: number, closingMonth?: number, closingYear?: number): Observable<ConsolidatedSummary> {
-    let params = new HttpParams();
-    if (month) params = params.set('month', month);
-    if (year)  params = params.set('year', year);
-    if (closingMonth) params = params.set('closing_month', closingMonth);
-    if (closingYear) params = params.set('closing_year', closingYear);
-    params = params.set('include_obligations', '1');
-    return this.http.get<ConsolidatedSummary>(
-      `${environment.apiBaseUrl}/api/expenses/expenses/consolidated-summary/`, { params }
-    );
-  }
-
-  /** Endpoint otimizado — retorna todos os dados da tela Home em 1 request */
-  homeCharts(month?: number, year?: number, paymentMethod?: string): Observable<HomeCharts> {
-    let params = new HttpParams();
-    if (month) params = params.set('month', month);
-    if (year) params = params.set('year', year);
-    if (paymentMethod) params = params.set('payment_method', paymentMethod);
-    return this.http.get<HomeCharts>(
-      `${environment.apiBaseUrl}/api/expenses/expenses/home-charts/`, { params }
-    );
-  }
 }
