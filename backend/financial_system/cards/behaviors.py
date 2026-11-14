@@ -108,8 +108,12 @@ def _shared_invoice_breakdown(card, period_start, period_end):
         amount = abs(float(entry.amount))
         members_by_id = {m.id: m for m in entry.shared_debt.members.all()}
         members = [members_by_id[mid] for mid in entry.participant_ids() if mid in members_by_id]
-        portion = abs(float(entry.share_per_participant()))
         gross_total += amount
+        shares = entry.shares_by_participant()
+        portion = sum(
+            abs(float(shares.get(member.id, 0)))
+            for member in members if member.tenant_id == card.tenant_id
+        )
         my_total += portion
 
         group = groups.setdefault(
@@ -126,6 +130,7 @@ def _shared_invoice_breakdown(card, period_start, period_end):
         group['my_portion'] += portion
 
         for member in members:
+            member_portion = abs(float(shares.get(member.id, 0)))
             for bucket in (participants, group['participants']):
                 row = bucket.setdefault(
                     member.id,
@@ -136,7 +141,7 @@ def _shared_invoice_breakdown(card, period_start, period_end):
                         'is_current_user': member.tenant_id == card.tenant_id,
                     },
                 )
-                row['amount'] += portion
+                row['amount'] += member_portion
 
     return {
         'total': round(gross_total, 2),

@@ -123,7 +123,7 @@
                 </span>
               </div>
               <span class="shared-recurring__meta">
-                {{ formatCurrency(template.amount) }} / mês · Dia {{ template.day_of_month }} · Pago por {{ template.paid_by_name }} · {{ template.participant_ids.length }} participante(s)
+                {{ formatCurrency(template.amount) }} / mês · Previsto para dia {{ template.day_of_month }} · Pago por {{ template.paid_by_name }} · {{ template.participant_ids.length }} participante(s)
                 @if (template.category_name) { · {{ template.category_name }} }
                 @if (template.payment_method === 'cartao') { · {{ template.credit_card_name ?? 'Cartão de outro participante' }} }
               </span>
@@ -221,10 +221,13 @@
                     @if (e.total_installments > 1) { <span> · {{ e.installment_number }}ª de {{ e.total_installments }} parcelas</span> }
                   </span>
                 </div>
-                <span class="entry-status" [class.entry-status--paid]="e.paid">{{ e.paid ? 'Pago' : 'Não pago' }}</span>
+                <span class="entry-status" [class.entry-status--paid]="e.paid">Reembolso {{ e.paid ? 'registrado' : 'pendente' }}</span>
               </div>
               <div class="shared-ledger-row__meta">
                 <span>{{ e.payment_method === 'cartao' ? (e.credit_card_name ?? 'Cartão de crédito') : 'Dinheiro' }}</span>
+                @if (e.payment_method === 'cartao' && e.invoice_paid) {
+                  <span>Fatura considerada paga após o vencimento</span>
+                }
                 <span>Pago por <strong>{{ e.paid_by_name }}</strong></span>
                 <span>Dividido com <strong>{{ participantNames(e) }}</strong></span>
               </div>
@@ -233,7 +236,7 @@
                 <span>Sua parte <strong>{{ formatCurrency(myPortion(e)) }}</strong></span>
                 <div class="shared-ledger-row__actions">
                   <button type="button" class="badge-paid" [class.badge-paid--yes]="e.paid"
-                    (click)="togglePaid(e)" [attr.aria-label]="e.paid ? 'Marcar como não pago' : 'Marcar como pago'">{{ e.paid ? 'Pago' : 'Marcar pago' }}</button>
+                    (click)="togglePaid(e)" [attr.aria-label]="e.paid ? 'Remover registro de reembolso' : 'Registrar reembolso'">{{ e.paid ? 'Reembolsado' : 'Marcar reembolso' }}</button>
                   <button class="icon-btn" type="button" (click)="editEntry(e)" aria-label="Editar lançamento">Editar</button>
                   <button class="icon-btn icon-btn--danger" type="button" (click)="deleteEntry(e)" aria-label="Excluir lançamento">Excluir</button>
                 </div>

@@ -193,9 +193,22 @@ class SharedEntry(BaseModel):
         """Parte de cada participante (amount / n), Decimal sem arredondar."""
         return Decimal(self.amount) / Decimal(len(self.participant_ids()) or 1)
 
+    def shares_by_participant(self) -> dict[int, Decimal]:
+        """Divide centavos igualmente; participantes de menor ID recebem o resíduo."""
+        participant_ids = sorted(self.participant_ids())
+        if not participant_ids:
+            return {}
+        cents = int((Decimal(self.amount) * 100).quantize(Decimal('1')))
+        sign = -1 if cents < 0 else 1
+        base, remainder = divmod(abs(cents), len(participant_ids))
+        return {
+            member_id: Decimal(sign * (base + (index < remainder))) / 100
+            for index, member_id in enumerate(participant_ids)
+        }
+
     def share_of(self, member_id: int) -> Decimal:
         """Parte de um membro especifico; zero se ele nao participa."""
-        return self.share_per_participant() if member_id in self.participant_ids() else Decimal('0')
+        return self.shares_by_participant().get(member_id, Decimal('0'))
 
     class Meta:
         db_table = 'shared_entries'

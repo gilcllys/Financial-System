@@ -72,7 +72,8 @@
               </td>
               <td class="col-progress">
                 <div class="progress-cell">
-                  <span class="progress-label-sm">{{ group.paidInstallments }} de {{ group.totalInstallments }} pagas</span>
+                  <span class="progress-label-sm">{{ group.closedInstallments }} de {{ group.totalInstallments }} faturas fechadas</span>
+                  <span class="progress-label-sm">{{ cycleStatusLabel(group) }}</span>
                   <div class="progress-bar-wrap">
                     <div class="progress-bar" [style.width.%]="progressPct(group)" [style.background]="progressColor(progressPct(group))"></div>
                   </div>
@@ -105,7 +106,8 @@
                 </td>
                 <td class="col-progress">
                   <div class="progress-cell">
-                    <span class="progress-label-sm">{{ group.paidInstallments }} de {{ group.totalInstallments }} pagas</span>
+                    <span class="progress-label-sm">{{ group.closedInstallments }} de {{ group.totalInstallments }} faturas fechadas</span>
+                    <span class="progress-label-sm">{{ cycleStatusLabel(group) }}</span>
                     <div class="progress-bar-wrap">
                       <div class="progress-bar" style="width:100%;background:#05b169"></div>
                     </div>
@@ -180,7 +182,8 @@
                     </td>
                     <td class="col-progress">
                       <div class="progress-cell">
-                        <span class="progress-label-sm">{{ group.paidInstallments }} de {{ group.totalInstallments }} parcelas</span>
+                        <span class="progress-label-sm">{{ group.closedInstallments }} de {{ group.totalInstallments }} faturas fechadas · {{ group.reimbursedInstallments }} reembolsadas</span>
+                        <span class="progress-label-sm">{{ cycleStatusLabel(group) }}</span>
                         <div class="progress-bar-wrap">
                           <div class="progress-bar" [style.width.%]="progressPct(group)" [style.background]="progressColor(progressPct(group))"></div>
                         </div>

@@ -83,6 +83,11 @@ class HomeDashboardBehavior:
                 'count': expenses.count(),
                 'results': ExpenseSerializer(expenses[:20], many=True).data,
             },
+            'generated_recurring_template_ids': list(
+                expenses.filter(recurring_template_id__isnull=False)
+                .values_list('recurring_template_id', flat=True)
+                .distinct()
+            ),
             'installment_expenses': ExpenseSerializer(sources['installments'], many=True).data,
             'cards': list(sources['cards']),
             'categories': ExpenseCategorySerializer(sources['categories'], many=True).data,

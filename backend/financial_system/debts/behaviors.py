@@ -377,8 +377,7 @@ class BalancesBehavior:
     def _accumulate_balances(entries, paid, owed):
         for entry in entries:
             paid[entry.paid_by_id] = paid.get(entry.paid_by_id, Decimal('0')) + entry.amount
-            share = entry.share_per_participant()
-            for pid in entry.participant_ids():
+            for pid, share in entry.shares_by_participant().items():
                 owed[pid] = owed.get(pid, Decimal('0')) + share
 
     def _build_response(self, members, members_by_id, paid, owed, balance):

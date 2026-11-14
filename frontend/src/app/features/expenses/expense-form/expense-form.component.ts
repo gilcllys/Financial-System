@@ -99,10 +99,22 @@ export class ExpenseFormComponent implements OnInit {
     credit_card_id: [null as number | null],
 
     category_id: [null as number | null],
+
+    is_installment: [false],
+
+    installments: [
+      { value: 1, disabled: true },
+      [Validators.required, Validators.min(2), Validators.max(60)],
+    ],
   });
+  private sharedFormRevision = signal(0);
 
   get sharedIsCartao(): boolean {
     return this.sharedForm.value.payment_method === 'cartao';
+  }
+
+  get sharedIsInstallment(): boolean {
+    return this.sharedIsCartao && !!this.sharedForm.value.is_installment;
   }
 
   // ── Gastos Fixos (Recorrentes) ───────────────────────────────────────────
@@ -339,6 +351,27 @@ export class ExpenseFormComponent implements OnInit {
 
   private setupConditionals(): void {
     this.bindCardRequiredRule(this.sharedForm);
+    this.sharedForm.valueChanges.subscribe(() => this.sharedFormRevision.update(value => value + 1));
+
+    this.sharedForm.get('payment_method')!.valueChanges.subscribe((method) => {
+      const installmentCtrl = this.sharedForm.get('installments')!;
+      if (method === 'cartao') return;
+      this.sharedForm.patchValue({ is_installment: false }, { emitEvent: false });
+      installmentCtrl.disable({ emitEvent: false });
+      installmentCtrl.setValue(1, { emitEvent: false });
+    });
+
+    this.sharedForm.get('is_installment')!.valueChanges.subscribe((enabled) => {
+      const installmentCtrl = this.sharedForm.get('installments')!;
+      if (enabled && this.sharedIsCartao) {
+        installmentCtrl.enable({ emitEvent: false });
+        if ((installmentCtrl.value ?? 1) < 2) installmentCtrl.setValue(2, { emitEvent: false });
+      }
+      else {
+        installmentCtrl.disable({ emitEvent: false });
+        installmentCtrl.setValue(1, { emitEvent: false });
+      }
+    });
 
     this.form.get('is_installment')!.valueChanges.subscribe((val) => {
       const installmentsCtrl = this.form.get('installments')!;
@@ -506,6 +539,8 @@ export class ExpenseFormComponent implements OnInit {
       payment_method: 'dinheiro',
       credit_card_id: null,
       category_id: null,
+      is_installment: false,
+      installments: 1,
     });
     this.sharedForm.markAsPristine();
     this.sharedForm.markAsUntouched();
@@ -583,6 +618,11 @@ export class ExpenseFormComponent implements OnInit {
         credit_card_id: v.payment_method === 'cartao' ? v.credit_card_id : null,
 
         category_id: v.category_id,
+
+        total_installments_input:
+          v.payment_method === 'cartao' && v.is_installment
+            ? (v.installments ?? 1)
+            : 1,
       })
       .subscribe({
         next: () => {
@@ -732,8 +772,7 @@ export class ExpenseFormComponent implements OnInit {
     const count = v.installments ?? 2;
     const perInstallment = v.amount / count;
     const start = v.date ? new Date(v.date + 'T12:00:00') : new Date();
-    const end = new Date(start);
-    end.setMonth(end.getMonth() + count - 1);
+    const end = this.addMonthsClamped(start, count - 1);
     const fmt = (d: Date) =>
       `${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
     return {
@@ -745,8 +784,33 @@ export class ExpenseFormComponent implements OnInit {
     };
   });
 
+  sharedInstallmentPreview = computed(() => {
+    this.sharedFormRevision();
+    const value = this.sharedForm.getRawValue();
+    const count = value.installments ?? 1;
+    const amount = value.amount;
+    if (!value.is_installment || value.payment_method !== 'cartao' || !amount || count < 2) return null;
+
+    const totalCents = Math.round(amount * 100);
+    const baseCents = Math.floor(totalCents / count);
+    const remainderCents = totalCents % count;
+    const firstCents = baseCents + (remainderCents > 0 ? 1 : 0);
+    const lastCents = baseCents + (remainderCents > count - 1 ? 1 : 0);
+    const start = value.date ? new Date(value.date + 'T12:00:00') : new Date();
+    const end = this.addMonthsClamped(start, count - 1);
+    const fmt = (date: Date) => `${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+    return { count, first: firstCents / 100, last: lastCents / 100, total: totalCents / 100, firstMonth: fmt(start), lastMonth: fmt(end) };
+  });
+
   private todayStr(): string {
     return new Date().toISOString().split('T')[0];
+  }
+
+  private addMonthsClamped(date: Date, months: number): Date {
+    const target = new Date(date.getFullYear(), date.getMonth() + months, 1, 12);
+    const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    target.setDate(Math.min(date.getDate(), lastDay));
+    return target;
   }
 
   hasError(field: string): boolean {
