@@ -43,6 +43,7 @@ export interface SharedDebtEntry {
   is_recurrent?: boolean;
   recurring_template_id?: number | null;
   paid: boolean;
+  invoice_paid?: boolean;
   created_by_tenant_id: string;
   created_at: string;
 }

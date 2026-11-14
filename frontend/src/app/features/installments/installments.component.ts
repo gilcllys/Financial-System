@@ -6,14 +6,16 @@ import { ExpenseService } from '../../core/services/expense.service';
 import { InstallmentsService } from '../../core/services/installments.service';
 import { SharedDebtService, SharedDebtEntry } from '../../core/services/shared-debt.service';
 import { CreditCard, Expense } from '../../core/models';
-import { invoiceForDate, isInvoiceClosed, InvoiceMonthRef } from '../../core/utils/invoice-cycle';
+import { currentInvoice, invoiceForDate, isInvoiceClosed, InvoiceMonthRef } from '../../core/utils/invoice-cycle';
+
+type InvoiceLifecycle = 'scheduled' | 'open' | 'closed' | 'paid';
 
 interface InstallmentGroup {
   name: string;
   cardId: number | null;
   cardName: string;
   totalInstallments: number;
-  paidInstallments: number;
+  closedInstallments: number;
   amountPerInstallment: number;
   totalAmount: number;
   nextDate: string | null;
@@ -28,7 +30,8 @@ interface SharedInstallmentGroup {
   shared_debt_id: number;
   shared_debt_name: string;
   totalInstallments: number;
-  paidInstallments: number;
+  closedInstallments: number;
+  reimbursedInstallments: number;
   amountPerInstallment: number;
   myPortion: number;
   totalAmount: number;
@@ -116,8 +119,8 @@ export class InstallmentsComponent implements OnInit {
       if (existing) {
         existing.expenses.push(expense);
         existing.totalAmount = Math.round((existing.totalAmount + Math.abs(expense.amount)) * 100) / 100;
-        if (isPaid && currentPart > existing.paidInstallments) {
-          existing.paidInstallments = currentPart;
+        if (isPaid && currentPart > existing.closedInstallments) {
+          existing.closedInstallments = currentPart;
         }
         if (!isPaid && (!existing.nextDate || displayDate < existing.nextDate)) {
           existing.nextDate = displayDate;
@@ -130,7 +133,7 @@ export class InstallmentsComponent implements OnInit {
           cardId,
           cardName,
           totalInstallments: totalParts,
-          paidInstallments: isPaid ? currentPart : 0,
+          closedInstallments: isPaid ? currentPart : 0,
           amountPerInstallment: Math.abs(expense.amount),
           totalAmount: Math.abs(expense.amount) * totalParts,
           nextDate: !isPaid ? displayDate : null,
@@ -142,10 +145,10 @@ export class InstallmentsComponent implements OnInit {
   });
 
   activeGroups = computed((): InstallmentGroup[] =>
-    this.installmentGroups().filter(g => g.paidInstallments < g.totalInstallments)
+    this.installmentGroups().filter(g => g.closedInstallments < g.totalInstallments)
   );
   finalizadasGroups = computed((): InstallmentGroup[] =>
-    this.installmentGroups().filter(g => g.paidInstallments === g.totalInstallments)
+    this.installmentGroups().filter(g => g.closedInstallments === g.totalInstallments)
   );
 
   sharedInstallmentGroups = computed((): SharedInstallmentGroup[] => {
@@ -164,9 +167,10 @@ export class InstallmentsComponent implements OnInit {
       const existing = groupMap.get(gid);
       if (existing) {
         existing.entries.push(entry);
-        if (isPaid && entry.installment_number > existing.paidInstallments) {
-          existing.paidInstallments = entry.installment_number;
+        if (isPaid && entry.installment_number > existing.closedInstallments) {
+          existing.closedInstallments = entry.installment_number;
         }
+        if (entry.paid) existing.reimbursedInstallments++;
         if (!isPaid && (!existing.nextDate || displayDate < existing.nextDate)) {
           existing.nextDate = displayDate;
         }
@@ -179,7 +183,8 @@ export class InstallmentsComponent implements OnInit {
           shared_debt_id: entry.shared_debt,
           shared_debt_name: entry.shared_debt_name,
           totalInstallments: entry.total_installments,
-          paidInstallments: isPaid ? entry.installment_number : 0,
+          closedInstallments: isPaid ? entry.installment_number : 0,
+          reimbursedInstallments: entry.paid ? 1 : 0,
           amountPerInstallment: entry.amount,
           myPortion: entry.amount / (entry.participant_count ?? 1),
           totalAmount: entry.amount * entry.total_installments,
@@ -192,10 +197,10 @@ export class InstallmentsComponent implements OnInit {
   });
 
   activeSharedGroups = computed((): SharedInstallmentGroup[] =>
-    this.sharedInstallmentGroups().filter(g => g.paidInstallments < g.totalInstallments)
+    this.sharedInstallmentGroups().filter(g => g.closedInstallments < g.totalInstallments)
   );
   finalizadasSharedGroups = computed((): SharedInstallmentGroup[] =>
-    this.sharedInstallmentGroups().filter(g => g.paidInstallments === g.totalInstallments)
+    this.sharedInstallmentGroups().filter(g => g.closedInstallments === g.totalInstallments)
   );
 
   sharedSections = computed((): SharedDebtInstallmentSection[] =>
@@ -320,8 +325,42 @@ export class InstallmentsComponent implements OnInit {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount);
   }
 
-  progressPct(group: { paidInstallments: number; totalInstallments: number }): number {
-    return Math.round((group.paidInstallments / group.totalInstallments) * 100);
+  progressPct(group: { closedInstallments: number; totalInstallments: number }): number {
+    return Math.round((group.closedInstallments / group.totalInstallments) * 100);
+  }
+
+  cycleStatusLabel(group: InstallmentGroup | SharedInstallmentGroup): string {
+    const installments = 'expenses' in group ? group.expenses : group.entries;
+    if (!('expenses' in group) && group.entries.some(entry => (entry as SharedDebtEntry & { invoice_paid?: boolean }).invoice_paid)) {
+      return 'Fatura considerada paga após o vencimento';
+    }
+    const statuses = installments.map(item => this.invoiceLifecycle(
+      item.date,
+      'expenses' in group ? group.cardId : (item as SharedDebtEntry).credit_card ?? null,
+    ));
+    if (statuses.includes('paid')) return 'Fatura considerada paga após o vencimento';
+    if (statuses.includes('open')) return 'Há fatura em aberto';
+    if (statuses.includes('scheduled')) return 'Há fatura futura';
+    return 'Todos os ciclos fecharam';
+  }
+
+  private invoiceLifecycle(date: string, cardId: number | null): InvoiceLifecycle {
+    const card = cardId ? this.cardMap().get(cardId) : null;
+    if (!card) return date > new Date().toISOString().slice(0, 10) ? 'scheduled' : 'closed';
+
+    const invoice = invoiceForDate(date, card.closing_day);
+    const current = currentInvoice(card.closing_day);
+    if (invoice.sort > current.sort) return 'scheduled';
+    if (invoice.sort === current.sort) return 'open';
+
+    const dueDate = new Date(
+      invoice.year,
+      invoice.month - 1,
+      Math.min(card.due_day, new Date(invoice.year, invoice.month, 0).getDate()),
+    );
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return dueDate <= today ? 'paid' : 'closed';
   }
 
   progressColor(pct: number): string {

@@ -423,6 +423,26 @@ class BalancesBehaviorTests(TestCase):
         self.assertEqual(settlement[0]['to_member_id'], alice.id)
         self.assertEqual(settlement[0]['amount'], 50.0)
 
+    def test_split_centavos_fecha_total_e_acerto(self):
+        user = _make_user(tenant_id='owner-1')
+        group = SharedDebt.objects.create(name='G', owner_tenant_id='owner-1')
+        alice = SharedDebtMember.objects.create(shared_debt=group, tenant_id='owner-1', display_name='Alice')
+        bob = SharedDebtMember.objects.create(shared_debt=group, tenant_id=None, display_name='Bob')
+        entry = CreateSharedEntryBehavior(group, user, {
+            'description': 'Compra impar', 'amount': Decimal('100.01'),
+            'date': '2026-01-01', 'paid_by': alice.id, 'participant_ids': [bob.id, alice.id],
+            'payment_method': 'dinheiro', 'credit_card_id': None,
+        }).run()
+        stored = SharedEntry.objects.get(id=entry.data['id'])
+
+        self.assertEqual(stored.shares_by_participant(), {
+            alice.id: Decimal('50.01'), bob.id: Decimal('50.00'),
+        })
+        self.assertEqual(sum(stored.shares_by_participant().values()), Decimal('100.01'))
+        members = {m['member_id']: m for m in BalancesBehavior(group).run().data['members']}
+        self.assertEqual(members[alice.id]['balance'], 50.0)
+        self.assertEqual(members[bob.id]['balance'], -50.0)
+
 
 class PersonalSummaryBehaviorTests(TestCase):
     def setUp(self):
@@ -807,6 +827,40 @@ class SharedEntryCategoryOwnershipTests(TestCase):
             self.group, self.user, self._data(category_id=self.minha.id)
         ).run()
         self.assertEqual(resp.status_code, 201)
+
+    def test_invoice_paid_is_inferred_from_card_due_date_even_for_partner_card(self):
+        from cards.models import CreditCard
+        from debts.serializer import SharedEntrySerializer
+
+        partner = SharedDebtMember.objects.create(
+            shared_debt=self.group, tenant_id='partner', display_name='Partner'
+        )
+        card = CreditCard.objects.create(
+            tenant_id='partner', name='Partner card', closing_day=10, due_day=13,
+            last_four_digits='4242',
+        )
+        entry = SharedEntry.objects.create(
+            shared_debt=self.group, paid_by=partner, description='Card purchase',
+            amount=Decimal('100.00'), date=date(2026, 9, 11), payment_method='cartao',
+            credit_card=card, created_by_tenant_id='partner', paid=False,
+        )
+
+        self.assertTrue(SharedEntrySerializer.invoice_paid_by_due_date(entry, date(2026, 11, 13)))
+        self.assertFalse(SharedEntrySerializer.invoice_paid_by_due_date(entry, date(2026, 11, 12)))
+        self.assertTrue(SharedEntrySerializer.invoice_paid_by_due_date(entry, date(2026, 11, 14)))
+        payload = SharedEntrySerializer(entry).data
+        self.assertTrue(payload['invoice_paid'])
+        self.assertFalse(payload['paid'])
+
+    def test_cash_entry_is_never_automatically_invoice_paid(self):
+        from debts.serializer import SharedEntrySerializer
+
+        entry = SharedEntry.objects.create(
+            shared_debt=self.group, paid_by=self.me, description='Cash purchase',
+            amount=Decimal('10.00'), date=date(2026, 9, 11), payment_method='dinheiro',
+            created_by_tenant_id='owner-1', paid=False,
+        )
+        self.assertFalse(SharedEntrySerializer.invoice_paid_by_due_date(entry, date(2026, 12, 1)))
 
     def test_categoria_global_e_aceita(self):
         resp = CreateSharedEntryBehavior(

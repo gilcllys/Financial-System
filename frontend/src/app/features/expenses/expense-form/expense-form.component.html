@@ -241,6 +241,40 @@
               <span id="sg-card-error" class="form-error">Selecione o cartão de crédito usado.</span>
             }
           </div>
+
+          <div class="form-group installment-field">
+            <label class="form-label">Parcelamento</label>
+            <label class="toggle-item" aria-label="Parcelar compra compartilhada no cartão">
+              <span>À vista</span>
+              <span class="toggle-switch">
+                <input type="checkbox" formControlName="is_installment" />
+                <span class="toggle-switch__track"></span>
+              </span>
+              <span>Parcelado</span>
+            </label>
+          </div>
+
+          @if (sharedIsInstallment) {
+            <div class="form-group">
+              <label class="form-label" for="sg-installments">Número de parcelas</label>
+              <input id="sg-installments" class="form-input" type="number" min="2" max="60"
+                formControlName="installments" style="max-width:140px" />
+              @if (sharedForm.get('installments')?.invalid && sharedForm.get('installments')?.touched) {
+                <span class="form-error">Informe de 2 a 60 parcelas.</span>
+              }
+            </div>
+          }
+
+          @if (sharedInstallmentPreview(); as preview) {
+            <div class="installment-preview" role="status">
+              <span class="installment-preview__icon" aria-hidden="true">&#9432;</span>
+              <span>
+                {{ preview.count }} parcelas. Primeira de R$ {{ preview.first | number:'1.2-2' }}
+                e última de R$ {{ preview.last | number:'1.2-2' }}. Total R$ {{ preview.total | number:'1.2-2' }}.
+                De {{ preview.firstMonth }} a {{ preview.lastMonth }}.
+              </span>
+            </div>
+          }
         }
 
         <div class="form-row">

@@ -88,7 +88,7 @@
     <div class="kpi-clean-card__value" [class.kpi-clean-card__value--red]="balance() < 0">
       {{ balance() < 0 ? "-" : "" }}{{ formatCurrency(Math.abs(balance())) }}
     </div>
-    <p class="kpi-clean-card__sub">Custo pessoal no período: {{ formatCurrency(consolidated().personal_cost ?? consolidated().total_expenses) }}</p>
+    <p class="kpi-clean-card__sub">Cartões no ciclo selecionado e dinheiro em {{ currentMonthName }}: {{ formatCurrency(consolidated().personal_cost ?? consolidated().total_expenses) }}</p>
   </div>
 </div>
 
@@ -229,7 +229,7 @@
         <span class="card__icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
         </span>
-        <span class="card__title">Gastos Fixos</span>
+        <span class="card__title">Compromissos fixos do mês</span>
       </div>
       <a routerLink="/recurring-expenses" class="card__link">Gerenciar &rsaquo;</a>
     </div>
@@ -244,7 +244,7 @@
           </div>
           <div class="list-row__info">
             <p class="list-row__title">{{ t.description }}</p>
-            <p class="list-row__sub">{{ recurringMeta(t) }}</p>
+            <p class="list-row__sub">{{ recurringMeta(t) }} · compromisso previsto para este mês</p>
           </div>
           <span class="list-row__value mono">{{ formatCurrency(+t.amount) }}</span>
         </div>
@@ -298,7 +298,7 @@
       }
       @if (sharedDebts().length > 0) {
         <div class="invoice-total-row">
-          <span>Sua parte no mês</span>
+          <span>Sua parte compartilhada · cartões no ciclo, dinheiro no mês</span>
           <strong class="mono text-blue">{{ formatCurrency(consolidated().shared_my_portion) }}</strong>
         </div>
       }
@@ -327,7 +327,7 @@
         <div class="installment-item">
           <div class="installment-item__info">
             <p class="installment-item__name">{{ g.name }}</p>
-            <span class="installment-item__sub">Parcela {{ g.paidInstallments }}/{{ g.totalInstallments }}</span>
+            <span class="installment-item__sub">Ciclo fechado {{ g.closedInstallments }}/{{ g.totalInstallments }}</span>
             <div class="installment-item__progress-wrap">
               <div class="installment-item__progress-bar">
                 <div class="installment-item__progress-fill" [style.width]="progressPct(g) + '%'"></div>

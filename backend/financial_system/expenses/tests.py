@@ -920,6 +920,32 @@ class ConsolidatedSummaryCharacterizationTests(AnalyticsCharacterizationBase):
         self.assertEqual(response.data['card_invoices'], 120.0)
         self.assertEqual(response.data['card_invoices_detail'][0]['invoice_month'], 4)
 
+    def test_resumo_separa_compartilhado_em_dinheiro_por_mes_e_cartao_por_ciclo(self):
+        from debts.models import SharedDebt, SharedDebtMember, SharedEntry, SharedEntryParticipant
+        group = SharedDebt.objects.create(name='Casa', owner_tenant_id=self.TENANT)
+        me = SharedDebtMember.objects.create(shared_debt=group, tenant_id=self.TENANT, display_name='Eu')
+        partner = SharedDebtMember.objects.create(shared_debt=group, tenant_id='partner', display_name='Parceiro')
+
+        def shared(description, amount, day, method, card=None):
+            entry = SharedEntry.objects.create(
+                shared_debt=group, paid_by=me, description=description, amount=amount,
+                date=date(2026, 3, day), payment_method=method, credit_card=card,
+                created_by_tenant_id=self.TENANT,
+            )
+            SharedEntryParticipant.objects.create(entry=entry, member=me)
+            SharedEntryParticipant.objects.create(entry=entry, member=partner)
+
+        shared('Cartão no ciclo', '120.00', 10, 'cartao', self.card)
+        shared('Cartão após fechamento', '90.00', 22, 'cartao', self.card)
+        shared('Dinheiro do mês', '20.00', 22, 'dinheiro')
+
+        response = self.client.get(
+            '/api/expenses/expenses/consolidated-summary/?month=3&year=2026'
+            '&closing_month=3&closing_year=2026')
+
+        self.assertEqual(response.data['shared_my_portion'], 70.0)
+        self.assertEqual(response.data['total_expenses'], 70.0)
+
 
 class StableCategoryKeyTests(AnalyticsCharacterizationBase):
 

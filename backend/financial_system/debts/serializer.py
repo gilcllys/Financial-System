@@ -1,4 +1,6 @@
-﻿from rest_framework import serializers
+﻿from datetime import date
+
+from rest_framework import serializers
 
 from debts.models import SharedDebt, SharedDebtMember, SharedEntry, SharedRecurringTemplate
 
@@ -27,6 +29,7 @@ class SharedEntrySerializer(serializers.ModelSerializer):
     credit_card_name = serializers.SerializerMethodField()
     recurring_template_id = serializers.IntegerField(read_only=True, allow_null=True)
     is_recurrent = serializers.BooleanField(read_only=True)
+    invoice_paid = serializers.SerializerMethodField()
 
     def get_participant_count(self, obj):
         return len(obj.participant_ids()) or 1
@@ -43,6 +46,24 @@ class SharedEntrySerializer(serializers.ModelSerializer):
         if obj.paid_by.tenant_id == my_tenant:
             return obj.credit_card.name if obj.credit_card else None
         return None
+
+    @staticmethod
+    def invoice_paid_by_due_date(obj, today=None):
+        """Infer card-fatura payment from its due date, without changing reimbursement."""
+        if obj.payment_method != 'cartao' or not obj.credit_card:
+            return False
+
+        from cards.behaviors import _effective_closing_date, compute_invoice_period, shift_month
+
+        closing_month, closing_year = obj.date.month, obj.date.year
+        if obj.date > _effective_closing_date(closing_year, closing_month, obj.credit_card.closing_day):
+            closing_month, closing_year = shift_month(closing_month, closing_year, 1)
+        invoice_month, invoice_year = shift_month(closing_month, closing_year, 1)
+        _, _, due_date = compute_invoice_period(obj.credit_card, invoice_month, invoice_year)
+        return due_date <= (today or date.today())
+
+    def get_invoice_paid(self, obj):
+        return self.invoice_paid_by_due_date(obj)
 
     class Meta:
         model = SharedEntry
@@ -67,6 +88,7 @@ class SharedEntrySerializer(serializers.ModelSerializer):
             'total_installments',
             'installment_number',
             'paid',
+            'invoice_paid',
             'recurring_template_id',
             'is_recurrent',
             'created_by_tenant_id',

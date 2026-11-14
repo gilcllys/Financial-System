@@ -11,7 +11,7 @@ import { RecurringExpenseTemplate } from './expense.service';
 export interface InstallmentGroup {
   name: string;
   totalInstallments: number;
-  paidInstallments: number;
+  closedInstallments: number;
   amountPerInstallment: number;
   totalAmount: number;
   remainingAmount: number;
@@ -29,6 +29,7 @@ export interface HomeSummary {
   installmentGroups: InstallmentGroup[];
   categories: ExpenseCategory[];
   recurringTemplates: RecurringExpenseTemplate[];
+  generatedRecurringTemplateIds: number[];
 }
 
 interface HomeDashboardPayload {
@@ -42,6 +43,7 @@ interface HomeDashboardPayload {
   cards: CreditCard[];
   categories: ExpenseCategory[];
   recurring_templates: RecurringExpenseTemplate[];
+  generated_recurring_template_ids: number[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -62,6 +64,7 @@ export class HomeService {
         installmentGroups: this.groupInstallments(data.installment_expenses, data.cards),
         categories: data.categories,
         recurringTemplates: data.recurring_templates,
+        generatedRecurringTemplateIds: data.generated_recurring_template_ids ?? [],
       }))
     );
   }
@@ -83,11 +86,11 @@ export class HomeService {
       const closed = card ? isInvoiceClosed(expense.date, card.closing_day) : expense.date < new Date().toISOString().slice(0, 10);
       const amount = Math.abs(Number(expense.amount));
       const group = groups.get(key) ?? {
-        name, totalInstallments: totalParts, paidInstallments: 0,
+        name, totalInstallments: totalParts, closedInstallments: 0,
         amountPerInstallment: amount, totalAmount: 0, remainingAmount: 0, nextDate: null,
       };
       group.totalAmount = Math.round((group.totalAmount + amount) * 100) / 100;
-      if (closed) group.paidInstallments = Math.max(group.paidInstallments, part);
+      if (closed) group.closedInstallments = Math.max(group.closedInstallments, part);
       else {
         group.remainingAmount = Math.round((group.remainingAmount + amount) * 100) / 100;
         const displayDate = invoice?.displayDate ?? expense.date;
@@ -97,7 +100,7 @@ export class HomeService {
     }
 
     return Array.from(groups.values())
-      .filter(group => group.paidInstallments < group.totalInstallments)
+      .filter(group => group.closedInstallments < group.totalInstallments)
       .sort((a, b) => (a.nextDate ?? '').localeCompare(b.nextDate ?? ''));
   }
 }

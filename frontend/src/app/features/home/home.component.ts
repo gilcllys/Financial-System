@@ -45,7 +45,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   private sharedDebtService = inject(SharedDebtService);
 
 
-  recurringTemplates = signal<RecurringExpenseTemplate[]>([]);
+  recurringTemplates = signal<RecurringExpenseTemplate[]>([]);
+  generatedRecurringTemplateIds = signal<number[]>([]);
   private destroy$         = new Subject<void>();
   private searchSubject    = new Subject<string>();
 
@@ -123,7 +124,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   /** Parcelas ativas (ainda não quitadas) — máximo 4 no preview */
   activeInstallments = computed(() =>
-    this.installmentGroups().filter(g => g.paidInstallments < g.totalInstallments).slice(0, 4)
+    this.installmentGroups().filter(g => g.closedInstallments < g.totalInstallments).slice(0, 4)
   );
 
   totalRemainingInstallments = computed(() =>
@@ -172,6 +173,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.evolution.set(data.evolution);
           this.categories.set(data.categories);
           this.recurringTemplates.set(data.recurringTemplates);
+          this.generatedRecurringTemplateIds.set(data.generatedRecurringTemplateIds);
           this.expenses.set(data.expensePage.results);
           this.totalCount.set(data.expensePage.count);
           this.tableLoading.set(false);
@@ -282,7 +284,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   progressPct(g: InstallmentGroup): number {
-    return Math.round((g.paidInstallments / g.totalInstallments) * 100);
+    return Math.round((g.closedInstallments / g.totalInstallments) * 100);
   }
 
   daysLabel(days: number): string {
@@ -332,7 +334,10 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
   recurringMeta(t: RecurringExpenseTemplate): string {
     const pay = t.payment_method === 'cartao' ? (t.credit_card_name ?? 'Cartão não definido') : 'Dinheiro';
-    return `${t.category_name ?? 'Sem categoria'} · ${pay} · dia ${t.day_of_month}`;
+    const status = this.generatedRecurringTemplateIds().includes(t.id)
+      ? 'Lançado neste mês'
+      : `Previsto para dia ${t.day_of_month}`;
+    return `${t.category_name ?? 'Sem categoria'} · ${pay} · ${status}`;
   }
 
   @ViewChild('lineChartEl') lineChartEl!: ElementRef<HTMLDivElement>;

@@ -619,6 +619,7 @@ class ExpenseAnalyticsBehavior:
         card_invoices_total = 0.0
         card_invoices_count = 0
         card_invoices_detail = []
+        invoice_periods = {}
 
         for card in cards:
             if closing_month is not None and closing_year is not None:
@@ -628,6 +629,7 @@ class ExpenseAnalyticsBehavior:
             period_start, period_end, due = compute_invoice_period(
                 card, inv_month, inv_year
             )
+            invoice_periods[card.id] = (period_start, period_end)
             agg = (
                 models.Expense.objects
                 .filter(
@@ -665,17 +667,40 @@ class ExpenseAnalyticsBehavior:
             SharedEntry.objects
             .filter(
                 participants__member_id__in=my_member_ids,
-                date__year=year,
-                date__month=month,
             )
             .prefetch_related('participants')
             .distinct()
         )
+        shared_card_ids = set(
+            entries_qs.exclude(credit_card_id=None)
+            .values_list('credit_card_id', flat=True)
+        )
+        shared_cards = CreditCard.objects.filter(id__in=shared_card_ids)
+        for card in shared_cards:
+            if card.id in invoice_periods:
+                continue
+            inv_month, inv_year = (
+                (shift_month(closing_month, closing_year, 1))
+                if closing_month is not None and closing_year is not None
+                else current_invoice_month(card)
+            )
+            invoice_periods[card.id] = compute_invoice_period(card, inv_month, inv_year)[:2]
 
         shared_my_portion = Decimal('0')
         shared_count = 0
         for entry in entries_qs:
-            shared_my_portion += entry.share_per_participant()
+            if entry.payment_method == 'dinheiro':
+                included = entry.date.year == year and entry.date.month == month
+            else:
+                period = invoice_periods.get(entry.credit_card_id)
+                included = bool(period and period[0] <= entry.date <= period[1])
+            if not included:
+                continue
+            shares = entry.shares_by_participant()
+            shared_my_portion += sum(
+                (shares.get(member_id, Decimal('0')) for member_id in my_member_ids),
+                Decimal('0'),
+            )
             shared_count += 1
 
         shared_my_portion = to_float(shared_my_portion)
@@ -1189,8 +1214,10 @@ class ExpenseHistoryBehavior:
             participant_ids = entry.participant_ids()
             if not member_ids.intersection(participant_ids):
                 continue
-            own_portion = float(Decimal(entry.share_per_participant()).quantize(
-                Decimal('0.01'), rounding=ROUND_HALF_UP,
+            shares = entry.shares_by_participant()
+            own_portion = float(sum(
+                (share for member_id, share in shares.items() if member_id in member_ids),
+                Decimal('0'),
             ))
             card_name = None
             if entry.credit_card_id:
