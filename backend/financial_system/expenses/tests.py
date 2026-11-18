@@ -690,6 +690,29 @@ class AnalyticsCharacterizationBase(TestCase):
 
 class AnalyticsMonthlyCharacterizationTests(AnalyticsCharacterizationBase):
 
+    def test_compartilhado_preserva_rateio_de_centavos_no_mes(self):
+        from debts.models import SharedDebt, SharedDebtMember, SharedEntry, SharedEntryParticipant
+        group = SharedDebt.objects.create(name='Casa', owner_tenant_id=self.TENANT)
+        members = [
+            SharedDebtMember.objects.create(shared_debt=group, tenant_id=self.TENANT, display_name='Eu'),
+            SharedDebtMember.objects.create(shared_debt=group, tenant_id='outro-tenant', display_name='Parceiro'),
+            SharedDebtMember.objects.create(shared_debt=group, tenant_id='terceiro-tenant', display_name='Outra pessoa'),
+        ]
+        entry = SharedEntry.objects.create(
+            shared_debt=group, paid_by=members[0], description='Compra compartilhada',
+            amount='100.00', date=date(2026, 3, 10), payment_method='dinheiro',
+            created_by_tenant_id=self.TENANT,
+        )
+        SharedEntryParticipant.objects.bulk_create([
+            SharedEntryParticipant(entry=entry, member=member) for member in members
+        ])
+
+        response = self.client.get('/api/expenses/expenses/analytics/monthly/?year=2026')
+
+        march = response.data[2]
+        self.assertEqual(march['shared_my_portion'], 33.34)
+        self.assertEqual(march['expenses'], 33.34)
+
     def test_retorna_sempre_os_12_meses_mesmo_sem_lancamentos(self):
         resp = self.client.get('/api/expenses/expenses/analytics/monthly/?year=2026')
         self.assertEqual(resp.status_code, 200)
@@ -720,6 +743,25 @@ class AnalyticsMonthlyCharacterizationTests(AnalyticsCharacterizationBase):
         self.assertEqual(maio['cash_expenses'], 200.0)
         self.assertEqual(maio['card_expenses'], 50.0)
         self.assertEqual(maio['expenses'], 250.0)
+
+    def test_estorno_no_cartao_abate_despesa_sem_entrar_como_receita(self):
+        self._expense('Compra', '-100.00', date(2026, 3, 10),
+                      payment_method='cartao', credit_card=self.card)
+        self._expense('Estorno', '40.00', date(2026, 3, 12),
+                      payment_method='cartao', credit_card=self.card)
+
+        monthly = self.client.get('/api/expenses/expenses/analytics/monthly/?year=2026').data[2]
+        consolidated = self.client.get(
+            '/api/expenses/expenses/consolidated-summary/?month=3&year=2026'
+            '&closing_month=3&closing_year=2026'
+        ).data
+
+        self.assertEqual(monthly['income'], 0.0)
+        self.assertEqual(monthly['card_expenses'], 60.0)
+        self.assertEqual(monthly['expenses'], 60.0)
+        self.assertEqual(consolidated['income'], 0.0)
+        self.assertEqual(consolidated['card_invoices'], 60.0)
+        self.assertEqual(consolidated['total_expenses'], 60.0)
 
     def test_ano_invalido_cai_para_o_ano_corrente_sem_erro(self):
         resp = self.client.get('/api/expenses/expenses/analytics/monthly/?year=abc')
@@ -881,7 +923,7 @@ class ConsolidatedSummaryCharacterizationTests(AnalyticsCharacterizationBase):
     EXPECTED_KEYS = {
         'month', 'year', 'income', 'cash_expenses', 'cash_count',
         'card_invoices', 'card_invoices_count', 'card_invoices_detail',
-        'shared_my_portion', 'shared_count', 'total_expenses', 'balance',
+        'shared_my_portion', 'shared_cash_portion', 'shared_count', 'total_expenses', 'balance',
     }
 
     def test_contrato_de_chaves_da_resposta(self):
@@ -944,6 +986,7 @@ class ConsolidatedSummaryCharacterizationTests(AnalyticsCharacterizationBase):
             '&closing_month=3&closing_year=2026')
 
         self.assertEqual(response.data['shared_my_portion'], 70.0)
+        self.assertEqual(response.data['shared_cash_portion'], 10.0)
         self.assertEqual(response.data['total_expenses'], 70.0)
 
 
@@ -958,6 +1001,24 @@ class StableCategoryKeyTests(AnalyticsCharacterizationBase):
 
         self.assertEqual(response.data['count'], 1)
         self.assertEqual(response.data['results'][0]['description'], 'Sem rótulo')
+
+    def test_bulk_category_persists_selection_and_removes_expense_from_uncategorized(self):
+        uncategorized = ExpenseCategory.objects.create(
+            tenant_id='system', name='Sem categoria', key='uncategorized')
+        expense = self._expense('Sem rótulo', '-15.00', date(2026, 3, 2), category=uncategorized)
+
+        response = self.client.post(
+            '/api/expenses/expenses/history/bulk-category/',
+            {'expense_ids': [expense.id], 'category_id': self.cat_lazer.id},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['updated'], 1)
+        expense.refresh_from_db()
+        self.assertEqual(expense.category_id, self.cat_lazer.id)
+        remaining = self.client.get('/api/expenses/expenses/?category_key=uncategorized')
+        self.assertEqual(remaining.data['count'], 0)
 
     def test_livre_para_gastar_desconta_gastos_fixos_ainda_nao_gerados(self):
         from expenses.models import RecurringExpenseTemplate

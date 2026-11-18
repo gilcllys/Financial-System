@@ -4,7 +4,7 @@ Aba "Por pessoa" de um grupo compartilhado: quanto cada membro deve, por fatura.
 Duas visões:
   - closed: faturas que FECHARAM no mês selecionado (uma linha por cartão de
     cada membro) + gastos em dinheiro do mês. É o que pode ser cobrado.
-  - open:   faturas ainda abertas de cada cartão (previsão; sem acerto).
+  - open:   faturas ainda abertas de cada cartão + gastos em dinheiro pagos no mês atual.
 
 Só entram lançamentos com `date` dentro de [period_start, period_end] da
 fatura correspondente — o mesmo range usado na tela do cartão.
@@ -43,7 +43,8 @@ class ByPersonBehavior:
         """{member_id: parte} — rateio igual entre participantes (ou todos)."""
         return entry.shares_by_participant()
 
-    def _entry_payload(self, entry, shares):
+    def _entry_payload(self, entry, shares, member_by_tenant):
+        creator = member_by_tenant.get(entry.created_by_tenant_id)
         return {
             'id': entry.id,
             'description': entry.description,
@@ -51,13 +52,14 @@ class ByPersonBehavior:
             'amount': _f(entry.amount),
             'paid_by': entry.paid_by_id,
             'paid_by_name': entry.paid_by.display_name,
+            'created_by_name': creator.display_name if creator else None,
             'participant_ids': list(shares.keys()),
             'shares': {mid: _f(v) for mid, v in shares.items()},
             'installment_number': entry.installment_number,
             'total_installments': entry.total_installments,
         }
 
-    def _block(self, entries, member_ids, payer_id, **meta):
+    def _block(self, entries, member_ids, payer_id, member_by_tenant, **meta):
         shares_total = {mid: Decimal('0') for mid in member_ids}
         total = Decimal('0')
         rows = []
@@ -66,7 +68,7 @@ class ByPersonBehavior:
             total += Decimal(e.amount)
             for mid, v in shares.items():
                 shares_total[mid] = shares_total.get(mid, Decimal('0')) + v
-            rows.append(self._entry_payload(e, shares))
+            rows.append(self._entry_payload(e, shares, member_by_tenant))
         return {
             **meta,
             'payer_member_id': payer_id,
@@ -140,7 +142,7 @@ class ByPersonBehavior:
             if self.mode == 'closed' and not entries:
                 continue
             block, total, shares_total = self._block(
-                entries, member_ids, owner.id,
+                entries, member_ids, owner.id, context['member_by_tenant'],
                 kind='card', card_id=card.id, card_name=card.name, last_four_digits=card.last_four_digits,
                 owner_member_id=owner.id, owner_name=owner.display_name,
                 invoice_month=inv_month, invoice_year=inv_year,
@@ -170,29 +172,34 @@ class ByPersonBehavior:
                     )
 
     def _add_cash_block(self, context):
-        if self.mode == 'closed':
-            # Dinheiro / sem cartão cadastrado: conta no mês em que foi pago.
-            _, last_day = calendar.monthrange(self.year, self.month)
-            cash_entries = list(
-                context['base_queryset'].filter(
-                    credit_card=None,
-                    date__gte=date(self.year, self.month, 1),
-                    date__lte=date(self.year, self.month, last_day),
-                )
-                .order_by('date', 'id')
+        # Dinheiro não pertence a uma fatura: fechado usa o mês selecionado;
+        # aberto soma apenas os valores já pagos no mês corrente até hoje.
+        if self.mode == 'open':
+            year, month, last_day = self.today.year, self.today.month, self.today.day
+        else:
+            year, month = self.year, self.month
+            _, last_day = calendar.monthrange(year, month)
+
+        cash_entries = list(
+            context['base_queryset'].filter(
+                credit_card=None,
+                date__gte=date(year, month, 1),
+                date__lte=date(year, month, last_day),
             )
-            if cash_entries:
-                block, total, shares_total = self._block(
-                    cash_entries, context['member_ids'], None,
-                    kind='cash', status='closed',
+            .order_by('date', 'id')
+        )
+        if cash_entries:
+            block, total, shares_total = self._block(
+                cash_entries, context['member_ids'], None, context['member_by_tenant'],
+                kind='cash', status='closed',
+            )
+            context['blocks'].append(block)
+            for e in cash_entries:
+                context['paid'][e.paid_by_id] = (
+                    context['paid'].get(e.paid_by_id, Decimal('0')) + Decimal(e.amount)
                 )
-                context['blocks'].append(block)
-                for e in cash_entries:
-                    context['paid'][e.paid_by_id] = (
-                        context['paid'].get(e.paid_by_id, Decimal('0')) + Decimal(e.amount)
-                    )
-                for mid, v in shares_total.items():
-                    context['share'][mid] += v
+            for mid, v in shares_total.items():
+                context['share'][mid] += v
 
     def _build_response(self, context):
         members = context['members']

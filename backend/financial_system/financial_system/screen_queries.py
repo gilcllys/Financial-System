@@ -30,6 +30,7 @@ class HomeDashboardBehavior:
             'year': self.year,
             'closing_month': self.month,
             'closing_year': self.year,
+            'include_obligations': '1',
         }
         return {
             'consolidated': ExpenseAnalyticsBehavior(

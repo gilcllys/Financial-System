@@ -205,7 +205,14 @@ export interface OpenInvoiceSharedGroup {
   group_name: string;
   total: number;       // valor cheio do grupo que caiu neste cartão
   my_portion: number;  // minha parte no rateio
+  participants: Array<{
+    member_id: number;
+    name: string;
+    amount: number;
+    is_current_user: boolean;
+  }>;
 }
+
 
 export interface OpenInvoice {
   card_id: number;

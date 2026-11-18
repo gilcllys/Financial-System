@@ -182,14 +182,14 @@
 .shared-ledger-row__main { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
 .shared-ledger-row__main h3 { overflow-wrap: anywhere; margin: 0; color: var(--color-ink); font-size: 12px; font-weight: 650; }
 .shared-ledger-row__sub { display: block; margin-top: 4px; color: var(--color-muted); font-size: 10px; }
+.invoice-status { flex: none; padding: 4px 9px; border-radius: var(--rounded-pill); background: #fbf3e5; color: #a96f16; font-size: 10px; font-weight: 650; }
+.invoice-status--paid { background: #e8f5ef; color: #16805b; }
 .shared-ledger-row__meta { display: flex; flex-wrap: wrap; gap: 5px 12px; color: var(--color-muted); font-size: 10px; }
 .shared-ledger-row__meta strong { color: var(--color-ink); font-weight: 600; }
 .shared-ledger-row__amounts { display: flex; align-items: center; justify-content: flex-end; gap: 10px 13px; flex-wrap: wrap; color: var(--color-muted); font-size: 10px; }
 .shared-ledger-row__amounts > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .shared-ledger-row__amounts strong { color: var(--color-ink); font: 600 11px var(--font-mono); }
 .shared-ledger-row__actions { display: flex; align-items: center; gap: 5px; }
-.entry-status { flex: none; padding: 4px 9px; border-radius: var(--rounded-pill); background: #fbf3e5; color: #a96f16; font-size: 10px; font-weight: 650; }
-.entry-status--paid { background: #e8f5ef; color: #16805b; }
 
 @media (max-width: 700px) {
   .shared-detail-kpis { grid-template-columns: 1fr; }
@@ -286,13 +286,6 @@
   &--danger:hover { color: #cf202f; border-color: #cf202f; }
 }
 
-.badge-paid {
-  border: 1px solid var(--color-hairline); background: var(--color-surface-soft);
-  color: var(--color-muted); font-size: 12px; font-weight: 600;
-  padding: 3px 10px; border-radius: 999px; cursor: pointer;
-  &--yes { background: #05b169; border-color: #05b169; color: #fff; }
-}
-
 .value-red { color: #cf202f; font-weight: 600; }
 
 /* Pagination */
@@ -374,7 +367,7 @@
   &--info { background: #f2f5ff; border: 1px solid #d7e2ff; color: #31589b; }
   strong { color: #31589b; }
 }
-.bp-card-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 580px), 1fr)); gap: 12px; min-width: 0; }
+.bp-card-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
 .bp-avatar {
   width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
   background: var(--color-surface-strong); color: var(--color-ink); font-size: 11px; font-weight: 700; flex-shrink: 0;
@@ -412,6 +405,7 @@
   &__desc { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   &__name { overflow-wrap: anywhere; font-size: 14px; font-weight: 500; color: var(--color-ink); }
   &__meta { font-size: 12px; color: var(--color-muted); overflow-wrap: anywhere; }
+  &__people { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 3px; span { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 3px; font-size: 11px; } small { color: var(--color-muted); } strong { color: var(--color-ink); font-weight: 600; } }
   &__cells { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(70px, var(--bp-cell)); }
   &__cell { min-width: 0; text-align: right; font-size: 13px; white-space: nowrap; }
 }
@@ -424,7 +418,7 @@
   &--red { background: #fae4e6; color: var(--color-semantic-down); }
 }
 .bp-total {
-  align-self: flex-end; width: min(100%, 650px); border: 1px solid var(--color-hairline); border-radius: 12px; padding: 4px 12px; background: var(--color-surface-soft);
+  align-self: stretch; width: 100%; border: 1px solid var(--color-hairline); border-radius: 12px; padding: 4px 12px; background: var(--color-surface-soft);
   &--forecast { border-color: var(--color-hairline); }
   &__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 2px; border-bottom: 1px solid var(--color-hairline-soft); &:last-child { border-bottom: 0; } &--balance { background: transparent; margin: 0; padding: 9px 2px; border-radius: 0; } }
   &__label { font-size: 11px; font-weight: 500; color: var(--color-body); }

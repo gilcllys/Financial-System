@@ -3,6 +3,7 @@ import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ExpenseService } from '../../core/services/expense.service';
 import { CategoryService } from '../../core/services/category.service';
+import { ToastService } from '../../core/services/toast.service';
 import { Expense, ExpenseCategory } from '../../core/models';
 
 @Component({
@@ -66,6 +67,7 @@ import { Expense, ExpenseCategory } from '../../core/models';
 export class UncategorizedComponent implements OnInit {
   private expenseService = inject(ExpenseService);
   private categoryService = inject(CategoryService);
+  private toast = inject(ToastService);
 
   items      = signal<Expense[]>([]);
   categories = signal<ExpenseCategory[]>([]);
@@ -97,8 +99,19 @@ export class UncategorizedComponent implements OnInit {
     if (!categoryId) return;
     const matching = this.categories().find(category => category.id === +categoryId);
     if (!matching || matching.kind !== (expense.amount >= 0 ? 'receita' : 'despesa')) return;
-    this.expenseService.update(expense.id, { ...expense, category_id: +categoryId } as any).subscribe({
-      next: () => this.items.update(list => list.filter(e => e.id !== expense.id)),
+    this.expenseService.updateHistoryCategories([expense.id], +categoryId).subscribe({
+      next: result => {
+        if (result.updated !== 1) {
+          this.toast.error('Não foi possível salvar a categoria. Tente novamente.');
+          this.load();
+          return;
+        }
+        this.items.update(list => list.filter(e => e.id !== expense.id));
+      },
+      error: () => {
+        this.toast.error('Não foi possível salvar a categoria. Tente novamente.');
+        this.load();
+      },
     });
   }
 

@@ -2,6 +2,7 @@
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from debts import custom_serializer, serializer
@@ -77,6 +78,24 @@ class SharedDebtViewSet(viewsets.ModelViewSet):
         return SharedDebtScreenSummaryBehavior(
             group, request.user, query.validated_data, request,
         ).run()
+
+    @action(detail=True, methods=['get'], url_path='installment-entries')
+    def installment_entries(self, request, pk=None):
+        shared_debt = self.get_object()
+        entries = (
+            SharedEntry.objects.filter(
+                shared_debt=shared_debt,
+                total_installments__gt=1,
+            )
+            .select_related('paid_by', 'shared_debt', 'credit_card', 'category')
+            .prefetch_related('participants', 'shared_debt__members')
+            .order_by('date', 'id')
+        )
+        return Response(
+            serializer.SharedEntrySerializer(
+                entries, many=True, context={'request': request},
+            ).data,
+        )
 
     @action(detail=True, methods=['get'], url_path='monthly-history')
     def monthly_history(self, request, pk=None):

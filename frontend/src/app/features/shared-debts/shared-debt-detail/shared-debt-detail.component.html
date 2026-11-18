@@ -79,7 +79,7 @@
     </article>
 
     <article class="shared-detail-kpi shared-detail-kpi--forecast">
-      <span class="shared-detail-kpi__label">Previsão das faturas abertas</span>
+      <span class="shared-detail-kpi__label">Previsão de acerto</span>
       @if (bpLoading() && !bpData()) {
         <strong class="shared-detail-kpi__forecast">Calculando previsão…</strong>
       } @else if (bpData(); as forecast) {
@@ -90,12 +90,12 @@
             }
           </div>
         } @else {
-          <strong class="shared-detail-kpi__forecast">Sem saldo previsto nas faturas abertas</strong>
+          <strong class="shared-detail-kpi__forecast">Sem saldo previsto no acerto</strong>
         }
       } @else {
         <strong class="shared-detail-kpi__forecast">Previsão indisponível</strong>
       }
-      <span class="shared-detail-kpi__note">Estimativa: pode mudar até as faturas fecharem</span>
+      <span class="shared-detail-kpi__note">Inclui faturas abertas e gastos em dinheiro do mês.</span>
     </article>
   </section>
 
@@ -221,13 +221,12 @@
                     @if (e.total_installments > 1) { <span> · {{ e.installment_number }}ª de {{ e.total_installments }} parcelas</span> }
                   </span>
                 </div>
-                <span class="entry-status" [class.entry-status--paid]="e.paid">Reembolso {{ e.paid ? 'registrado' : 'pendente' }}</span>
+                <span class="invoice-status" [class.invoice-status--paid]="e.invoice_paid">
+                  {{ e.payment_method === 'cartao' ? (e.invoice_paid ? 'Fatura paga' : 'Fatura pendente') : 'Dinheiro' }}
+                </span>
               </div>
               <div class="shared-ledger-row__meta">
                 <span>{{ e.payment_method === 'cartao' ? (e.credit_card_name ?? 'Cartão de crédito') : 'Dinheiro' }}</span>
-                @if (e.payment_method === 'cartao' && e.invoice_paid) {
-                  <span>Fatura considerada paga após o vencimento</span>
-                }
                 <span>Pago por <strong>{{ e.paid_by_name }}</strong></span>
                 <span>Dividido com <strong>{{ participantNames(e) }}</strong></span>
               </div>
@@ -235,8 +234,6 @@
                 <span>Total da compra <strong>{{ formatCurrency(e.amount) }}</strong></span>
                 <span>Sua parte <strong>{{ formatCurrency(myPortion(e)) }}</strong></span>
                 <div class="shared-ledger-row__actions">
-                  <button type="button" class="badge-paid" [class.badge-paid--yes]="e.paid"
-                    (click)="togglePaid(e)" [attr.aria-label]="e.paid ? 'Remover registro de reembolso' : 'Registrar reembolso'">{{ e.paid ? 'Reembolsado' : 'Marcar reembolso' }}</button>
                   <button class="icon-btn" type="button" (click)="editEntry(e)" aria-label="Editar lançamento">Editar</button>
                   <button class="icon-btn icon-btn--danger" type="button" (click)="deleteEntry(e)" aria-label="Excluir lançamento">Excluir</button>
                 </div>
@@ -261,7 +258,14 @@
 
   <!-- TAB: Por parcelamento -->
   @if (activeTab() === 'installments') {
-    @if (installmentGroups().length === 0) {
+    @if (installmentEntriesLoading()) {
+      <div class="empty-state"><p class="empty-state__text">Carregando parcelamentos...</p></div>
+    } @else if (installmentEntriesError()) {
+      <div class="empty-state">
+        <p class="empty-state__title">Não foi possível carregar os parcelamentos</p>
+        <p class="empty-state__text">Tente abrir esta aba novamente.</p>
+      </div>
+    } @else if (installmentGroups().length === 0) {
       <div class="empty-state">
         <div class="empty-state__icon" aria-hidden="true"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg></div>
         <p class="empty-state__title">Nenhum parcelamento</p>
@@ -272,7 +276,7 @@
         <div class="installment-panel__heading">
           <div>
             <h2 id="installment-heading">Parcelamentos</h2>
-            <p>Veja quanto já foi pago e quanto falta da sua parte.</p>
+            <p>O status da fatura muda automaticamente após o vencimento do cartão.</p>
           </div>
           <span class="shared-ledger-count">{{ installmentGroups().length }} {{ installmentGroups().length === 1 ? 'parcelamento' : 'parcelamentos' }}</span>
         </div>
@@ -302,7 +306,7 @@
                 <span class="inst-pct">{{ grp.progressPct }}%</span>
               </div>
               <div class="inst-card__summary-row">
-                  <span>{{ grp.paid }}/{{ grp.total }} parcelas pagas</span>
+                  <span>{{ grp.paid }}/{{ grp.total }} faturas pagas pelo vencimento</span>
                   <span><strong class="mono">{{ formatCurrency(grp.myPortionPerInstallment) }}</strong> / mês · sua parte</span>
                   <strong class="value-red">Restante: {{ formatCurrency(grp.remaining) }}</strong>
               </div>
@@ -314,8 +318,7 @@
                         <th>PARCELA</th><th>DATA</th>
                         <th class="text-right">VALOR</th>
                         <th class="text-right">MINHA PARTE</th>
-                        <th>STATUS</th>
-                        <th class="text-center">PAGO</th>
+                        <th>FATURA</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -326,14 +329,13 @@
                           <td class="text-right mono">{{ formatCurrency(e.amount) }}</td>
                           <td class="text-right value-red mono">{{ formatCurrency(myPortion(e)) }}</td>
                           <td>
-                            @if (isPaid(e)) {
+                            @if (e.payment_method !== 'cartao') {
+                              <span class="status-pending">Dinheiro</span>
+                            } @else if (isPaid(e)) {
                               <span class="status-paid">Paga</span>
                             } @else {
                               <span class="status-pending">Pendente</span>
                             }
-                          </td>
-                          <td class="col-paid text-center">
-                            <button class="badge-paid" [class.badge-paid--yes]="e.paid" (click)="togglePaid(e)" [attr.aria-label]="e.paid ? 'Marcar parcela como não paga' : 'Marcar parcela como paga'">{{ e.paid ? 'Sim' : 'Não' }}</button>
                           </td>
                         </tr>
                       }
@@ -357,7 +359,7 @@
       <div class="bp-panel-intro">
         <div>
           <h2>Acerto por pessoa</h2>
-          <p>Separando faturas já fechadas da previsão das que continuam abertas.</p>
+          <p>Veja a parte de cada pessoa nas faturas e nos gastos em dinheiro do mês.</p>
         </div>
         <div class="bp-toolbar">
           <div class="bp-segment" role="group" aria-label="Tipo de fatura">
@@ -381,7 +383,7 @@
         @if (d.mode === 'open') {
           <div class="bp-alert bp-alert--info" role="status">
             <strong>Previsão até hoje, {{ bpFormatToday() }}</strong>
-            <span>Novos gastos até o fechamento podem alterar o acerto.</span>
+            <span>Inclui faturas abertas e gastos em dinheiro já pagos neste mês.</span>
           </div>
         }
 
@@ -419,10 +421,10 @@
                     <div class="bp-card__meta">Período {{ bpPeriod(b) }} &middot; fecha {{ formatDate(b.period_end!) }} &middot; vence {{ formatDate(b.due_date!) }}</div>
                     <div class="bp-card__total">Gastos do grupo nesta fatura <strong class="mono">{{ formatCurrency(b.total) }}</strong></div>
                   } @else {
-                    <div class="bp-card__title">Dinheiro</div>
-                    <div class="bp-card__sub"><span class="bp-badge bp-badge--yellow">Sem fatura</span></div>
-                    <div class="bp-card__meta">Pago em dinheiro ou sem cartao cadastrado &middot; {{ d.month_name }}</div>
-                    <div class="bp-card__total">Total <strong class="mono">{{ formatCurrency(b.total) }}</strong></div>
+                    <div class="bp-card__title">Gastos compartilhados em dinheiro</div>
+                    <div class="bp-card__sub"><span class="bp-badge bp-badge--yellow">Já pago</span></div>
+                    <div class="bp-card__meta">Lançamentos de {{ d.month_name }} até hoje. Veja quem cadastrou, quem pagou e a parte de cada pessoa.</div>
+                    <div class="bp-card__total">Total em dinheiro <strong class="mono">{{ formatCurrency(b.total) }}</strong></div>
                   }
                 </div>
                 <div class="bp-card__cells">
@@ -457,7 +459,13 @@
                           <span class="bp-detail-row__name">{{ e.description }}
                             @if (e.total_installments > 1) { <span class="badge-parcela">{{ e.installment_number }}/{{ e.total_installments }}</span> }
                           </span>
-                          <span class="bp-detail-row__meta">{{ formatDate(e.date) }} &middot; <span class="mono">{{ formatCurrency(e.amount) }}</span> &middot; {{ bpSplitLabel(e) }}@if (b.kind === 'cash') { &middot; pago por {{ e.paid_by_name }} }</span>
+                          <span class="bp-detail-row__meta">{{ formatDate(e.date) }} &middot; <span class="mono">{{ formatCurrency(e.amount) }}</span> &middot; {{ bpSplitLabel(e) }}</span>
+                          @if (b.kind === 'cash') {
+                            <div class="bp-detail-row__people">
+                              <span><small>Cadastrado por</small><strong>{{ e.created_by_name || 'pessoa não identificada' }}</strong></span>
+                              <span><small>Pago por</small><strong>{{ e.paid_by_name }}</strong></span>
+                            </div>
+                          }
                         </div>
                         <div class="bp-detail-row__cells">
                           @for (m of d.members; track m.id) {
@@ -488,7 +496,7 @@
               </div>
             </div>
             <div class="bp-total__row">
-              <span class="bp-total__label">{{ d.mode === 'open' ? 'Vai pagar ao banco' : 'Já pagou' }}</span>
+              <span class="bp-total__label">{{ d.mode === 'open' ? 'Pago em dinheiro / a pagar ao banco' : 'Já pagou' }}</span>
               <div class="bp-total__cells">
                 @for (m of d.members; track m.id) { <div class="bp-total__cell mono">{{ formatCurrency(bpTotal('paid', m.id)) }}</div> }
               </div>
@@ -542,7 +550,7 @@
               <p class="bp-note">Fora desta conta: {{ d.outside.count }} lançamento(s) ({{ formatCurrency(d.outside.total) }}) em faturas ainda abertas &mdash; entram quando as faturas fecharem.</p>
             }
           } @else {
-            <p class="bp-note">Gastos em dinheiro não aparecem aqui: não têm fatura e já contam no mês em que foram pagos, em Faturas fechadas.</p>
+            <p class="bp-note">O saldo previsto soma as partes nas faturas abertas e os gastos em dinheiro pagos neste mês.</p>
           }
         }
       }

@@ -44,10 +44,12 @@ export interface ConsolidatedSummary {
   card_invoices_count: number;
   card_invoices_detail: CardInvoiceDetail[];
   shared_my_portion: number;
+  shared_cash_portion?: number;
   shared_count: number;
   total_expenses: number;
   balance: number;
   personal_cost?: number;
+  upcoming_fixed?: number;
   free_to_spend?: number;
 }
 

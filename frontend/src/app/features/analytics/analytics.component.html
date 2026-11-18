@@ -7,10 +7,33 @@
 </div>
 
 @if (!loading()) {
-  <section class="analytics-kpis" aria-label="Resumo de despesas do mês">
-    <article class="analytics-kpi"><span>Despesas no período</span><strong>{{ formatCurrency(monthlyExpenseTotal()) }}</strong><small>Lançamentos e compras do mês</small></article>
-    <article class="analytics-kpi"><span>Média por dia com gastos</span><strong>{{ formatCurrency(avgDaily()) }}</strong><small>{{ daysWithExpense() }} dias com movimentação</small></article>
-    <article class="analytics-kpi"><span>Mediana diária</span><strong>{{ formatCurrency(medianDaily()) }}</strong><small>Reduz o peso de gastos atípicos</small></article>
+  <section class="analytics-summary" aria-label="Composição das despesas do mês">
+    <div class="analytics-summary__heading">
+      <div>
+        <h2>Quanto você gastou</h2>
+        <p>{{ currentMonthName() }} de {{ selectedYear() }} · valores somam gastos individuais e compartilhados</p>
+      </div>
+    </div>
+    <div class="analytics-kpis">
+      <article class="analytics-kpi analytics-kpi--total">
+        <span>Total de despesas</span>
+        <strong>{{ formatCurrency(monthlyExpenseTotal()) }}</strong>
+        <small>Seus gastos individuais + sua parte nos compartilhados</small>
+      </article>
+      <article class="analytics-kpi">
+        <span>Gastos individuais</span>
+        <strong>{{ formatCurrency(individualExpenseTotal()) }}</strong>
+        <small>Dinheiro + cartão, com estornos do cartão abatidos</small>
+      </article>
+      <article class="analytics-kpi">
+        <span>Sua parte nos compartilhados</span>
+        <strong>{{ formatCurrency(sharedExpenseTotal()) }}</strong>
+        <small>Valor atribuído a você nos lançamentos compartilhados</small>
+      </article>
+    </div>
+    <p class="analytics-summary__formula">
+      {{ formatCurrency(monthlyExpenseTotal()) }} = {{ formatCurrency(individualExpenseTotal()) }} individuais + {{ formatCurrency(sharedExpenseTotal()) }} compartilhados
+    </p>
   </section>
 }
 
@@ -30,11 +53,10 @@
 @if (loading()) {
   <div class="loading-wrapper"><span class="spinner"></span> Carregando análises...</div>
 } @else {
-  <!-- Gráfico 1: barras agrupadas e linha de saldo -->
   <div class="chart-card">
     <div class="chart-card__header">
       <h2 class="chart-card__title">Receitas x Despesas &mdash; {{ selectedYear() }}</h2>
-      <p class="chart-card__subtitle">Barras agrupadas e linha de saldo (amarelo)</p>
+      <p class="chart-card__subtitle">Despesas incluem seus gastos + rateios. Receitas são lançamentos individuais em dinheiro. O saldo usa a mesma escala em reais.</p>
     </div>
     <div class="chart-card__body">
       <div #monthlyChart class="d3-chart"></div>
@@ -42,11 +64,19 @@
   </div>
 
   <div class="charts-grid">
-    <!-- Gráfico 2: treemap de categorias -->
     <div class="chart-card">
-      <div class="chart-card__header">
-        <h2 class="chart-card__title">Por Categoria &mdash; {{ currentMonthName() }}</h2>
-        <p class="chart-card__subtitle">Treemap de distribuição por categoria</p>
+      <div class="chart-card__header analytics-category-header">
+        <div>
+          <h2 class="chart-card__title">Por categoria &mdash; {{ currentMonthName() }} {{ selectedYear() }}</h2>
+          <p class="chart-card__subtitle">Gastos individuais por categoria; estornos e rateios compartilhados ficam fora.</p>
+        </div>
+        <label class="chart-card__filter">Forma de pagamento
+          <select class="form-select" [ngModel]="categoryPaymentMethod()" (ngModelChange)="categoryPaymentMethod.set($event); onFilterChange()" aria-label="Filtrar categorias por forma de pagamento">
+            <option value="">Todas</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="cartao">Cartão</option>
+          </select>
+        </label>
       </div>
       <div class="chart-card__body chart-card__body--treemap">
         @if (categoryData().length === 0) {
@@ -68,10 +98,9 @@
       }
     </div>
 
-    <!-- Gráfico 3: barras por cartão -->
     <div class="chart-card">
     <div class="chart-card__header">
-      <h2 class="chart-card__title">Por cartão &mdash; {{ currentMonthName() }}</h2>
+      <h2 class="chart-card__title">Por cartão &mdash; {{ currentMonthName() }} {{ selectedYear() }}</h2>
       <label class="chart-card__subtitle">Período
         <select class="form-select" [ngModel]="cardPeriod()" (ngModelChange)="cardPeriod.set($event); onFilterChange()">
           <option value="cycle">Ciclo da fatura</option>
@@ -79,6 +108,7 @@
         </select>
       </label>
       </div>
+      <p class="chart-card__subtitle">{{ cardPeriod() === 'cycle' ? 'Compras no ciclo da fatura; estornos e rateios ficam fora.' : 'Compras feitas no mês; estornos e rateios ficam fora.' }}</p>
       <div class="chart-card__body chart-card__body--hbar">
         @if (cardData().length === 0) {
           <div class="empty-chart">Sem gastos em cartão neste período</div>
@@ -88,27 +118,12 @@
       </div>
     </div>
 
-    <!-- Gráfico 4: gastos em dinheiro por categoria -->
-    <div class="chart-card">
-      <div class="chart-card__header">
-        <h2 class="chart-card__title">Gastos em Dinheiro &mdash; Categorias</h2>
-        <p class="chart-card__subtitle">Donut com total no centro</p>
-      </div>
-      <div class="chart-card__body chart-card__body--donut">
-        @if (cashCategoryData().length === 0) {
-          <div class="empty-chart">Sem gastos em dinheiro neste período</div>
-        } @else {
-          <div #cashCategoryChart class="d3-chart d3-chart--donut"></div>
-        }
-      </div>
-    </div>
   </div>
 
-  <!-- Gráfico 5: gastos diários -->
   <div class="chart-card">
     <div class="chart-card__header">
-      <h2 class="chart-card__title">Gasto diário &mdash; {{ currentMonthName() }} {{ selectedYear() }}</h2>
-      <p class="chart-card__subtitle">Área com gradiente de volume</p>
+      <h2 class="chart-card__title">Saídas individuais por dia &mdash; {{ currentMonthName() }} {{ selectedYear() }}</h2>
+      <p class="chart-card__subtitle">Mostra valores lançados como despesa. Estornos e rateios compartilhados ficam fora deste gráfico.</p>
     </div>
     @if (dailyData().length > 0) {
       <div class="daily-kpis">

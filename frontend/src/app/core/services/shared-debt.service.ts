@@ -168,6 +168,7 @@ export interface ByPersonEntry {
   amount: number;
   paid_by: number;
   paid_by_name: string;
+  created_by_name: string | null;
   participant_ids: number[];
   shares: Record<string, number>;
   installment_number: number;
@@ -325,6 +326,10 @@ export class SharedDebtService {
     if (category != null) params = params.set('category', category);
     if (search.trim()) params = params.set('search', search.trim());
     return this.http.get<SharedDebtScreenSummary>(`${this.base}/shared-debts/${id}/screen-summary/`, { params });
+  }
+
+  installmentEntries(id: number): Observable<SharedDebtEntry[]> {
+    return this.http.get<SharedDebtEntry[]>(`${this.base}/shared-debts/${id}/installment-entries/`);
   }
 
   monthlyHistory(id: number): Observable<MonthlyHistoryEntry[]> {

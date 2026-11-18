@@ -19,18 +19,17 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
   @ViewChild('monthlyChart') monthlyRef!: ElementRef<HTMLDivElement>;
   @ViewChild('categoryChart') categoryRef!: ElementRef<HTMLDivElement>;
   @ViewChild('cardChart') cardRef!: ElementRef<HTMLDivElement>;
-  @ViewChild('cashCategoryChart') cashCategoryRef!: ElementRef<HTMLDivElement>;
   @ViewChild('dailyChart') dailyRef!: ElementRef<HTMLDivElement>;
 
   selectedYear = signal(new Date().getFullYear());
   selectedMonth = signal(new Date().getMonth() + 1);
   cardPeriod = signal<'cycle' | 'purchase_month'>('cycle');
+  categoryPaymentMethod = signal<'' | 'dinheiro' | 'cartao'>('');
   loading = signal(true);
 
   monthlyData = signal<MonthlyAnalytics[]>([]);
   categoryData = signal<CategoryAnalytics[]>([]);
   cardData = signal<CardAnalytics[]>([]);
-  cashCategoryData = signal<CategoryAnalytics[]>([]);
   dailyData = signal<DailyAnalytics[]>([]);
 
   years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
@@ -57,7 +56,13 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
     return values.length % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
   };
   daysWithExpense = () => this.dailyData().filter(d => d.total > 0).length;
-  monthlyExpenseTotal = () => this.dailyData().reduce((total, day) => total + day.total, 0);
+  monthlyAnalytics = () => this.monthlyData().find(data => data.month === this.selectedMonth());
+  monthlyExpenseTotal = () => this.monthlyAnalytics()?.expenses ?? 0;
+  individualExpenseTotal = () => {
+    const data = this.monthlyAnalytics();
+    return (data?.cash_expenses ?? 0) + (data?.card_expenses ?? 0);
+  };
+  sharedExpenseTotal = () => this.monthlyAnalytics()?.shared_my_portion ?? 0;
 
   private viewReady = false;
   private dataReady = false;
@@ -68,12 +73,12 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
   loadAll(): void {
     this.loading.set(true);
     this.dataReady = false;
-    let pending = 5;
+    let pending = 4;
     const done = () => { if (--pending === 0) { this.dataReady = true; this.loading.set(false); if (this.viewReady) this.renderCharts(); } };
     this.analyticsService.monthly(this.selectedYear()).subscribe({ next: d => { this.monthlyData.set(d); done(); }, error: () => done() });
-    this.analyticsService.byCategory(this.selectedMonth(), this.selectedYear()).subscribe({ next: d => { this.categoryData.set(d); done(); }, error: () => done() });
+    const paymentMethod = this.categoryPaymentMethod() || undefined;
+    this.analyticsService.byCategory(this.selectedMonth(), this.selectedYear(), paymentMethod).subscribe({ next: d => { this.categoryData.set(d); done(); }, error: () => done() });
     this.analyticsService.byCard(this.selectedMonth(), this.selectedYear(), this.cardPeriod()).subscribe({ next: d => { this.cardData.set(d); done(); }, error: () => done() });
-    this.analyticsService.byCategory(this.selectedMonth(), this.selectedYear(), 'dinheiro').subscribe({ next: d => { this.cashCategoryData.set(d); done(); }, error: () => done() });
     this.analyticsService.daily(this.selectedMonth(), this.selectedYear()).subscribe({ next: d => { this.dailyData.set(d); done(); }, error: () => done() });
   }
 
@@ -84,7 +89,6 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
       this.renderMonthly();
       this.renderCategory();
       this.renderCard();
-      this.renderCashCategory();
       this.renderDaily();
     }, 80);
   }
@@ -116,16 +120,6 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
       label: `${d.card_name} ****${d.last_four_digits}`, value: d.total,
     }));
     this.d3.renderHorizontalBar(el, data);
-  }
-
-  private renderCashCategory(): void {
-    const el = this.cashCategoryRef?.nativeElement;
-    if (!el) return;
-    const total = this.cashCategoryData().reduce((s, d) => s + d.total, 0);
-    const data: DonutData[] = this.cashCategoryData().map((d, i) => ({
-      label: d.category_name, value: d.total, color: CAT_COLORS[i % CAT_COLORS.length],
-    }));
-    this.d3.renderDonut(el, data, new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(total));
   }
 
   private renderDaily(): void {

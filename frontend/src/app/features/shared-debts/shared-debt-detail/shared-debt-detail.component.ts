@@ -62,6 +62,9 @@ export class SharedDebtDetailComponent implements OnInit {
   group = signal<SharedDebtGroup | null>(null);
   members = signal<SharedDebtMember[]>([]);
   entries = signal<SharedDebtEntry[]>([]);
+  installmentEntries = signal<SharedDebtEntry[]>([]);
+  installmentEntriesLoading = signal(true);
+  installmentEntriesError = signal(false);
   balances = signal<BalancesResponse | null>(null);
 
   // ── Filtros e paginação ─────────────────────────────────────────────────
@@ -228,6 +231,7 @@ export class SharedDebtDetailComponent implements OnInit {
 
   private loadAll(): void {
     this.loading.set(true);
+    this.refreshInstallmentEntries();
     this.svc.screenSummary(this.groupId, this.filterMonth(), this.filterCategory(), this.currentPage(), this.filterSearch()).subscribe({
       next: data => {
         this.group.set(data.group);
@@ -249,6 +253,7 @@ export class SharedDebtDetailComponent implements OnInit {
 
   private refreshEntriesAndBalances(resetPage = false): void {
     if (resetPage) this.currentPage.set(1);
+    this.refreshInstallmentEntries();
     this.svc.screenSummary(this.groupId, this.filterMonth(), this.filterCategory(), this.currentPage(), this.filterSearch()).subscribe({
       next: data => {
         this.group.set(data.group);
@@ -262,6 +267,21 @@ export class SharedDebtDetailComponent implements OnInit {
       }
     });
     if (this.bpData()) this.loadByPerson();
+  }
+
+  private refreshInstallmentEntries(): void {
+    this.installmentEntriesLoading.set(true);
+    this.installmentEntriesError.set(false);
+    this.svc.installmentEntries(this.groupId).subscribe({
+      next: entries => {
+        this.installmentEntries.set(entries);
+        this.installmentEntriesLoading.set(false);
+      },
+      error: () => {
+        this.installmentEntriesError.set(true);
+        this.installmentEntriesLoading.set(false);
+      },
+    });
   }
 
   private openEntryFromQuery(): void {
@@ -444,14 +464,6 @@ export class SharedDebtDetailComponent implements OnInit {
     });
   }
 
-  togglePaid(entry: SharedDebtEntry): void {
-    const nextPaid = !entry.paid;
-    this.svc.updateEntry(entry.id, { paid: nextPaid }).subscribe({
-      next: () => this.refreshEntriesAndBalances(),
-      error: () => this.toast.error('Erro ao atualizar status de pagamento.'),
-    });
-  }
-
   // ── Group deletion (owner only) ─────────────────────────────────────────
   async deleteGroup(): Promise<void> {
     const name = this.group()?.name ?? 'este grupo';
@@ -597,9 +609,7 @@ export class SharedDebtDetailComponent implements OnInit {
   }
 
   installmentGroups = computed(() => {
-    const all = this.entries();
-    const myId = this.myTenantId;
-    // Group by installment_group_id (non-null) or by description for same total_installments
+    const all = this.installmentEntries();
     const map = new Map<string, SharedDebtEntry[]>();
     for (const e of all) {
       if (e.total_installments <= 1) continue;
@@ -608,40 +618,34 @@ export class SharedDebtDetailComponent implements OnInit {
       map.get(key)!.push(e);
     }
 
-    const MONTH_NAMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-    const now = new Date();
-
     return [...map.entries()].map(([groupId, entries]) => {
       entries.sort((a, b) => a.installment_number - b.installment_number);
       const first = entries[0];
       const last = entries[entries.length - 1];
       const total = first.total_installments;
-      const paid = entries.filter(e => e.paid).length;
+      const paid = entries.filter(e => e.invoice_paid).length;
       const progressPct = Math.round((paid / total) * 100);
       const paidBy = first.paid_by_name;
       const participantCount = first.participant_count;
       const installmentAmount = first.amount;
       const myPortionPerInstallment = installmentAmount / (participantCount || 1);
-      const totalAmount = installmentAmount * total;
-      const myTotalPortion = myPortionPerInstallment * total;
-      const myPaidPortion = myPortionPerInstallment * paid;
-      const remaining = myTotalPortion - myPaidPortion;
+      const totalAmount = entries.reduce((sum, entry) => sum + entry.amount, 0);
+      const myTotalPortion = entries.reduce((sum, entry) => sum + this.myPortion(entry), 0);
+      const myPaidPortion = entries
+        .filter(entry => entry.invoice_paid)
+        .reduce((sum, entry) => sum + this.myPortion(entry), 0);
+      const remaining = entries
+        .filter(entry => !entry.invoice_paid)
+        .reduce((sum, entry) => sum + this.myPortion(entry), 0);
 
-      // Status
-      const lastEntry = entries[entries.length - 1];
-      const lastDate = new Date(lastEntry.date);
-      let status = 'Em andamento';
-      if (paid >= total) status = 'Concluído';
-      else if (lastDate < now && paid < total) status = 'Atrasada';
-
-      const startD = new Date(first.date);
-      const endD = new Date(last.date);
-      const startMonth = `${MONTH_NAMES[startD.getMonth()]}/${startD.getFullYear()}`;
-      const endMonth = `${MONTH_NAMES[endD.getMonth()]}/${endD.getFullYear()}`;
+      const status = paid >= total ? 'Concluído' : 'Em andamento';
+      const startMonth = this.formatMonthYear(first.date);
+      const endMonth = this.formatMonthYear(last.date);
+      const description = first.description.replace(/\s*\(\d+\/\d+\)\s*$/, '').trim();
 
       return {
         groupId,
-        description: first.description,
+        description,
         total,
         paid,
         progressPct,
@@ -672,7 +676,7 @@ export class SharedDebtDetailComponent implements OnInit {
   }
 
   isPaid(e: SharedDebtEntry): boolean {
-    return e.paid;
+    return e.invoice_paid === true;
   }
 
   formatMonthYear(d: string): string {
@@ -703,7 +707,7 @@ export class SharedDebtDetailComponent implements OnInit {
   bpYear = signal(new Date().getFullYear());
   bpData = signal<ByPersonResponse | null>(null);
   bpLoading = signal(false);
-  bpExpanded = signal<Set<string>>(new Set());
+  bpExpanded = signal<Set<string>>(new Set(['cash']));
 
   readonly bpMonthOptions = (() => {
     const out: { month: number; year: number; label: string }[] = [];
@@ -732,7 +736,7 @@ export class SharedDebtDetailComponent implements OnInit {
   bpSetMode(mode: 'closed' | 'open'): void {
     if (this.bpMode() === mode) return;
     this.bpMode.set(mode);
-    this.bpExpanded.set(new Set());
+    this.bpExpanded.set(new Set(['cash']));
     this.loadByPerson();
   }
 
@@ -740,7 +744,7 @@ export class SharedDebtDetailComponent implements OnInit {
     const [y, m] = key.split('-').map(Number);
     this.bpYear.set(y);
     this.bpMonth.set(m);
-    this.bpExpanded.set(new Set());
+    this.bpExpanded.set(new Set(['cash']));
     this.loadByPerson();
   }
 

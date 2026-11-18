@@ -12,9 +12,9 @@ import { HomeService, InstallmentGroup } from '../../core/services/home.service'
 
 import { MonthlyAnalytics, CategoryAnalytics, ConsolidatedSummary } from '../../core/services/analytics.service';
 import { OpenInvoice, Expense, ExpenseCategory } from '../../core/models';
-import { ExpenseService, RecurringExpenseTemplate } from '../../core/services/expense.service';
+import { ExpenseService, HistoryEntry, RecurringExpenseTemplate } from '../../core/services/expense.service';
 import * as d3 from 'd3';
-import { SharedDebtService, SharedDebtHomeSummary, SharedDebtEntry } from '../../core/services/shared-debt.service';
+import { BalancesResponse, SharedDebtService, SharedDebtHomeSummary, SharedDebtEntry } from '../../core/services/shared-debt.service';
 
 const MONTH_NAMES = [
   'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -46,7 +46,9 @@ export class HomeComponent implements OnInit, OnDestroy {
 
 
   recurringTemplates = signal<RecurringExpenseTemplate[]>([]);
-  generatedRecurringTemplateIds = signal<number[]>([]);
+  generatedRecurringTemplateIds = signal<number[]>([]);
+  compositionEntries = signal<HistoryEntry[] | null>(null);
+  compositionDetailsState = signal<'loading' | 'ready' | 'error'>('loading');
   private destroy$         = new Subject<void>();
   private searchSubject    = new Subject<string>();
 
@@ -55,6 +57,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   consolidated       = signal<ConsolidatedSummary>(EMPTY_CONSOLIDATED);
   openInvoices       = signal<OpenInvoice[]>([]);
   sharedDebts        = signal<SharedDebtHomeSummary[]>([]);
+  sharedBalances = signal<{ group: SharedDebtHomeSummary; balances: BalancesResponse | null }[]>([]);
+  sharedInstallmentCount = signal<number | null>(null);
 
   // ── Tabs "Todos os Gastos" ───────────────────────────────────────────────
   activeTab           = signal<'individual' | 'compartilhada'>('individual');
@@ -89,11 +93,28 @@ export class HomeComponent implements OnInit, OnDestroy {
   totalPages    = computed(() => Math.ceil(this.totalCount() / this.pageSize));
   pageNumbers   = computed(() => Array.from({ length: this.totalPages() }, (_, i) => i + 1));
   /** Soma BRUTA das faturas abertas (individual + valor cheio do compartilhado) — o que o banco cobra. */
-  totalInvoices = computed(() => this.openInvoices().reduce((s, i) => s + i.total, 0));
-  maxCategory   = computed(() => Math.max(...this.byCategory().map(c => c.total), 1));
-  // ── Home v2: KPIs centrados no cartão ─────────────────────────────────────
-  /** Usa o saldo pessoal calculado no backend, incluindo obrigações ainda não lançadas. */
+  totalInvoices = computed(() => this.moneyFromCents(
+    this.openInvoices().reduce((sum, invoice) => sum + this.moneyCents(invoice.total), 0)
+  ));
+  maxCategory   = computed(() => Math.max(...this.byCategory().map(c => c.total), 1));  // ── Home v2: KPIs centrados no cartão ─────────────────────────────────────  /** Usa o saldo pessoal calculado no backend, incluindo obrigações ainda não lançadas. */
   balance = computed(() => this.consolidated().free_to_spend ?? this.consolidated().balance);
+  sharedCashPortion = computed(() => this.consolidated().shared_cash_portion ?? 0);
+  sharedCardPortionOutsideMyInvoices = computed(() => {
+    const sharedOnMyCards = this.openInvoices().reduce((sum, invoice) => sum + invoice.shared_total, 0);
+    return this.consolidated().shared_my_portion - sharedOnMyCards - this.sharedCashPortion();
+  });
+  compositionAmount = computed(() => this.moneyFromCents(
+    this.moneyCents(this.consolidated().cash_expenses)
+      + this.moneyCents(this.sharedCashPortion())
+      + this.openInvoices().reduce((sum, invoice) => sum
+        + this.moneyCents(invoice.expenses_total)
+        + this.moneyCents(invoice.shared_total), 0)
+      + this.moneyCents(this.sharedCardPortionOutsideMyInvoices())
+  ));
+  cashCompositionEntries = computed(() => (this.compositionEntries() ?? []).filter(entry =>    entry.payment_method === 'dinheiro' && entry.date.startsWith(`${this.filterYear()}-${String(this.filterMonth()).padStart(2, '0')}`)      && Number(entry.amount) < 0  ));  cashCompositionTotal = computed(() => this.moneyFromCents(this.cashCompositionEntries().reduce((sum, entry) =>    sum + this.moneyCents(entry.type === 'shared' ? (entry.own_portion ?? 0) : Math.abs(entry.amount)), 0  )));  generatedFixedEntries = computed(() => (this.compositionEntries() ?? []).filter(entry =>    entry.type === 'individual' && entry.recurring_template_id != null  ));  generatedFixedIncluded = computed(() => this.generatedFixedEntries().filter(entry => this.isIncludedInComposition(entry)));  generatedFixedIncludedTotal = computed(() => this.moneyFromCents(this.generatedFixedIncluded().reduce((sum, entry) =>    sum + this.moneyCents(Math.abs(entry.amount)), 0  )));  generatedFixedOutside = computed(() => this.generatedFixedEntries().filter(entry =>    entry.date.startsWith(`${this.filterYear()}-${String(this.filterMonth()).padStart(2, '0')}`)      && !this.isIncludedInComposition(entry)  ));  upcomingFixedTemplates = computed(() => {    if (this.compositionDetailsState() !== 'ready') return [];    const generatedThisMonth = new Set(this.generatedFixedEntries()      .filter(entry => entry.date.startsWith(`${this.filterYear()}-${String(this.filterMonth()).padStart(2, '0')}`))      .map(entry => entry.recurring_template_id!));    return this.activeRecurring().filter(template => !generatedThisMonth.has(template.id));  });  upcomingFixedTotal = computed(() => this.moneyFromCents(this.upcomingFixedTemplates().reduce((sum, template) =>    sum + this.moneyCents(Math.abs(template.amount)), 0  )));  compositionDifference = computed(() => this.moneyFromCents(
+    this.moneyCents(this.consolidated().personal_cost ?? this.consolidated().total_expenses)
+      - this.moneyCents(this.compositionAmount())
+  ));
   nextDueDate = computed<string | null>(() => {
     const dates = this.openInvoices().map(i => i.due_date).filter(Boolean).sort();
     return dates[0] ?? null;
@@ -124,8 +145,19 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   /** Parcelas ativas (ainda não quitadas) — máximo 4 no preview */
   activeInstallments = computed(() =>
-    this.installmentGroups().filter(g => g.closedInstallments < g.totalInstallments).slice(0, 4)
+    this.installmentGroups().filter(g => g.paidInstallments < g.totalInstallments).slice(0, 4)
   );
+  activeInstallmentCount = computed(() =>
+    this.installmentGroups().filter(g => g.paidInstallments < g.totalInstallments).length
+  );
+  activeInstallmentTotal = computed(() => this.sharedInstallmentCount() === null
+    ? null
+    : this.activeInstallmentCount() + this.sharedInstallmentCount()!
+  );
+  settlementLoadFailed = computed(() => this.sharedBalances().some(item => item.balances === null));
+  settlementLines = computed(() => this.sharedBalances().flatMap(({ group, balances }) =>
+    (balances?.settlement ?? []).map(line => ({ ...line, groupName: group.name }))
+  ));
 
   totalRemainingInstallments = computed(() =>
     this.installmentGroups().reduce((s, g) => s + g.remainingAmount, 0)
@@ -161,6 +193,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   // ── Dashboard load ────────────────────────────────────────────────────────
   private loadDashboard(): void {
     this.dashLoading.set(true);
+    this.compositionEntries.set(null);
+    this.compositionDetailsState.set('loading');
     this.homeService.load(this.filterMonth(), this.filterYear())
       .pipe(takeUntil(this.destroy$))
       .subscribe({
@@ -168,18 +202,26 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.consolidated.set(data.consolidated);
           this.openInvoices.set(data.openInvoices);
           this.sharedDebts.set(data.sharedDebts);
+          this.sharedBalances.set(data.sharedBalances);
+          this.sharedInstallmentCount.set(data.sharedInstallmentCount);
           this.byCategory.set(data.byCategory);
           this.installmentGroups.set(data.installmentGroups);
           this.evolution.set(data.evolution);
           this.categories.set(data.categories);
           this.recurringTemplates.set(data.recurringTemplates);
           this.generatedRecurringTemplateIds.set(data.generatedRecurringTemplateIds);
+          this.compositionEntries.set(data.compositionEntries);
+          this.compositionDetailsState.set(data.compositionEntries === null ? 'error' : 'ready');
           this.expenses.set(data.expensePage.results);
           this.totalCount.set(data.expensePage.count);
           this.tableLoading.set(false);
           this.dashLoading.set(false);
         },
-        error: () => this.dashLoading.set(false),
+        error: () => {
+          this.dashLoading.set(false);
+          this.compositionEntries.set(null);
+          this.compositionDetailsState.set('error');
+        },
       });
   }
 
@@ -274,8 +316,12 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   formatCurrency(value: number): string {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(value));
-  }
+  }  isIncludedInComposition(entry: HistoryEntry): boolean {    const month = `${this.filterYear()}-${String(this.filterMonth()).padStart(2, '0')}`;    if (entry.payment_method === 'dinheiro') return entry.date.startsWith(month);    return this.openInvoices().some(invoice => invoice.card_id === entry.credit_card_id      && invoice.period_start <= entry.date && entry.date <= invoice.period_end);  }
 
+  formatSignedCurrency(value: number): string {
+    return `${value < 0 ? '−' : ''}${this.formatCurrency(value)}`;
+  }
+
   amountClass(amount: number): string  { return amount >= 0 ? 'value--up' : 'value--down'; }
   amountPrefix(amount: number): string { return amount >= 0 ? '+' : '-'; }
 
@@ -284,7 +330,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   progressPct(g: InstallmentGroup): number {
-    return Math.round((g.closedInstallments / g.totalInstallments) * 100);
+    return Math.round((g.paidInstallments / g.totalInstallments) * 100);
   }
 
   daysLabel(days: number): string {
@@ -307,8 +353,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     return `${this.shortDate(invoice.period_start)} – ${this.shortDate(invoice.period_end)}`;
   }
 
-  private shortDate(iso: string): string {
-    const monthNames = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  shortDate(iso: string): string {    const monthNames = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
     const month = Number(iso.slice(5, 7)) - 1;
     return `${iso.slice(8, 10)} ${monthNames[month] ?? ''}`.trim();
   }
@@ -319,9 +364,21 @@ export class HomeComponent implements OnInit, OnDestroy {
       .slice(-6);
   }
 
-  monthlyExpensePct(value: number): number {
-    const maxExpense = Math.max(...this.recentYearMonths().map(month => Number(month.expenses)), 1);
-    return Math.max((Number(value) / maxExpense) * 100, 3);
+  monthlyValuePct(value: number): number {
+    const values = this.recentYearMonths().flatMap(month => [month.income, month.expenses, month.balance]);
+    const maxValue = Math.max(...values.filter(item => item >= 0).map(Number), 1);
+    const maxDeficit = Math.max(...values.filter(item => item < 0).map(item => Math.abs(Number(item))), 1);
+    return value < 0
+      ? (Math.abs(Number(value)) / maxDeficit) * 16
+      : (Number(value) / maxValue) * 70;
+  }
+
+  private moneyCents(value: number): number {
+    return Math.round(Number(value || 0) * 100);
+  }
+
+  private moneyFromCents(cents: number): number {
+    return cents / 100;
   }
 
   /** % da fatura que é gasto individual (restante = compartilhado) — largura da barra dividida. */
@@ -517,6 +574,4 @@ export class HomeComponent implements OnInit, OnDestroy {
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
   }
 
-}
-
-
+}

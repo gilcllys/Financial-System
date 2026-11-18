@@ -49,7 +49,7 @@ class SharedEntrySerializer(serializers.ModelSerializer):
 
     @staticmethod
     def invoice_paid_by_due_date(obj, today=None):
-        """Infer card-fatura payment from its due date, without changing reimbursement."""
+        """Infer card-fatura payment from its due date, separately from reimbursement."""
         if obj.payment_method != 'cartao' or not obj.credit_card:
             return False
 
