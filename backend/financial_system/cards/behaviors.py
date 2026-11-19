@@ -424,6 +424,7 @@ class OpenInvoicesBehavior:
                     'group_name': group['group_name'],
                     'total': group['total'],
                     'my_portion': group['my_portion'],
+                    'participants': group['participants'],
                 }
                 for group in shared['groups']
             ],

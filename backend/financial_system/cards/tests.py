@@ -296,7 +296,17 @@ class OpenInvoicesSharedTests(TestCase):
         self.assertEqual(row['shared_groups'], [{
             'group_id': self.group.id, 'group_name': 'Casa',
             'total': 200.00, 'my_portion': 100.00,
+            'participants': [
+                {'member_id': self.me.id, 'name': 'Eu', 'amount': 100.00, 'is_current_user': True},
+                {'member_id': self.other.id, 'name': 'Ana', 'amount': 100.00, 'is_current_user': False},
+            ],
         }])
+        group = row['shared_groups'][0]
+        self.assertEqual(round(sum(member['amount'] for member in group['participants']), 2), group['total'])
+        self.assertEqual(
+            round(sum(member['amount'] for member in group['participants'] if member['is_current_user']), 2),
+            group['my_portion'],
+        )
 
     def test_shared_outside_invoice_window_is_excluded(self):
         self._shared('999.00', real_date(2026, 7, 21))   # fechamento anterior

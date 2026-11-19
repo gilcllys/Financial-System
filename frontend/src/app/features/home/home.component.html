@@ -27,60 +27,24 @@
     <p class="kpi-clean-card__sub">Entradas de {{ currentMonthName }}</p>
   </div>
 
-  <!-- FATURAS ABERTAS (bruto: o que o banco cobra) -->
+  <!-- CUSTO PESSOAL: dinheiro, gastos individuais no cartão e sua parte compartilhada -->
   <div class="kpi-clean-card">
     <div class="kpi-clean-card__top">
-      <span class="kpi-clean-card__label">DEVIDO AO BANCO</span>
+      <span class="kpi-clean-card__label">GASTO PESSOAL DO PERÍODO</span>
       <span class="kpi-clean-card__icon kpi-clean-card__icon--red">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
       </span>
     </div>
     <div class="kpi-clean-card__value kpi-clean-card__value--red">
-      {{ formatCurrency(totalInvoices()) }}
+      {{ formatSignedCurrency(consolidated().personal_cost ?? consolidated().total_expenses) }}
     </div>
-    <p class="kpi-clean-card__sub">{{ invoicesKpiSub() }}</p>
-    @if (openInvoices().length > 0) {
-      <details class="bank-composition">
-        <summary>Ver composição</summary>
-        <div class="bank-composition__content">
-          @for (invoice of openInvoices(); track invoice.card_id) {
-            <section class="bank-composition__invoice" [attr.aria-label]="'Fatura do cartão ' + invoice.card_name">
-              <div class="bank-composition__invoice-head">
-                <span>{{ invoice.card_name }} ···· {{ invoice.last_four_digits }}</span>
-                <strong class="mono">{{ formatCurrency(invoice.total) }}</strong>
-              </div>
-              <dl class="bank-composition__rows">
-                <div>
-                  <dt>Gastos individuais</dt>
-                  <dd class="mono">{{ formatCurrency(invoice.expenses_total) }}</dd>
-                </div>
-                <div>
-                  <dt>Compras compartilhadas <small>valor integral cobrado pelo banco</small></dt>
-                  <dd class="mono">{{ formatCurrency(invoice.shared_gross_total) }}</dd>
-                </div>
-                @if (invoice.shared_gross_total > 0) {
-                  <div class="bank-composition__portion">
-                    <dt>Sua parte nas compras compartilhadas</dt>
-                    <dd class="mono">{{ formatCurrency(invoice.shared_total) }}</dd>
-                  </div>
-                }
-              </dl>
-              <div class="bank-composition__invoice-total">
-                <span>Total desta fatura</span>
-                <strong class="mono">{{ formatCurrency(invoice.total) }}</strong>
-              </div>
-            </section>
-          }
-          <p class="bank-composition__note">O valor compartilhado aparece integralmente porque é o total cobrado na fatura. “Sua parte” é informativa e não é somada novamente.</p>
-        </div>
-      </details>
-    }
+    <p class="kpi-clean-card__sub">Dinheiro, gastos individuais no cartão e sua parte nos compartilhados.</p>
   </div>
 
-  <!-- SALDO = Receitas − Faturas − Dinheiro -->
+  <!-- Sobra após gastos pessoais e contas fixas previstas ainda não lançadas -->
   <div class="kpi-clean-card">
     <div class="kpi-clean-card__top">
-      <span class="kpi-clean-card__label">LIVRE PARA GASTAR</span>
+      <span class="kpi-clean-card__label">SOBRA ESTIMADA DO MÊS</span>
       <span class="kpi-clean-card__icon kpi-clean-card__icon--blue">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
       </span>
@@ -88,317 +52,226 @@
     <div class="kpi-clean-card__value" [class.kpi-clean-card__value--red]="balance() < 0">
       {{ balance() < 0 ? "-" : "" }}{{ formatCurrency(Math.abs(balance())) }}
     </div>
-    <p class="kpi-clean-card__sub">Cartões no ciclo selecionado e dinheiro em {{ currentMonthName }}: {{ formatCurrency(consolidated().personal_cost ?? consolidated().total_expenses) }}</p>
+    <p class="kpi-clean-card__sub">Depois dos gastos pessoais e das contas fixas previstas que ainda não foram lançadas.</p>
   </div>
 </div>
 
-<!-- Ritmo anual — visão compacta do gasto mês a mês -->
+<section class="expense-composition card" aria-labelledby="expense-composition-title">
+  <header class="expense-composition__header">
+    <div>
+      <h2 id="expense-composition-title">Composição dos gastos</h2>
+      <p>As faturas mostram o valor integral cobrado. O total pessoal abaixo considera só a sua parte e também inclui gastos em dinheiro e compras compartilhadas em outros cartões.</p>
+    </div>
+  </header>
+
+  <div class="expense-composition__cards">
+    @if (openInvoices().length === 0) {
+      <p class="empty-msg">Nenhuma fatura de cartão neste ciclo.</p>
+    }
+    @for (invoice of openInvoices(); track invoice.card_id) {
+      <article class="expense-card" [attr.aria-label]="'Composição da fatura ' + invoice.card_name">
+        <header class="expense-card__header">
+          <div>
+            <h3>{{ invoice.card_name }} ···· {{ invoice.last_four_digits }}</h3>
+            <p>Ciclo da fatura: {{ cycleRange(invoice) }} <span>· vence {{ ddmm(invoice.due_date) }}</span></p>
+          </div>
+          <div class="expense-card__bank-total">
+            <span>Fatura do cartão</span>
+            <strong class="mono">{{ formatSignedCurrency(invoice.total) }}</strong>
+          </div>
+        </header>
+
+        <div class="expense-card__rows">
+          <div class="expense-card__row">
+            <span>Gastos individuais</span>
+            <strong class="mono">{{ formatSignedCurrency(invoice.expenses_total) }}</strong>
+          </div>
+          @if (invoice.shared_groups.length > 0) {
+            <div class="expense-card__section-label">Gastos compartilhados · {{ formatCurrency(invoice.shared_gross_total) }}</div>
+            @for (group of invoice.shared_groups; track group.group_id) {
+              <details class="expense-group">
+                <summary>
+                  <span>{{ group.group_name }}</span>
+                  <strong class="mono">{{ formatCurrency(group.total) }}</strong>
+                </summary>
+                <div class="expense-group__participants">
+                  <span class="expense-group__caption">Divisão entre participantes</span>
+                  @for (participant of group.participants; track participant.member_id) {
+                    <div class="expense-group__participant">
+                      <span>{{ participant.is_current_user ? 'Sua parte · ' + participant.name : participant.name }}</span>
+                      <strong class="mono">{{ formatCurrency(participant.amount) }}</strong>
+                    </div>
+                  } @empty {
+                    <p>Não há participantes registrados para este gasto.</p>
+                  }
+                </div>
+              </details>
+            }
+            <div class="expense-card__my-share">
+              <span>Sua parte nos gastos compartilhados</span>
+              <strong class="mono">{{ formatCurrency(invoice.shared_total) }}</strong>
+            </div>
+          } @else {
+            <div class="expense-card__section-label">Sem gastos compartilhados neste ciclo</div>
+          }
+        </div>
+      </article>
+    }
+  </div>
+
+  <div class="expense-composition__invoices-total">
+    <div>
+      <span>Total cobrado nos cartões</span>
+      <small>Soma integral das faturas acima, incluindo a parte de outras pessoas nas compras compartilhadas.</small>
+    </div>
+    <strong class="mono">{{ formatSignedCurrency(totalInvoices()) }}</strong>
+  </div>
+
+  <div class="expense-composition__cash">
+    <div><span>Gastos individuais em dinheiro</span><strong class="mono">{{ formatCurrency(consolidated().cash_expenses) }}</strong></div>
+    @if (sharedCashPortion() !== 0) {
+      <div><span>Sua parte em gastos compartilhados em dinheiro</span><strong class="mono">{{ formatCurrency(sharedCashPortion()) }}</strong></div>
+    }
+    @if (sharedCardPortionOutsideMyInvoices() !== 0) {
+      <div><span>Sua parte em compras compartilhadas em outros cartões</span><strong class="mono">{{ formatSignedCurrency(sharedCardPortionOutsideMyInvoices()) }}</strong></div>
+    }
+  </div>
+
+  <div class="expense-composition__details">
+    <details class="expense-breakdown" open>
+      <summary>
+        <span><strong>Gastos em dinheiro de {{ currentMonthName }}</strong><small>Veja cada lançamento e, nos compartilhados, quanto cabe a você.</small></span>
+        <span class="expense-breakdown__summary-value">
+          @if (compositionDetailsState() === 'ready') {
+            <strong class="mono">{{ formatCurrency(cashCompositionTotal()) }}</strong><small>{{ cashCompositionEntries().length }} lançamento(s)</small>
+          } @else {
+            <strong class="mono">—</strong><small>{{ compositionDetailsState() === 'loading' ? 'Carregando detalhes' : 'Detalhes indisponíveis' }}</small>
+          }
+        </span>
+      </summary>
+      @if (compositionDetailsState() === 'loading') {
+        <p class="expense-breakdown__empty">Carregando os lançamentos deste mês…</p>
+      } @else if (compositionDetailsState() === 'error') {
+        <p class="expense-breakdown__empty">Não foi possível carregar os detalhes dos lançamentos.</p>
+      } @else if (cashCompositionEntries().length === 0) {
+        <p class="expense-breakdown__empty">Nenhum gasto em dinheiro registrado neste mês.</p>
+      } @else {
+        <div class="expense-breakdown__table" role="table" aria-label="Gastos em dinheiro do mês">
+          <div class="expense-breakdown__row expense-breakdown__row--head" role="row"><span role="columnheader">Lançamento</span><span role="columnheader">Valor</span><span role="columnheader">Sua parte</span></div>
+          @for (entry of cashCompositionEntries(); track entry.type + '-' + entry.id) {
+            <div class="expense-breakdown__row" role="row">
+              <span class="expense-breakdown__description" role="cell"><strong>{{ entry.description }}</strong><small>{{ shortDate(entry.date) }} · {{ entry.type === 'shared' ? (entry.group_name ?? 'Compartilhado') : 'Individual' }}@if (entry.type === 'shared' && entry.paid_by_name) { · pago por {{ entry.paid_by_name }} }</small></span>
+              <span class="mono" role="cell">{{ formatCurrency(Math.abs(entry.amount)) }}</span>
+              <strong class="mono" role="cell">{{ formatCurrency(entry.type === 'shared' ? (entry.own_portion ?? 0) : Math.abs(entry.amount)) }}</strong>
+            </div>
+          }
+        </div>
+        <p class="expense-breakdown__note">O valor em “Sua parte” é o que entra no seu total pessoal. Em gastos individuais, ele é igual ao valor total.</p>
+      }
+    </details>
+
+    <details class="expense-breakdown" open>
+      <summary>
+        <span><strong>Gastos fixos considerados</strong><small>Confira o que já entrou no total e o que ainda será descontado da sobra.</small></span>
+        <span class="expense-breakdown__summary-value">
+          @if (compositionDetailsState() === 'ready') {
+            <strong class="mono">{{ formatCurrency(upcomingFixedTotal()) }}</strong><small>previsto ainda não lançado</small>
+          } @else {
+            <strong class="mono">—</strong><small>{{ compositionDetailsState() === 'loading' ? 'Carregando detalhes' : 'Detalhes indisponíveis' }}</small>
+          }
+        </span>
+      </summary>
+      @if (compositionDetailsState() === 'loading') {
+        <p class="expense-breakdown__empty">Carregando as contas fixas deste período…</p>
+      } @else if (compositionDetailsState() === 'error') {
+        <p class="expense-breakdown__empty">Não foi possível carregar os detalhes das contas fixas.</p>
+      } @else {
+        <div class="expense-breakdown__fixed-section">
+          <div class="expense-breakdown__section-heading"><span><strong>Já lançados · incluídos no total gasto por você</strong><small>Já fazem parte do total gasto; não são somados novamente.</small></span><strong class="mono">{{ formatCurrency(generatedFixedIncludedTotal()) }}</strong></div>
+          @for (entry of generatedFixedIncluded(); track entry.id) {
+            <div class="expense-breakdown__fixed-row"><span><strong>{{ entry.description }}</strong><small>{{ shortDate(entry.date) }} · {{ entry.payment_method === 'dinheiro' ? 'Dinheiro' : (entry.card_name ?? 'Cartão') }}</small></span><strong class="mono">{{ formatCurrency(Math.abs(entry.amount)) }}</strong></div>
+          } @empty {
+            <p class="expense-breakdown__empty">Nenhuma conta fixa lançada está incluída neste período.</p>
+          }
+        </div>
+
+        @if (generatedFixedOutside().length > 0) {
+          <div class="expense-breakdown__fixed-section expense-breakdown__fixed-section--muted">
+            <div class="expense-breakdown__section-heading"><span><strong>Lançados fora do período atual</strong><small>Não entram no total desta composição de gastos.</small></span></div>
+            @for (entry of generatedFixedOutside(); track entry.id) {
+              <div class="expense-breakdown__fixed-row"><span><strong>{{ entry.description }}</strong><small>{{ shortDate(entry.date) }} · {{ entry.card_name ?? entry.payment_method }}</small></span><strong class="mono">{{ formatCurrency(Math.abs(entry.amount)) }}</strong></div>
+            }
+          </div>
+        }
+
+        <div class="expense-breakdown__fixed-section expense-breakdown__fixed-section--forecast">
+          <div class="expense-breakdown__section-heading"><span><strong>Previstos · descontados da sobra estimada</strong><small>Ainda não foram lançados neste mês; não fazem parte do total gasto por você.</small></span><strong class="mono">{{ formatCurrency(upcomingFixedTotal()) }}</strong></div>
+          @for (template of upcomingFixedTemplates(); track template.id) {
+            <div class="expense-breakdown__fixed-row"><span><strong>{{ template.description }}</strong><small>Dia {{ template.day_of_month }} · {{ template.payment_method === 'dinheiro' ? 'Dinheiro' : (template.credit_card_name ?? 'Cartão') }}</small></span><strong class="mono">{{ formatCurrency(template.amount) }}</strong></div>
+          } @empty {
+            <p class="expense-breakdown__empty">Nenhuma conta fixa prevista para este mês.</p>
+          }
+        </div>
+      }
+    </details>
+  </div>
+
+  <footer class="expense-composition__total">
+    <div><span>Total gasto por você</span><small>Sua parte nas faturas + gastos em dinheiro + sua parte em compras compartilhadas nos outros cartões.</small></div>
+    <strong class="mono">{{ formatSignedCurrency(consolidated().personal_cost ?? consolidated().total_expenses) }}</strong>
+  </footer>
+  @if (Math.abs(compositionDifference()) >= 0.01) {
+    <p class="expense-composition__warning" role="status">A composição detalhada difere do total pessoal em {{ formatCurrency(compositionDifference()) }}. Confira os períodos e lançamentos antes de usar a sobra estimada.</p>
+  }
+  @if ((consolidated().upcoming_fixed ?? 0) > 0) {
+    <p class="expense-composition__formula">Sobra estimada = receitas − total gasto por você − {{ formatCurrency(consolidated().upcoming_fixed ?? 0) }} em contas previstas ainda não lançadas.</p>
+  } @else {
+    <p class="expense-composition__formula">Sobra estimada = receitas − total gasto por você.</p>
+  }
+</section>
+
+<!-- Ritmo anual com receita, despesas e saldo dos lançamentos por mês -->
 <article class="card rhythm-card">
   <div class="card__header">
     <div>
       <h2 class="card__title">Ritmo do ano</h2>
-      <p class="card__subtitle">Despesas por mês · {{ currentYear }}</p>
+      <p class="card__subtitle">Receitas, despesas e saldo após lançamentos · {{ currentYear }}</p>
+    </div>
+    <div class="rhythm-legend" aria-label="Legenda do gráfico">
+      <span><i class="rhythm-legend__income"></i>Receita</span>
+      <span><i class="rhythm-legend__expense"></i>Despesas</span>
+      <span><i class="rhythm-legend__balance"></i>Saldo</span>
     </div>
   </div>
   @if (recentYearMonths().length > 0) {
-    <div class="rhythm-bars" role="img" aria-label="Despesas dos últimos meses do ano">
-      @for (month of recentYearMonths(); track month.month) {
-        <div class="rhythm-bars__item">
-          <div class="rhythm-bars__track">
-            <span class="rhythm-bars__bar" [class.rhythm-bars__bar--current]="month.month === filterMonth()" [style.height.%]="monthlyExpensePct(month.expenses)" [attr.title]="formatCurrency(month.expenses)"></span>
-          </div>
-          <span class="rhythm-bars__label">{{ month.month_name.slice(0, 3).toLowerCase() }}</span>
+    <div class="rhythm-chart-scroll">
+      <div class="rhythm-chart-layout">
+        <div class="rhythm-chart__zero-axis" aria-hidden="true"><span>R$ 0</span></div>
+        <div class="rhythm-chart" role="list" aria-label="Receita, despesas e saldo mensal">
+          @for (month of recentYearMonths(); track month.month) {
+            <div class="rhythm-chart__month" role="listitem">
+              <div class="rhythm-chart__columns">
+                <span class="rhythm-chart__zero-line" aria-hidden="true"></span>
+                <div class="rhythm-chart__column rhythm-chart__column--income" [style.--bar-height]="monthlyValuePct(month.income) + '%'" [attr.title]="'Receita ' + formatCurrency(month.income)">
+                  <span class="rhythm-chart__value">{{ formatCurrency(month.income) }}</span>
+                  <span class="rhythm-chart__bar"></span>
+                </div>
+                <div class="rhythm-chart__column rhythm-chart__column--expense" [class.rhythm-chart__column--negative]="month.expenses < 0" [style.--bar-height]="monthlyValuePct(month.expenses) + '%'" [attr.title]="'Despesas ' + formatSignedCurrency(month.expenses)">
+                  <span class="rhythm-chart__value">{{ formatSignedCurrency(month.expenses) }}</span>
+                  <span class="rhythm-chart__bar"></span>
+                </div>
+                <div class="rhythm-chart__column rhythm-chart__column--balance" [class.rhythm-chart__column--negative]="month.balance < 0" [style.--bar-height]="monthlyValuePct(month.balance) + '%'" [attr.title]="'Saldo ' + (month.balance < 0 ? '-' : '') + formatCurrency(month.balance)">
+                  <span class="rhythm-chart__value">{{ formatSignedCurrency(month.balance) }}</span>
+                  <span class="rhythm-chart__bar"></span>
+                </div>
+              </div>
+              <span class="rhythm-chart__label">{{ month.month_name.slice(0, 3).toLowerCase() }}</span>
+            </div>
+          }
         </div>
-      }
+      </div>
     </div>
   } @else {
     <p class="empty-msg">Ainda não há despesas neste ano.</p>
   }
 </article>
-
-<div class="prototype-home-grid">
-<!-- Faturas do ciclo que fecha no mês selecionado -->
-<div class="card invoices-card" style="margin-bottom: var(--space-base)">
-  <div class="card__header">
-    <div class="card__header-title">
-      <span class="card__icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
-      </span>
-      <div>
-        <span class="card__title">Faturas do ciclo</span>
-        <p class="card__subtitle">Início, fechamento e vencimento de cada cartão</p>
-      </div>
-    </div>
-    <a routerLink="/cards" class="card__link">Ver todos os cartões &rsaquo;</a>
-  </div>
-  <div class="card__body">
-    @if (openInvoices().length === 0) {
-      <p class="empty-msg">Nenhum cartão cadastrado. <a routerLink="/cards/new" class="btn-link">Cadastrar cartão</a></p>
-    }
-    @for (inv of openInvoices(); track inv.card_id) {
-      <a [routerLink]="['/cards', inv.card_id, 'expenses']" class="invoice-row">
-        <div class="invoice-row__top">
-          <div class="invoice-row__icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
-          </div>
-          <div class="invoice-row__info">
-            <p class="invoice-row__name">{{ inv.card_name }}</p>
-            <p class="invoice-row__meta">
-              •••• {{ inv.last_four_digits }} · ciclo: {{ cycleRange(inv) }} · vence {{ ddmm(inv.due_date) }}
-              @if (inv.shared_groups.length > 0) {
-                · {{ inv.shared_groups.length }} {{ inv.shared_groups.length === 1 ? 'grupo compartilhado' : 'grupos compartilhados' }}
-              } @else {
-                · só individual
-              }
-            </p>
-          </div>
-          <span class="badge" [class]="daysClass(inv.days_to_close)">{{ daysLabel(inv.days_to_close) }}</span>
-          <p class="invoice-row__total mono">{{ formatCurrency(inv.total) }}</p>
-        </div>
-        <div class="split-bar" role="img" [attr.aria-label]="'Individual ' + individualPct(inv) + '%'">
-          <span class="split-bar__ind" [style.width.%]="individualPct(inv)"></span>
-          @if (inv.shared_gross_total > 0) { <span class="split-bar__shared"></span> }
-        </div>
-        <p class="invoice-row__legend">
-          <span class="dot dot--blue"></span>Individual <span class="mono">{{ formatCurrency(inv.expenses_total) }}</span>
-          @if (inv.shared_gross_total > 0) {
-            <span class="invoice-row__legend-sep">·</span>
-            <span class="dot dot--green"></span>Compartilhado <span class="mono">{{ formatCurrency(inv.shared_gross_total) }}</span>
-            <span class="text-muted">(sua parte {{ formatCurrency(inv.shared_total) }})</span>
-          } @else {
-            <span class="invoice-row__legend-sep">·</span><span class="text-muted">Sem gastos compartilhados</span>
-          }
-        </p>
-      </a>
-    }
-    @if (openInvoices().length > 0) {
-      <div class="invoice-total-row">
-        <span>Total em Faturas</span>
-        <strong class="mono value--down">{{ formatCurrency(totalInvoices()) }}</strong>
-      </div>
-    }
-  </div>
-</div>
-
-  <!-- Últimos Lançamentos -->
-  <div class="card">
-    <div class="card__header">
-      <div class="card__header-title">
-        <span class="card__icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        </span>
-        <span class="card__title">Últimos Lançamentos</span>
-      </div>
-      <a routerLink="/history" class="card__link">Ver Extrato</a>
-    </div>
-    <div class="card__body">
-      @if (expenses().length === 0 && !tableLoading()) {
-        <p class="empty-msg">Nenhum lançamento neste mês.</p>
-      }
-      @for (exp of expenses().slice(0, 5); track exp.id) {
-        <div class="expense-item">
-          <div class="expense-item__icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
-          </div>
-          <div class="expense-item__info">
-            <p class="expense-item__desc">{{ exp.description }}</p>
-            <p class="expense-item__meta">
-              {{ expenseCategoryName(exp) }}
-            </p>
-          </div>
-          <div class="expense-item__right">
-            <span class="expense-item__date text-muted">{{ exp.date | slice:8:10 }}/{{ exp.date | slice:5:7 }}</span>
-            <span class="expense-item__amount mono" [class.value-up]="exp.amount > 0" [class.value-down]="exp.amount < 0">
-              {{ amountPrefix(exp.amount) }}{{ formatCurrency(exp.amount) }}
-            </span>
-          </div>
-        </div>
-      }
-    </div>
-  </div>
-
-
-</div>
-
-<!-- ?? 2-Column Grid Row 1 (Gastos Fixos & Gastos Compartilhados) ?? -->
-<div class="grid-2col">
-  <!-- Gastos Fixos -->
-  <div class="card">
-    <div class="card__header">
-      <div class="card__header-title">
-        <span class="card__icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-        </span>
-        <span class="card__title">Compromissos fixos do mês</span>
-      </div>
-      <a routerLink="/recurring-expenses" class="card__link">Gerenciar &rsaquo;</a>
-    </div>
-    <div class="card__body">
-      @if (activeRecurring().length === 0) {
-        <p class="empty-msg">Nenhum gasto fixo ativo. <a routerLink="/recurring-expenses" class="btn-link">Cadastrar agora</a></p>
-      }
-      @for (t of activeRecurring().slice(0, 5); track t.id) {
-        <div class="list-row">
-          <div class="list-row__icon">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-          </div>
-          <div class="list-row__info">
-            <p class="list-row__title">{{ t.description }}</p>
-            <p class="list-row__sub">{{ recurringMeta(t) }} · compromisso previsto para este mês</p>
-          </div>
-          <span class="list-row__value mono">{{ formatCurrency(+t.amount) }}</span>
-        </div>
-      }
-      @if (activeRecurring().length > 0) {
-        <div class="invoice-total-row">
-          <span>Total mensal · {{ activeRecurring().length }} {{ activeRecurring().length === 1 ? 'ativo' : 'ativos' }}</span>
-          <strong class="mono">{{ formatCurrency(totalRecurringMonthly()) }}</strong>
-        </div>
-      }
-    </div>
-  </div>
-
-  <!-- Gastos Compartilhados: por grupo, sua parte e em qual cartão caiu -->
-  <div class="card">
-    <div class="card__header">
-      <div class="card__header-title">
-        <span class="card__icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        </span>
-        <div>
-          <span class="card__title">Gastos Compartilhados</span>
-          <p class="card__subtitle">Por grupo: total, sua parte e em qual cartão caiu</p>
-        </div>
-      </div>
-      <a routerLink="/shared-debts" class="card__link">Ver grupos &rsaquo;</a>
-    </div>
-    <div class="card__body">
-      @if (sharedDebts().length === 0) {
-        <p class="empty-msg">Nenhum gasto compartilhado ativo.</p>
-      }
-      @for (group of sharedDebts().slice(0, 3); track group.id) {
-        <a [routerLink]="['/shared-debts', group.id]" class="group-item">
-          <div class="group-item__top">
-            <div class="group-item__avatar">{{ group.name.substring(0, 2).toUpperCase() }}</div>
-            <div class="group-item__info">
-              <p class="group-item__name">{{ group.name }}</p>
-              <p class="group-item__sub">Total do grupo <span class="mono">{{ formatCurrency(group.total_amount) }}</span></p>
-            </div>
-            <div class="group-item__portion">
-              <span class="group-item__portion-label">Sua parte</span>
-              <span class="group-item__portion-value mono">{{ formatCurrency(group.my_portion) }}</span>
-            </div>
-          </div>
-          @for (c of cardsForGroup(group.id); track c.label) {
-            <p class="group-item__card"><span class="dot dot--green"></span>Caiu no {{ c.label }} · <span class="mono">{{ formatCurrency(c.total) }}</span> nesta fatura</p>
-          } @empty {
-            <p class="group-item__card group-item__card--none">Nenhum lançamento em fatura aberta</p>
-          }
-        </a>
-      }
-      @if (sharedDebts().length > 0) {
-        <div class="invoice-total-row">
-          <span>Sua parte compartilhada · cartões no ciclo, dinheiro no mês</span>
-          <strong class="mono text-blue">{{ formatCurrency(consolidated().shared_my_portion) }}</strong>
-        </div>
-      }
-    </div>
-  </div>
-</div>
-
-<!-- ?? 2-Column Grid Row 2 (Parcelamentos Ativos & Gastos por Categoria) ?? -->
-<div class="grid-2col">
-  <!-- Parcelamentos Ativos -->
-  <div class="card">
-    <div class="card__header">
-      <div class="card__header-title">
-        <span class="card__icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
-        </span>
-        <span class="card__title">Parcelamentos Ativos</span>
-      </div>
-      <a routerLink="/installments" class="card__link">Ver Todos</a>
-    </div>
-    <div class="card__body">
-      @if (activeInstallments().length === 0) {
-        <p class="empty-msg">Nenhum parcelamento ativo.</p>
-      }
-      @for (g of activeInstallments(); track g.name) {
-        <div class="installment-item">
-          <div class="installment-item__info">
-            <p class="installment-item__name">{{ g.name }}</p>
-            <span class="installment-item__sub">Ciclo fechado {{ g.closedInstallments }}/{{ g.totalInstallments }}</span>
-            <div class="installment-item__progress-wrap">
-              <div class="installment-item__progress-bar">
-                <div class="installment-item__progress-fill" [style.width]="progressPct(g) + '%'"></div>
-              </div>
-            </div>
-          </div>
-          <div class="installment-item__value">
-            <p class="installment-item__amount mono">{{ formatCurrency(g.amountPerInstallment) }}/mês</p>
-          </div>
-        </div>
-      }
-    </div>
-  </div>
-
-  <!-- Gastos por Categoria -->
-  <div class="card category-card">
-    <div class="card__header">
-      <div class="card__header-title">
-        <span class="card__icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
-        </span>
-        <span class="card__title">Gastos por Categoria</span>
-      </div>
-      <a routerLink="/analytics" class="card__link">Ver Gráfico</a>
-    </div>
-    <div class="card__body">
-      <div class="category-card__list" role="region" aria-label="Gastos por categoria" tabindex="0">
-        @if (byCategory().length === 0) {
-          <p class="empty-msg">Nenhum gasto categorizado.</p>
-        }
-        @for (cat of byCategory().slice(0, 6); track cat.category_id) {
-          <div class="cat-item">
-            <span class="cat-item__label">{{ cat.category_name }}</span>
-            <div class="cat-item__bar-wrap">
-              <div class="cat-item__bar" [style.width]="categoryBarWidth(cat.total)"></div>
-            </div>
-            <span class="cat-item__value mono">{{ formatCurrency(cat.total) }}</span>
-          </div>
-        }
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Gráfico detalhado já disponível no app -->
-<div class="grid-2col grid-2col--single">
-  <!-- Evolução Mensal (D3 Charts: lineChartEl & compChartEl) —— -->
-  <div class="card">
-    <div class="card__header">
-      <div class="card__header-title">
-        <span class="card__icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-        </span>
-        <span class="card__title">Evolução Mensal — {{ currentYear }}</span>
-      </div>
-      <div class="chart-legend">
-        <span class="chart-legend__dot chart-legend__dot--green"></span> Receita
-        <span class="chart-legend__dot chart-legend__dot--red"></span> Despesa
-      </div>
-    </div>
-    <div class="card__body">
-      <div #lineChartEl class="d3-chart-container" style="height: 220px"></div>
-      <div #compChartEl class="d3-chart-container" style="display: none"></div>
-    </div>
-  </div>
-</div>
-
-@if (chartTooltip(); as t) {
-  <div class="chart-tooltip" [style.left.px]="t.cx" [style.top.px]="t.cy">
-    <strong>{{ t.month }}</strong><br/>
-    <span style="color:#16a34a">Receita: {{ formatCurrency(t.income) }}</span><br/>
-    <span style="color:#ef4444">Despesa: {{ formatCurrency(t.expense) }}</span>
-  </div>
-}

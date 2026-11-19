@@ -56,8 +56,6 @@ class CreateSharedEntryInputSerializer(serializers.Serializer):
         default=False,
         help_text='Indica se a despesa ja foi paga/quitada.',
     )
-
-
 class SharedEntryCreateInputSerializer(CreateSharedEntryInputSerializer):
     shared_debt = serializers.IntegerField(required=True, min_value=1)
 

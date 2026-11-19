@@ -25,8 +25,15 @@ export class D3ChartService {
 
     const x0 = d3.scaleBand().domain(data.map(d => d.label)).range([0, w]).padding(0.25);
     const x1 = d3.scaleBand().domain(['income', 'expenses']).range([0, x0.bandwidth()]).padding(0.05);
-    const maxY = d3.max(data, d => Math.max(d.income, d.expenses)) ?? 0;
-    const y = d3.scaleLinear().domain([0, maxY * 1.1]).range([h, 0]);
+    const balanceData = data.map(d => ({ label: d.label, balance: d.income - d.expenses }));
+    const minBalance = d3.min(balanceData, d => d.balance) ?? 0;
+    const minValue = d3.min(data, d => Math.min(d.income, d.expenses)) ?? 0;
+    const maxValue = d3.max(data, d => Math.max(d.income, d.expenses)) ?? 0;
+    const maxBalance = d3.max(balanceData, d => d.balance) ?? 0;
+    const y = d3.scaleLinear()
+      .domain([Math.min(0, minBalance, minValue) * 1.1, Math.max(0, maxValue, maxBalance) * 1.1 || 1])
+      .range([h, 0]);
+    const zeroY = y(0);
 
     // Gridlines
     svg.append('g').attr('class', 'grid')
@@ -36,38 +43,32 @@ export class D3ChartService {
     // Income bars
     svg.selectAll('.bar-income').data(data).enter().append('rect')
       .attr('x', d => (x0(d.label) ?? 0) + (x1('income') ?? 0))
-      .attr('y', d => y(d.income))
+      .attr('y', d => y(Math.max(0, d.income)))
       .attr('width', x1.bandwidth())
-      .attr('height', d => h - y(d.income))
+      .attr('height', d => Math.abs(zeroY - y(d.income)))
       .attr('fill', '#05b169').attr('rx', 3)
       .append('title').text(d => `Receita: ${FMT2.format(d.income)}`);
 
     // Expense bars
     svg.selectAll('.bar-exp').data(data).enter().append('rect')
       .attr('x', d => (x0(d.label) ?? 0) + (x1('expenses') ?? 0))
-      .attr('y', d => y(d.expenses))
+      .attr('y', d => y(Math.max(0, d.expenses)))
       .attr('width', x1.bandwidth())
-      .attr('height', d => h - y(d.expenses))
+      .attr('height', d => Math.abs(zeroY - y(d.expenses)))
       .attr('fill', '#cf202f').attr('rx', 3)
       .append('title').text(d => `Despesa: ${FMT2.format(d.expenses)}`);
 
-    // Balance area
-    const balanceData = data.map(d => ({ label: d.label, balance: d.income - d.expenses }));
-    const minBal = d3.min(balanceData, d => d.balance) ?? 0;
-    const maxBal = d3.max(balanceData, d => d.balance) ?? 0;
-    if (maxBal !== minBal) {
-      const yBal = d3.scaleLinear().domain([Math.min(0, minBal) * 1.2, Math.max(0, maxBal) * 1.2]).range([h, 0]);
+    if (d3.min(balanceData, d => d.balance) !== d3.max(balanceData, d => d.balance)) {
       const line = d3.line<{ label: string; balance: number }>()
         .x(d => (x0(d.label) ?? 0) + x0.bandwidth() / 2)
-        .y(d => yBal(d.balance))
+        .y(d => y(d.balance))
         .curve(d3.curveMonotoneX);
       svg.append('path').datum(balanceData).attr('fill', 'none')
         .attr('stroke', '#f4b000').attr('stroke-width', 2).attr('stroke-dasharray', '4,2')
         .attr('d', line);
-      // Dots
       svg.selectAll('.bal-dot').data(balanceData).enter().append('circle')
         .attr('cx', d => (x0(d.label) ?? 0) + x0.bandwidth() / 2)
-        .attr('cy', d => yBal(d.balance))
+        .attr('cy', d => y(d.balance))
         .attr('r', 3).attr('fill', '#f4b000')
         .append('title').text(d => `Saldo: ${FMT2.format(d.balance)}`);
     }

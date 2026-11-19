@@ -380,10 +380,9 @@ class ExpenseAnalyticsBehavior:
             .annotate(month_num=ExtractMonth('date'))
             .values('month_num')
             .annotate(
-                income=Sum('amount', filter=Q(amount__gt=0)),
-                expenses_total=Sum(Abs('amount'), filter=Q(amount__lt=0)),
+                income=Sum('amount', filter=Q(amount__gt=0, payment_method='dinheiro')),
                 cash_total=Sum(Abs('amount'), filter=Q(amount__lt=0, payment_method='dinheiro')),
-                card_total=Sum(Abs('amount'), filter=Q(amount__lt=0, payment_method='cartao')),
+                card_total=Sum('amount', filter=Q(payment_method='cartao')),
                 count=Count('id'),
             )
             .order_by('month_num')
@@ -401,18 +400,23 @@ class ExpenseAnalyticsBehavior:
             .prefetch_related('participants')
             .distinct()
         )
-        shared_by_month: dict[int, float] = {}
+        shared_by_month: dict[int, Decimal] = {}
         for entry in shared_entries:
             m = entry.date.month
-            shared_by_month[m] = shared_by_month.get(m, 0.0) + float(entry.share_per_participant())
+            shares = entry.shares_by_participant()
+            tenant_share = sum(
+                (abs(shares.get(member_id, Decimal('0'))) for member_id in my_member_ids),
+                Decimal('0'),
+            )
+            shared_by_month[m] = shared_by_month.get(m, Decimal('0')) + tenant_share
 
         result = []
         for m in range(1, 13):
             row = month_map.get(m, {})
             income        = float(row.get('income') or 0)
             cash_exp      = float(row.get('cash_total') or 0)
-            card_exp      = float(row.get('card_total') or 0)
-            shared_exp    = round(shared_by_month.get(m, 0.0), 2)
+            card_exp      = -float(row.get('card_total') or 0)
+            shared_exp    = to_float(shared_by_month.get(m, Decimal('0')))
             total_exp     = round(cash_exp + card_exp + shared_exp, 2)
             result.append({
                 'month':            m,
@@ -602,8 +606,8 @@ class ExpenseAnalyticsBehavior:
         )
 
         income_agg = base_qs.aggregate(
-            income=Sum('amount', filter=Q(amount__gt=0)),
-            income_count=Count('id', filter=Q(amount__gt=0)),
+            income=Sum('amount', filter=Q(amount__gt=0, payment_method='dinheiro')),
+            income_count=Count('id', filter=Q(amount__gt=0, payment_method='dinheiro')),
         )
         income = to_float(income_agg['income'])
 
@@ -638,9 +642,9 @@ class ExpenseAnalyticsBehavior:
                     date__gte=period_start,
                     date__lte=period_end,
                 )
-                .aggregate(total=Sum(Abs('amount')), count=Count('id'))
+                .aggregate(total=Sum('amount'), count=Count('id'))
             )
-            total = to_float(agg['total'])
+            total = round(-to_float(agg['total']), 2)
             cnt   = agg['count'] or 0
             card_invoices_total += total
             card_invoices_count += cnt
@@ -687,6 +691,7 @@ class ExpenseAnalyticsBehavior:
             invoice_periods[card.id] = compute_invoice_period(card, inv_month, inv_year)[:2]
 
         shared_my_portion = Decimal('0')
+        shared_cash_portion = Decimal('0')
         shared_count = 0
         for entry in entries_qs:
             if entry.payment_method == 'dinheiro':
@@ -697,10 +702,13 @@ class ExpenseAnalyticsBehavior:
             if not included:
                 continue
             shares = entry.shares_by_participant()
-            shared_my_portion += sum(
+            my_portion = sum(
                 (shares.get(member_id, Decimal('0')) for member_id in my_member_ids),
                 Decimal('0'),
             )
+            shared_my_portion += my_portion
+            if entry.payment_method == 'dinheiro':
+                shared_cash_portion += my_portion
             shared_count += 1
 
         shared_my_portion = to_float(shared_my_portion)
@@ -718,6 +726,7 @@ class ExpenseAnalyticsBehavior:
             'card_invoices_count':  card_invoices_count,
             'card_invoices_detail': card_invoices_detail,
             'shared_my_portion': shared_my_portion,
+            'shared_cash_portion': to_float(shared_cash_portion),
             'shared_count':      shared_count,
             'total_expenses': total_expenses,
             'balance':        balance,
@@ -806,7 +815,7 @@ class ExpenseAnalyticsBehavior:
         ]
 
         agg = base_qs.aggregate(
-            income=Sum('amount', filter=Q(amount__gt=0)),
+            income=Sum('amount', filter=Q(amount__gt=0, payment_method='dinheiro')),
             expenses=Sum(Abs('amount'), filter=Q(amount__lt=0)),
             count=Count('id'),
         )
@@ -1206,6 +1215,7 @@ class ExpenseHistoryBehavior:
             'total_installments': None,
             'is_recurrent': expense.is_recurrent,
             'is_recurring': expense.is_recurrent,
+            'recurring_template_id': expense.recurring_template_id,
         } for expense in expenses]
 
     def _shared_rows(self, entries, member_ids):
@@ -1320,10 +1330,11 @@ class BulkExpenseCategoryBehavior:
         ).first()
         if category is None:
             return Response({'detail': 'Categoria não encontrada.'}, status=404)
-        invalid_kind = expenses.filter(
-            (Q(amount__gte=0) & ~Q(category__kind='receita')) |
-            Q(amount__lt=0, category__kind='receita')
-        ).exists()
+        invalid_kind = (
+            category.kind == 'receita' and expenses.filter(amount__lt=0).exists()
+        ) or (
+            category.kind == 'despesa' and expenses.filter(amount__gte=0).exists()
+        )
         if invalid_kind:
             return Response(
                 {'detail': 'A categoria deve corresponder ao tipo de receita ou despesa.'},

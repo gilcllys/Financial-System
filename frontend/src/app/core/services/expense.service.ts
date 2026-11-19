@@ -51,6 +51,7 @@ export interface HistoryEntry {
   own_portion?: number;
   is_recurrent?: boolean;
   is_recurring: boolean;
+  recurring_template_id?: number | null;
 }
 
 export interface HistoryTotals {
@@ -101,6 +102,20 @@ export class ExpenseService {
       if (value !== undefined && value !== null && value !== '') params = params.set(key, String(value));
     }
     return this.http.get<HistoryResponse>(`${this.base}/history/`, { params });
+  }
+
+  historyAll(filters: Record<string, string | number | boolean | null | undefined> = {}): Observable<HistoryEntry[]> {
+    const pageSize = 100;
+    return this.history({ ...filters, page: 1, page_size: pageSize }).pipe(
+      switchMap(first => {
+        const pageCount = Math.ceil(first.count / pageSize);
+        if (pageCount <= 1) return of(first.results);
+        const requests = Array.from({ length: pageCount - 1 }, (_, index) =>
+          this.history({ ...filters, page: index + 2, page_size: pageSize })
+        );
+        return forkJoin(requests).pipe(map(pages => [first, ...pages].flatMap(page => page.results)));
+      })
+    );
   }
 
   downloadHistoryCsv(filters: Record<string, string | number | boolean | null | undefined> = {}): Observable<Blob> {

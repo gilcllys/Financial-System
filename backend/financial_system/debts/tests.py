@@ -1059,11 +1059,11 @@ class ByPersonBehaviorTests(TestCase):
         self.nubank = CreditCard.objects.create(tenant_id=GIL, name='Nubank', closing_day=21, due_day=25, last_four_digits='1234')
         self.inter = CreditCard.objects.create(tenant_id=VI, name='Inter', closing_day=24, due_day=5, last_four_digits='9012')
 
-    def _entry(self, desc, amount, day, paid_by, card=None, parts=None, month=9):
+    def _entry(self, desc, amount, day, paid_by, card=None, parts=None, month=9, created_by=None):
         e = SharedEntry.objects.create(
             shared_debt=self.group, paid_by=paid_by, description=desc, amount=Decimal(amount),
             date=date(2026, month, day), payment_method='cartao' if card else 'dinheiro',
-            credit_card=card, created_by_tenant_id=paid_by.tenant_id,
+            credit_card=card, created_by_tenant_id=(created_by or paid_by).tenant_id,
         )
         for m in (parts or [self.gil, self.vi]):
             SharedEntryParticipant.objects.create(entry=e, member=m)
@@ -1137,12 +1137,24 @@ class ByPersonBehaviorTests(TestCase):
 
         self.assertEqual(cash['total'], 80.00)
 
+    def test_cash_entries_identify_creator_payer_and_each_person_share(self):
+        self._entry('Feira', '80.00', 14, self.gil, created_by=self.vi)
+
+        cash = self._block(self._run(), 'cash')
+        entry = cash['entries'][0]
+
+        self.assertEqual(entry['created_by_name'], 'Vitória')
+        self.assertEqual(entry['paid_by_name'], 'Gil')
+        self.assertEqual(entry['shares'], {self.gil.id: 40.00, self.vi.id: 40.00})
+
     # ── open ────────────────────────────────────────────────────────────────
-    def test_open_shows_current_invoice_with_empty_state_and_no_cash(self):
+    def test_open_includes_cash_paid_this_month_in_settlement(self):
         self._entry('Uber', '45.00', 28, self.gil, self.nubank)   # 28/09: fatura aberta 22/09–21/10
         self._entry('Mercado antigo', '200.00', 12, self.gil, self.nubank)  # já fechou: fora
         self._entry('Móveis', '400.00', 2, self.vi, self.inter)  # garante que o Inter é um cartão "usado"
-        self._entry('Feira', '80.00', 14, self.vi)                # dinheiro: não aparece em open
+        self._entry('Feira', '80.00', 14, self.vi)                # dinheiro pago este mês
+        self._entry('Feira futura', '30.00', 29, self.vi)         # ainda não pago
+        self._entry('Feira anterior', '20.00', 14, self.vi, month=8)
 
         data = self._run(mode='open')
         nb = self._block(data, 'card', self.nubank)
@@ -1154,8 +1166,15 @@ class ByPersonBehaviorTests(TestCase):
         self.assertEqual(nb['total'], 45.00)
         self.assertEqual(it['total'], 0.0)
         self.assertEqual(it['entries'], [])
-        self.assertFalse(any(b['kind'] == 'cash' for b in data['blocks']))
-        self.assertEqual(data['totals']['balance'], {self.gil.id: 22.50, self.vi.id: -22.50})
+        cash = self._block(data, 'cash')
+        self.assertEqual(cash['total'], 80.00)
+        self.assertEqual(cash['shares'], {self.gil.id: 40.00, self.vi.id: 40.00})
+        self.assertEqual([e['description'] for e in cash['entries']], ['Feira'])
+        self.assertEqual(data['totals']['balance'], {self.gil.id: -17.50, self.vi.id: 17.50})
+        self.assertEqual(data['settlement'], [
+            {'from_member_id': self.gil.id, 'from_name': 'Gil', 'to_member_id': self.vi.id,
+             'to_name': 'Vitória', 'amount': 17.50},
+        ])
         self.assertEqual(data['next_closing']['card_name'], 'Nubank')
         self.assertEqual(data['next_closing']['date'], '2026-10-21')
 
