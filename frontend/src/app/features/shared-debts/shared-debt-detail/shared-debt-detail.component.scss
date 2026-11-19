@@ -307,6 +307,8 @@
 .installment-panel__heading h2 { margin: 0; color: var(--color-ink); font-size: 16px; }
 .installment-panel__heading p { margin: 4px 0 0; color: var(--color-muted); font-size: 12px; }
 .installment-groups { display: flex; flex-direction: column; gap: 12px; }
+.inst-card__actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.inst-card__actions .btn-danger { padding: 5px 12px; }
 
 .inst-card {
   background: var(--color-canvas); border-radius: 14px;

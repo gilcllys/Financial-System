@@ -342,10 +342,19 @@
                     </tbody>
                   </table>
                 </div>
-                <button class="btn-ghost" style="margin-top:8px" type="button" (click)="grp.expanded = false">&#9650; Ocultar parcelas</button>
-              } @else {
-                <button class="btn-ghost" style="margin-top:8px" type="button" (click)="grp.expanded = true">+ Ver parcelas</button>
               }
+              <div class="inst-card__actions">
+                <button class="btn-ghost" type="button" (click)="grp.expanded = !grp.expanded">
+                  {{ grp.expanded ? '▲ Ocultar parcelas' : '+ Ver parcelas' }}
+                </button>
+                @if (grp.installmentGroupId) {
+                  <button class="btn-danger" type="button" (click)="deleteInstallmentGroup(grp)"
+                    [disabled]="deletingInstallmentGroupId() === grp.installmentGroupId"
+                    [attr.aria-label]="'Apagar parcelamento ' + grp.description">
+                    {{ deletingInstallmentGroupId() === grp.installmentGroupId ? 'Apagando…' : 'Apagar parcelamento' }}
+                  </button>
+                }
+              </div>
             </article>
           }
         </div>

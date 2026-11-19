@@ -151,6 +151,7 @@ export class SharedDebtDetailComponent implements OnInit {
   editingEntryId = signal<number | null>(null);
 
   deletingGroup = signal(false);
+  deletingInstallmentGroupId = signal<string | null>(null);
   monthlyHistory = signal<MonthlyHistoryEntry[]>([]);
   groupEntryCount = computed(() =>
     this.monthlyHistory().reduce((total, month) => total + month.entry_count, 0),
@@ -464,6 +465,32 @@ export class SharedDebtDetailComponent implements OnInit {
     });
   }
 
+  async deleteInstallmentGroup(group: {
+    installmentGroupId: string | null;
+    description: string;
+    total: number;
+  }): Promise<void> {
+    const installmentGroupId = group.installmentGroupId;
+    if (!installmentGroupId) return;
+    if (!(await this.confirmDialog.confirm(
+      `Apagar todas as ${group.total} parcelas de "${group.description}"? Os lançamentos e rateios serão removidos para todos os membros do grupo. Isso não cancela a cobrança junto ao cartão.`,
+      'Apagar parcelamento',
+    ))) return;
+
+    this.deletingInstallmentGroupId.set(installmentGroupId);
+    this.svc.deleteInstallments(installmentGroupId).subscribe({
+      next: response => {
+        this.deletingInstallmentGroupId.set(null);
+        this.toast.success(`Parcelamento apagado. ${response.deleted} parcelas removidas.`);
+        this.refreshEntriesAndBalances();
+      },
+      error: () => {
+        this.deletingInstallmentGroupId.set(null);
+        this.toast.error('Erro ao apagar parcelamento compartilhado.');
+      },
+    });
+  }
+
   // ── Group deletion (owner only) ─────────────────────────────────────────
   async deleteGroup(): Promise<void> {
     const name = this.group()?.name ?? 'este grupo';
@@ -645,6 +672,7 @@ export class SharedDebtDetailComponent implements OnInit {
 
       return {
         groupId,
+        installmentGroupId: first.installment_group_id ?? null,
         description,
         total,
         paid,
